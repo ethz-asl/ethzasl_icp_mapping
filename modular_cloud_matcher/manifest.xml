@@ -13,7 +13,6 @@
   <depend package="std_msgs"/>
   <depend package="geometry_msgs"/>
   <depend package="sensor_msgs"/>
-  <depend package="nodelet"/>
   <depend package="tf"/>
   <depend package="tf_conversions"/>
   <!--  <rosdep name="eigen2"/> -->

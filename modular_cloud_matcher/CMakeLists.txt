@@ -38,12 +38,11 @@ find_library(NABO_LIBRARY libnabo
 )
 
 # msa
-find_path(MSA_INCLUDE_DIR MetricSpaceAligner.h
+find_path(POINT_MATCHER_INCLUDE_DIR PointMatcher.h
 	/usr/local/include
 	/usr/include
-  ../icplib/
 )
-find_library(MSA_LIBRARY msa
+find_library(POINT_MATCHER_LIBRARY msa
 	/usr/local/lib
 	/usr/lib
 )
@@ -62,12 +61,12 @@ if (OPENCL_LIBRARIES)
 	set(EXTRA_LIBS ${OPENCL_LIBRARIES})
 endif (OPENCL_LIBRARIES)
 
-include_directories(${EIGEN2_INCLUDE_DIR} ${MSA_INCLUDE_DIR} ${NABO_INCLUDE_DIR} ../icplib)
+include_directories(${EIGEN2_INCLUDE_DIR} ${POINT_MATCHER_INCLUDE_DIR} ${NABO_INCLUDE_DIR} ../icplib)
 
 #common commands for building c++ executables and libraries
 #rosbuild_add_library(${PROJECT_NAME} src/example.cpp)
 #target_link_libraries(${PROJECT_NAME} another_library)
 rosbuild_add_boost_directories()
 #rosbuild_link_boost(${PROJECT_NAME} thread)
-rosbuild_add_executable(icpros src/icpros.cpp)
-target_link_libraries(icpros ${MSA_LIBRARY} ${NABO_LIBRARY} ${EXTRA_LIBS})
+rosbuild_add_executable(cloud_matcher_node src/modular_cloud_matcher.cpp)
+target_link_libraries(cloud_matcher_node ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY} ${EXTRA_LIBS})

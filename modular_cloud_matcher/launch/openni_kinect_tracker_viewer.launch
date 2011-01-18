@@ -1,0 +1,20 @@
+<launch>
+  
+  <include file="$(find modular_cloud_matcher)/launch/openni_kinect_sensor.launch" />
+  
+  <include file="$(find modular_cloud_matcher)/launch/openni_kinect_tracker.launch" />
+
+  <node name="point_cloud_converter" pkg="point_cloud_converter" type="point_cloud_converter">
+    <remap from="points2_in" to ="/camera/depth/points2"/>
+    <remap from="points_out" to ="/camera/depth/points"/>
+  </node>
+  
+  <node name="point_cloud_assembler" pkg="laser_assembler" type="point_cloud_assembler">
+    <remap from="cloud" to="/camera/depth/points"/>
+    <param name="max_clouds" type="int" value="150" />
+    <param name="fixed_frame" type="string" value="/world" />
+  </node>
+
+  <node name="periodic_snapshotter" pkg="laser_assembler" type="periodic_snapshotter"/>
+  <node name="rviz" pkg="rviz" type="rviz"/>
+</launch>

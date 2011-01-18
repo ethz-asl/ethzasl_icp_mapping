@@ -1,11 +1,11 @@
 #include <boost/format.hpp>
 
 #include "ros/ros.h"
-#include "icpros/MatchClouds.h"
+#include "modular_cloud_matcher/MatchClouds.h"
 #include "sensor_msgs/PointCloud.h"
 #include <tf/transform_broadcaster.h>
 #include <tf_conversions/tf_eigen.h>
-#include "../icplib/MetricSpaceAligner.h"
+#include "pointmatcher/PointMatcher.h"
 
 using namespace std;
 
@@ -52,12 +52,11 @@ protected:
 	CreatorMap creators;
 };
 
-
 template<typename T>
 T getParam(const string& name, const T& defaultValue)
 {
 	T v;
-	if (ros::param::get(name, v))
+	if (ros::param::get(string("~")+name, v))
 	{
 		ROS_INFO_STREAM("Found parameter: " << name << ", value: " << v);
 		return v;
@@ -69,6 +68,7 @@ T getParam(const string& name, const T& defaultValue)
 
 typedef double Scalar;
 typedef MetricSpaceAligner<Scalar> MSA;
+
 
 #define REG(name) (name##Registrar)
 #define DEF_REGISTRAR(name) Registrar< MSA::name > name##Registrar;
@@ -193,47 +193,47 @@ MSA::Strategy p;
 
 void buildStrategy()
 {
-	const int transformationCount(getParam<int>("msa/transformationCount", 1));
-	const int readingDataPointsFilterCount(getParam<int>("msa/readingDataPointsFilterCount", 1));
-	const int referenceDataPointsFilterCount(getParam<int>("msa/referenceDataPointsFilterCount", 1));
-	const int featureOutlierFilterCount(getParam<int>("msa/featureOutlierFilterCount", 1));
-	const int transformationCheckerCount(getParam<int>("msa/transformationCheckerCount", 1));
+	const int transformationCount(getParam<int>("transformationCount", 1));
+	const int readingDataPointsFilterCount(getParam<int>("readingDataPointsFilterCount", 1));
+	const int referenceDataPointsFilterCount(getParam<int>("referenceDataPointsFilterCount", 1));
+	const int featureOutlierFilterCount(getParam<int>("featureOutlierFilterCount", 1));
+	const int transformationCheckerCount(getParam<int>("transformationCheckerCount", 1));
 	
 	for (int i = 0; i < readingDataPointsFilterCount; ++i)
 	{
-		string root((boost::format("msa/readingDataPointsFilter/%1%") % i).str());
+		string root((boost::format("readingDataPointsFilter/%1%") % i).str());
 		p.readingDataPointsFilters.push_back(REG(DataPointsFilter).create(getParam<string>(root+"/name", "FixstepSamplingDataPointsFilter"), root + "/"));
 	}
 	for (int i = 0; i < referenceDataPointsFilterCount; ++i)
 	{
-		string root((boost::format("msa/referenceDataPointsFilter/%1%") % i).str());
+		string root((boost::format("referenceDataPointsFilter/%1%") % i).str());
 		p.referenceDataPointsFilters.push_back(REG(DataPointsFilter).create(getParam<string>(root+"/name", "SamplingSurfaceNormalDataPointsFilter"), root + "/"));
 	}
 	for (int i = 0; i < transformationCount; ++i)
 	{
-		string root((boost::format("msa/transformations/%1%") % i).str());
+		string root((boost::format("transformations/%1%") % i).str());
 		p.transformations.push_back(REG(Transformation).create(getParam<string>(root+"/name", "TransformFeatures"), root + "/"));
 	}
-	p.matcher = REG(Matcher).create(getParam<string>("msa/matcher/name", "KDTreeMatcher"), "msa/matcher/");
+	p.matcher = REG(Matcher).create(getParam<string>("matcher/name", "KDTreeMatcher"), "matcher/");
 	for (int i = 0; i < featureOutlierFilterCount; ++i)
 	{
-		string root((boost::format("msa/featureOutlierFilters/%1%") % i).str());
+		string root((boost::format("featureOutlierFilters/%1%") % i).str());
 		p.featureOutlierFilters.push_back(REG(FeatureOutlierFilter).create(getParam<string>(root+"/name", "MedianDistOutlierFilter"), root + "/"));
 	}
-	p.descriptorOutlierFilter = REG(DescriptorOutlierFilter).create(getParam<string>("msa/descriptorOutlierFilter/name", "NullDescriptorOutlierFilter"), "msa/descriptorOutlierFilter/");
-	p.errorMinimizer = REG(ErrorMinimizer).create(getParam<string>("msa/errorMinimizer/name", "PointToPlaneErrorMinimizer"), "msa/errorMinimizer/");
+	p.descriptorOutlierFilter = REG(DescriptorOutlierFilter).create(getParam<string>("descriptorOutlierFilter/name", "NullDescriptorOutlierFilter"), "descriptorOutlierFilter/");
+	p.errorMinimizer = REG(ErrorMinimizer).create(getParam<string>("errorMinimizer/name", "PointToPlaneErrorMinimizer"), "errorMinimizer/");
 	for (int i = 0; i < transformationCheckerCount; ++i)
 	{
-		string root((boost::format("msa/transformationCheckers/%1%") % i).str());
+		string root((boost::format("transformationCheckers/%1%") % i).str());
 		p.transformationCheckers.push_back(REG(TransformationChecker).create(getParam<string>(root+"/name", "ErrorTransformationChecker"), root + "/"));
 	}
-	p.inspector = REG(Inspector).create(getParam<string>("msa/inspector/name", "Inspector"), "msa/inspector");
-	//p.inspector = REG(Inspector).create(getParam<string>("msa/inspector", "VTKFileInspector"), "msa/inspector");
-	p.outlierMixingWeight = getParam<double>("msa/outlierMixingWeight", 1);
+	p.inspector = REG(Inspector).create(getParam<string>("inspector/name", "Inspector"), "inspector");
+	//p.inspector = REG(Inspector).create(getParam<string>("inspector", "VTKFileInspector"), "inspector");
+	p.outlierMixingWeight = getParam<double>("outlierMixingWeight", 1);
 }
 
-bool matchClouds(icpros::MatchClouds::Request& req,
-				 icpros::MatchClouds::Response& res)
+bool matchClouds(modular_cloud_matcher::MatchClouds::Request& req,
+				 modular_cloud_matcher::MatchClouds::Response& res)
 {
 	//ros::param::param("featureTransformation", default_param, "default_value");
 	
@@ -298,7 +298,7 @@ static string sensorFrame;
 
 void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 {
-	// FIXME: investigation trash
+	// FIXME: investigate broken cloud on first call!
 	cnt++;
 	if (cnt == 1)
 		return;
@@ -364,11 +364,11 @@ void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 		/*
 		NOTE: For using the keyframe mode, you have to removed the outlier
 		based on distance. This could be a typical configuration for this:
-		<param name="msa/featureOutlierFilterCount" value="2" />
-		<param name="msa/featureOutlierFilters/0/name" value="MaxDistOutlierFilter" />
-		<param name="msa/featureOutlierFilters/0/maxDist" value=".3" />
-		<param name="msa/featureOutlierFilters/1/name" value="MedianDistOutlierFilter" />
-		<param name="msa/featureOutlierFilters/1/factor" value="4" />
+		<param name="featureOutlierFilterCount" value="2" />
+		<param name="featureOutlierFilters/0/name" value="MaxDistOutlierFilter" />
+		<param name="featureOutlierFilters/0/maxDist" value=".3" />
+		<param name="featureOutlierFilters/1/name" value="MedianDistOutlierFilter" />
+		<param name="featureOutlierFilters/1/factor" value="4" />
 		*/
 		if (p.errorMinimizer->getWeightedPointUsedRatio() < ratioToSwitchKeyframe)
 		{
@@ -455,24 +455,24 @@ int main(int argc, char **argv)
 	ADD_TO_REGISTRAR(Inspector, Inspector)
 	ADD_CUSTOM_TO_REGISTRAR(Inspector, VTKFileInspector, createVTKFileInspector)
 	
-	ros::init(argc, argv, "msa");
+	ros::init(argc, argv, "cloud_matcher");
 	ros::NodeHandle n;
 	
 	buildStrategy();
 	
 	if (argc > 1 && (strcmp(argv[1], "-topic") == 0))
 	{
-		string cloudTopic(getParam<string>("msa/cloudTopic", "/camera/depth/points"));
+		string cloudTopic(getParam<string>("cloudTopic", "/camera/depth/points"));
 		ros::Subscriber sub = n.subscribe(cloudTopic, 1, gotCloud);
-		ratioToSwitchKeyframe = getParam("msa/ratioToSwitchKeyframe", 0.8);
-		maxSensorDist = getParam("msa/maxSensorDist", 2);
-		fixedFrame = getParam<string>("msa/fixedFrame",  "/world");
-		sensorFrame = getParam<string>("msa/sensorFrame",  "/openni_rgb_optical_frame");
+		ratioToSwitchKeyframe = getParam("ratioToSwitchKeyframe", 0.8);
+		maxSensorDist = getParam("maxSensorDist", 2);
+		fixedFrame = getParam<string>("fixedFrame",  "/world");
+		sensorFrame = getParam<string>("sensorFrame",  "/openni_rgb_optical_frame");
 		ros::spin();
 	}
 	else
 	{
-		ros::ServiceServer service = n.advertiseService("msa/matchClouds", matchClouds);
+		ros::ServiceServer service = n.advertiseService("matchClouds", matchClouds);
 		ros::spin();
 	}
 	

@@ -1,0 +1,36 @@
+<launch>
+  <node name="modular_cloud_matcher" pkg="modular_cloud_matcher" type="modular_cloud_matcher" args="-topic" output="screen">  
+    <param name="readingDataPointsFilterCount" value="1" />
+    <param name="readingDataPointsFilter/0/name" value="FixstepSamplingDataPointsFilter" />
+    <param name="readingDataPointsFilter/0/prob" value="5" />
+
+    <param name="referenceDataPointsFilterCount" value="1" />
+    <param name="referenceDataPointsFilter/0/name" value="SamplingSurfaceNormalDataPointsFilter" />
+    <param name="referenceDataPointsFilter/0/k" value="11" />
+
+    <param name="matcher/name" value="KDTreeMatcher" />
+    <param name="matcher/epsilon" value="0.0" />
+
+    <param name="transformationCheckerCount" value="3" />  
+    <param name="transformationCheckers/0/name" value="ErrorTransformationChecker" />
+    <param name="transformationCheckers/0/minRotErrorDelta" value="0.001" />
+    <param name="transformationCheckers/0/minTransErrorDelta" value="0.01" />
+    <param name="transformationCheckers/0/tail" value="4" />
+    <param name="transformationCheckers/1/name" value="CounterTransformationChecker" />
+    <param name="transformationCheckers/1/maxIterationCount" value="40" />
+    <param name="transformationCheckers/2/name" value="BoundTransformationChecker" />
+    <param name="transformationCheckers/2/maxRotationNorm" value="1" />
+    <param name="transformationCheckers/2/maxTranslationNorm" value="0.5" />
+
+    <param name="featureOutlierFilterCount" value="2" />
+    <param name="featureOutlierFilters/0/name" value="MaxDistOutlierFilter" />
+    <param name="featureOutlierFilters/0/maxDist" value=".3" />
+    <param name="featureOutlierFilters/1/name" value="MedianDistOutlierFilter" />
+    <param name="featureOutlierFilters/1/factor" value="4" />
+
+    <param name="inspector/name" value="Inspector" />
+    <param name="errorMinimizer/name" value="PointToPlaneErrorMinimizer" />
+
+    <param name="sensorFrame" value="/openni_depth" />
+  </node>
+</launch>

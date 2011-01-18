@@ -1,0 +1,12 @@
+<stack>
+  <description brief="ethzasl_mapping">
+    3D mapping tools for robotic applications
+  </description>
+  <author>François Pomerleau and Stéphane Magnenat</author>
+  <license>BSD</license>  
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/ethzasl_mapping</url>
+  <depend stack="common" /> 
+  <depend stack="common_msgs" />
+  <depend stack="ros" />
+</stack>
