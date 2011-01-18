@@ -1,9 +1,12 @@
 - svn:
     uri: https://code.ros.org/svn/ros-pkg/stacks/perception_pcl/tags/unstable
-    local-name: ros_pkg/stacks/perception_pcl
+    local-name: perception_pcl
 - svn:
     uri: https://code.ros.org/svn/ros-pkg/stacks/perception_pcl_addons/tags/unstable
-    local-name: ros_pkg/stacks/perception_pcl_addons
-- hg:
+    local-name: perception_pcl_addons
+- git:
+    uri: https://github.com/ros-pkg-git/ni.git
+     local-name: ni
+- git:
     uri: git://github.com/ethz-asl/ros-mapping.git
-    local-name: ros-pkg/stacks/ethzasl_mapping
+    local-name: ethzasl_mapping
