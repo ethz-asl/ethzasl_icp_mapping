@@ -1,0 +1,19 @@
+all: pointmatcher-installed
+
+POINT_MATCHER_DIR = pointmatcher
+GIT_DIR = $(POINT_MATCHER_DIR)/git
+BUILD_DIR = $(POINT_MATCHER_DIR)/build
+GIT_URL = git://github.com/ethz-asl/libpointmatcher.git
+include $(shell rospack find mk)/git_checkout.mk
+
+pointmatcher-installed: $(GIT_DIR) Makefile.pointmatcher
+	mkdir -p $(BUILD_DIR)
+	cd $(BUILD_DIR) && cmake -DNABO_INCLUDE_DIR=../../nabo/include -DNABO_LIBRARY=../../nabo/lib/libnabo.a -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=.. ../git
+	cd $(BUILD_DIR) && make install
+	touch pointmatcher-installed
+
+clean:
+	rm -rf $(BUILD_DIR) $(POINT_MATCHER_DIR)/include $(POINT_MATCHER_DIR)/lib pointmatcher-installed patched
+
+wipe: clean
+	rm -rf $(POINT_MATCHER_DIR)

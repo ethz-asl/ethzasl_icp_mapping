@@ -11,41 +11,35 @@ set(ROS_BUILD_TYPE RelWithDebInfo)
 
 rosbuild_init()
 
-#set the default path for built executables to the "bin" directory
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
-#set the default path for built libraries to the "lib" directory
-set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
+# dependencies
 
-#uncomment if you have defined messages
-rosbuild_genmsg()
-#uncomment if you have defined services
-rosbuild_gensrv()
+# eigen is provided as a ROS package in geometry
+# # eigen
+# find_path(EIGEN2_INCLUDE_DIR Eigen/Core
+# 	/usr/local/include/eigen2
+# 	/usr/include/eigen2
+# )
+# include_directories(${EIGEN2_INCLUDE_DIR})
 
-# eigen
-find_path(EIGEN2_INCLUDE_DIR Eigen/Core
-	/usr/local/include/eigen2
-	/usr/include/eigen2
-)
+# Build nabo
+execute_process(COMMAND cmake -E chdir ${PROJECT_SOURCE_DIR} make -f Makefile.nabo RESULT_VARIABLE _make_failed)
+if(_make_failed)
+  message(FATAL_ERROR "Build of Nabo failed")
+endif(_make_failed)
 
-# nabo
-find_path(NABO_INCLUDE_DIR nabo/nabo.h
-	/usr/local/include
-	/usr/include
-)
-find_library(NABO_LIBRARY libnabo
-	/usr/local/lib
-	/usr/lib
-)
+# Link nabo
+include_directories(${PROJECT_SOURCE_DIR}/nabo/include)
+link_directories(${PROJECT_SOURCE_DIR}/nabo/lib)
 
-# msa
-find_path(POINT_MATCHER_INCLUDE_DIR PointMatcher.h
-	/usr/local/include
-	/usr/include
-)
-find_library(POINT_MATCHER_LIBRARY msa
-	/usr/local/lib
-	/usr/lib
-)
+# Build pointmatcher
+execute_process(COMMAND cmake -E chdir ${PROJECT_SOURCE_DIR} make -f Makefile.pointmatcher RESULT_VARIABLE _make_failed)
+if(_make_failed)
+  message(FATAL_ERROR "Build of Pointmatcher failed")
+endif(_make_failed)
+
+# Link pointmatcher
+include_directories(${PROJECT_SOURCE_DIR}/pointmatcher/include)
+link_directories(${PROJECT_SOURCE_DIR}/pointmatcher/lib)
 
 # look for OpenCL library
 if (WIN32)
@@ -61,12 +55,12 @@ if (OPENCL_LIBRARIES)
 	set(EXTRA_LIBS ${OPENCL_LIBRARIES})
 endif (OPENCL_LIBRARIES)
 
-include_directories(${EIGEN2_INCLUDE_DIR} ${POINT_MATCHER_INCLUDE_DIR} ${NABO_INCLUDE_DIR} ../icplib)
+set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
+set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-#common commands for building c++ executables and libraries
-#rosbuild_add_library(${PROJECT_NAME} src/example.cpp)
-#target_link_libraries(${PROJECT_NAME} another_library)
+rosbuild_genmsg()
+rosbuild_gensrv()
+
 rosbuild_add_boost_directories()
-#rosbuild_link_boost(${PROJECT_NAME} thread)
 rosbuild_add_executable(cloud_matcher_node src/modular_cloud_matcher.cpp)
-target_link_libraries(cloud_matcher_node ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY} ${EXTRA_LIBS})
+target_link_libraries(cloud_matcher_node pointmatcher nabo ${EXTRA_LIBS})

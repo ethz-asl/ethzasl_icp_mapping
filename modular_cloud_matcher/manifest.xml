@@ -15,7 +15,7 @@
   <depend package="sensor_msgs"/>
   <depend package="tf"/>
   <depend package="tf_conversions"/>
-  <!--  <rosdep name="eigen2"/> -->
+  <depend package="eigen"/>
 
 </package>
 
