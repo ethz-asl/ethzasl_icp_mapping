@@ -1,0 +1,23 @@
+<package>
+  <description brief="modular_cloud_matcher">
+
+     3D point cloud matcher based on libpointmatcher (http://github.com/ethz-asl/libpointmatcher)
+
+  </description>
+  <author>François Pomerleau and Stéphane Magnenat</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/modular_cloud_matcher</url>
+  <depend package="roscpp"/>
+  <depend package="rospy"/>
+  <depend package="std_msgs"/>
+  <depend package="geometry_msgs"/>
+  <depend package="sensor_msgs"/>
+  <depend package="nodelet"/>
+  <depend package="tf"/>
+  <depend package="tf_conversions"/>
+  <!--  <rosdep name="eigen2"/> -->
+
+</package>
+
+

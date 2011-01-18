@@ -1,0 +1,50 @@
+<launch>
+  <node name="point_cloud_converter" pkg="point_cloud_converter" type="point_cloud_converter">
+    <remap from="points2_in" to ="/camera/depth/points2"/>
+    <remap from="points_out" to ="/camera/depth/points"/>
+  </node>
+  
+  <node name="icpros" pkg="icpros" type="icpros" args="-topic" output="screen"/>
+  
+  <param name="msa/readingDataPointsFilterCount" value="1" />
+  <param name="msa/readingDataPointsFilter/0/name" value="FixstepSamplingDataPointsFilter" />
+  <param name="msa/readingDataPointsFilter/0/prob" value="5" />
+  
+  <param name="msa/referenceDataPointsFilterCount" value="1" />
+  <param name="msa/referenceDataPointsFilter/0/name" value="SamplingSurfaceNormalDataPointsFilter" />
+  <param name="msa/referenceDataPointsFilter/0/k" value="11" />
+  
+  <param name="msa/matcher/name" value="KDTreeMatcher" />
+  <param name="msa/matcher/epsilon" value="0.0" />
+  
+  <param name="msa/transformationCheckerCount" value="3" />  
+  <param name="msa/transformationCheckers/0/name" value="ErrorTransformationChecker" />
+  <param name="msa/transformationCheckers/0/minRotErrorDelta" value="0.001" />
+  <param name="msa/transformationCheckers/0/minTransErrorDelta" value="0.01" />
+  <param name="msa/transformationCheckers/0/tail" value="4" />
+  <param name="msa/transformationCheckers/1/name" value="CounterTransformationChecker" />
+  <param name="msa/transformationCheckers/1/maxIterationCount" value="40" />
+  <param name="msa/transformationCheckers/2/name" value="BoundTransformationChecker" />
+  <param name="msa/transformationCheckers/2/maxRotationNorm" value="1" />
+  <param name="msa/transformationCheckers/2/maxTranslationNorm" value="0.5" />
+  
+  <param name="msa/featureOutlierFilterCount" value="2" />
+  <param name="msa/featureOutlierFilters/0/name" value="MaxDistOutlierFilter" />
+  <param name="msa/featureOutlierFilters/0/maxDist" value=".3" />
+  <param name="msa/featureOutlierFilters/1/name" value="MedianDistOutlierFilter" />
+  <param name="msa/featureOutlierFilters/1/factor" value="4" />
+  
+  <param name="msa/inspector/name" value="Inspector" />
+  <param name="msa/errorMinimizer/name" value="PointToPlaneErrorMinimizer" />
+
+  <param name="msa/sensorFrame" value="/openni_depth" />
+
+  <node name="point_cloud_assembler" pkg="laser_assembler" type="point_cloud_assembler">
+    <remap from="cloud" to="/camera/depth/points"/>
+    <param name="max_clouds" type="int" value="150" />
+    <param name="fixed_frame" type="string" value="/world" />
+  </node>
+  
+  <node name="periodic_snapshotter" pkg="laser_assembler" type="periodic_snapshotter"/>
+  <node name="rviz" pkg="rviz" type="rviz"/>
+</launch>
