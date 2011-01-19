@@ -5,10 +5,11 @@ GIT_DIR = $(NABO_DIR)/git
 BUILD_DIR = $(NABO_DIR)/build
 GIT_URL = git://github.com/ethz-asl/libnabo.git
 include $(shell rospack find mk)/git_checkout.mk
+EIGEN2_INCLUDE_DIR = $(shell rospack find eigen)/include
 
 nabo-installed: $(GIT_DIR) Makefile.nabo
 	mkdir -p $(BUILD_DIR)
-	cd $(BUILD_DIR) && cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=.. ../git
+	cd $(BUILD_DIR) && cmake -DEIGEN2_INCLUDE_DIR=${EIGEN2_INCLUDE_DIR} -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=.. ../git
 	cd $(BUILD_DIR) && make install
 	touch nabo-installed
 

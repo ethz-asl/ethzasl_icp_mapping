@@ -5,10 +5,11 @@ GIT_DIR = $(POINT_MATCHER_DIR)/git
 BUILD_DIR = $(POINT_MATCHER_DIR)/build
 GIT_URL = git://github.com/ethz-asl/libpointmatcher.git
 include $(shell rospack find mk)/git_checkout.mk
+EIGEN2_INCLUDE_DIR = $(shell rospack find eigen)/include
 
 pointmatcher-installed: $(GIT_DIR) Makefile.pointmatcher
 	mkdir -p $(BUILD_DIR)
-	cd $(BUILD_DIR) && cmake -DNABO_INCLUDE_DIR=../../nabo/include -DNABO_LIBRARY=../../nabo/lib/libnabo.a -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=.. ../git
+	cd $(BUILD_DIR) && cmake -DEIGEN2_INCLUDE_DIR=${EIGEN2_INCLUDE_DIR} -DNABO_INCLUDE_DIR=../../nabo/include -DNABO_LIBRARY=../../nabo/lib/libnabo.a -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=.. ../git
 	cd $(BUILD_DIR) && make install
 	touch pointmatcher-installed
 
