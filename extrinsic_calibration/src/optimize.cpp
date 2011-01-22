@@ -149,9 +149,14 @@ struct Params
 	
 	void dump(ostream& stream) const
 	{
-		stream <<
+		/*stream <<
 			"translation: x=" << tr.x() << " y=" << tr.y() << " z=" << tr.z() << " " <<
 			"quaternion: x=" << rot.x() << " y=" << rot.y() << " z=" << rot.z() << " w=" << rot.w();
+		*/
+		stream << "<node pkg=\"tf\" type=\"static_transform_publisher\" name=\"base_link_to_kinect\""
+				" args=\"" << tr.x() << " " << tr.y() << " " << tr.z() << " " <<
+				rot.x() << " " << rot.y() << " " << rot.z() << " " << rot.w() << " "
+				"/base_link /kinect 100\"/>";
 	}
 };
 
@@ -304,7 +309,9 @@ int main(int argc, char** argv)
 	{
 		cout << 50 + i << " best has error " << evolve_one_gen(genome, 1.) << endl;
 	}*/
+	cout << "\nOptimization completed, code to COPY-PASTE in your launch file:\n\n";
 	evolveOneGen(genome, 1.0, true);
+	cout << endl;
 	
 	return 0;
 }
