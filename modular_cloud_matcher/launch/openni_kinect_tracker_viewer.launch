@@ -2,7 +2,7 @@
   
   <include file="$(find modular_cloud_matcher)/launch/openni_kinect_sensor.launch" />
   
-  <include file="$(find modular_cloud_matcher)/launch/openni_kinect_tracker.launch" />
+  <include file="$(find modular_cloud_matcher)/launch/test_openni_kinect_tracker.launch" />
 
   <node name="point_cloud_converter" pkg="point_cloud_converter" type="point_cloud_converter">
     <remap from="points2_in" to ="/camera/depth/points2"/>

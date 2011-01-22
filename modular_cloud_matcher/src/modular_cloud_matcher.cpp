@@ -322,7 +322,7 @@ void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 	}
 	if (goodCount == 0)
 	{
-		ROS_ERROR("I found no goot points in the cloud");
+		ROS_ERROR("I found no good points in the cloud");
 		return;
 	}
 	
@@ -344,6 +344,15 @@ void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 	}
 	ROS_INFO_STREAM("Got " << cloudMsg.points.size() << " points (" << goodCount << " goods)");
 	
+  double imageRatio = (double)goodCount / (double)cloudMsg.points.size();
+  
+  if (goodCount < 8000)
+  {
+    ROS_ERROR_STREAM("Partial image! Missing " << goodCount << "(" << 100 - imageRatio*100.0 << "%) of the image");
+    return;
+  }
+
+
 	if (first)
 	{
 		keyFrameCloud = dp;
@@ -392,7 +401,7 @@ void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 	
 	//abort();
 	
-	cerr << "match ratio: " << p.errorMinimizer->getWeightedPointUsedRatio() << endl;
+	ROS_INFO_STREAM("match ratio: " << p.errorMinimizer->getWeightedPointUsedRatio() << endl);
 	
 	const Eigen::Quaternion<double> quat(Eigen::Matrix3d(globalTransform.block(0,0,3,3)));
 	
@@ -465,7 +474,7 @@ int main(int argc, char **argv)
 		string cloudTopic(getParam<string>("cloudTopic", "/camera/depth/points"));
 		ros::Subscriber sub = n.subscribe(cloudTopic, 1, gotCloud);
 		ratioToSwitchKeyframe = getParam("ratioToSwitchKeyframe", 0.8);
-		maxSensorDist = getParam("maxSensorDist", 2);
+		maxSensorDist = getParam("maxSensorDist", 2.5);
 		fixedFrame = getParam<string>("fixedFrame",  "/world");
 		sensorFrame = getParam<string>("sensorFrame",  "/openni_rgb_optical_frame");
 		ros::spin();
