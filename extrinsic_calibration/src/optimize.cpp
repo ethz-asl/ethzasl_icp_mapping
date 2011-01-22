@@ -154,7 +154,7 @@ struct Params
 			"quaternion: x=" << rot.x() << " y=" << rot.y() << " z=" << rot.z() << " w=" << rot.w();
 		*/
 		stream << "<node pkg=\"tf\" type=\"static_transform_publisher\" name=\"base_link_to_kinect\""
-				" args=\"" << tr.x() << " " << tr.y() << " " << tr.z() << " " <<
+				" args=\"" << tr.x() << " " << tr.y() << " 0 " <<
 				rot.x() << " " << rot.y() << " " << rot.z() << " " << rot.w() << " "
 				"/base_link /kinect 100\"/>";
 	}
