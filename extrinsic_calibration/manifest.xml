@@ -1,0 +1,19 @@
+<package>
+  <description brief="extrinsic_calibration">
+
+    Calibration of 3D transform of a depth sensor given two sets of TFs, one from the odometry and one from the sensor pose.
+	Uses modular_cloud_matcher to provide the sensor pose using ICP.
+
+  </description>
+  <author>François Pomerleau, Francis Colas, and Stéphane Magnenat</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/extrinsic_calibration</url>
+  <depend package="rospy"/> 
+  <depend package="roscpp"/>
+  <depend package="tf"/> 
+  <depend package="eigen"/> 
+
+</package>
+
+
