@@ -7,10 +7,11 @@
 
 using namespace std;
 
-const string baseLinkFrame = "/base_link";
+/*const string baseLinkFrame = "/base_link";
 const string odomFrame = "/odom";
 const string kinectFrame = "/openni_rgb_optical_frame";
 const string worldFrame = "/world";
+*/
 
 // see http://www.ros.org/wiki/Clock for how to manage timing 
 /*
@@ -35,10 +36,23 @@ ostream& operator<< (ostream& os, const tf::Vector3& trans)
 
 int main(int argc, char** argv)
 {
-	ros::init(argc, argv, "logger");
+	ros::init(argc, argv, "tf_logger");
 
-	ros::NodeHandle node;
+	ros::NodeHandle node("~");
 	
+	string baseLinkFrame;
+	node.param<string>("baseLinkFrame", baseLinkFrame, "/base_link");
+	string odomFrame;
+	node.param<string>("odomFrame", odomFrame, "/odom");
+	string kinectFrame;
+	node.param<string>("kinectFrame", kinectFrame, "/openni_rgb_optical_frame");
+	string worldFrame;
+	node.param<string>("worldFrame", worldFrame, "/world");
+	string outputFileName;
+	node.param<string>("outputFileName", outputFileName, "output.txt");
+	cout << baseLinkFrame << " " << odomFrame << " " << kinectFrame << " " <<
+			worldFrame << " " << outputFileName << endl;
+
 	tf::TransformListener t(ros::Duration(20));
 	tf::StampedTransform tr_o, tr_i;
 	
@@ -67,7 +81,7 @@ int main(int argc, char** argv)
 	sleep(3);
 	
 	ros::Rate rate(0.5);
-	ofstream ofs("output.txt");
+	ofstream ofs(outputFileName.c_str());
 	while (node.ok())
 	{
 		// sleep
@@ -87,10 +101,8 @@ int main(int argc, char** argv)
 		t.lookupTransform(kinectFrame, curTime, kinectFrame, lastTime, worldFrame, tr_i);
 		ofs << tr_i.getOrigin() << " " << tr_i.getRotation() << endl;
 		
-		cout << "ping" << endl;
 	}
 	
-  cout << "TEST on Ctrl-C" << endl;
 
 	return 0;
 }
