@@ -345,10 +345,11 @@ void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 	ROS_INFO_STREAM("Got " << cloudMsg.points.size() << " points (" << goodCount << " goods)");
 	
   double imageRatio = (double)goodCount / (double)cloudMsg.points.size();
-  
+ 
+  //TODO: put that as parameter, tricky to set...
   if (goodCount < 8000)
   {
-    ROS_ERROR_STREAM("Partial image! Missing " << goodCount << "(" << 100 - imageRatio*100.0 << "%) of the image");
+    ROS_ERROR_STREAM("Partial image! Missing " << 100 - imageRatio*100.0 << "% of the image (received " << goodCount << ")");
     return;
   }
 

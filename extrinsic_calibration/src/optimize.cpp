@@ -156,7 +156,11 @@ struct Params
 		stream << "<node pkg=\"tf\" type=\"static_transform_publisher\" name=\"base_link_to_kinect\""
 				" args=\"" << tr.x() << " " << tr.y() << " 0 " <<
 				rot.x() << " " << rot.y() << " " << rot.z() << " " << rot.w() << " "
-				"/base_link /kinect 100\"/>";
+				"/base_link /kinect 100\"/>" 
+        " \n\n OR \n\n"
+        "rosrun tf static_transform_publisher " << tr.x() << " " << tr.y() << " 0 " <<
+        rot.x() << " " << rot.y() << " " << rot.z() << " " << rot.w() << " "
+        "/base_link /kinect 100";
 	}
 };
 
@@ -309,7 +313,7 @@ int main(int argc, char** argv)
 	{
 		cout << 50 + i << " best has error " << evolve_one_gen(genome, 1.) << endl;
 	}*/
-	cout << "\nOptimization completed, code to COPY-PASTE in your launch file:\n\n";
+	cout << "\nOptimization completed, code to COPY-PASTE in to use the transformation:\n\n";
 	evolveOneGen(genome, 1.0, true);
 	cout << endl;
 	

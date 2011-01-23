@@ -10,7 +10,6 @@ using namespace std;
 const string baseLinkFrame = "/base_link";
 const string odomFrame = "/odom";
 const string kinectFrame = "/openni_rgb_optical_frame";
-const string myKinectFrame = "/kinect";
 const string worldFrame = "/world";
 
 // see http://www.ros.org/wiki/Clock for how to manage timing 
@@ -91,5 +90,7 @@ int main(int argc, char** argv)
 		cout << "ping" << endl;
 	}
 	
+  cout << "TEST on Ctrl-C" << endl;
+
 	return 0;
 }
