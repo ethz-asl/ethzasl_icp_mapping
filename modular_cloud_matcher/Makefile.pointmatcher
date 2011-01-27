@@ -4,6 +4,7 @@ POINT_MATCHER_DIR = pointmatcher
 GIT_DIR = $(POINT_MATCHER_DIR)/git
 BUILD_DIR = $(POINT_MATCHER_DIR)/build
 GIT_URL = git://github.com/ethz-asl/libpointmatcher.git
+GIT_REVISION = a54950b7c9e5107a51a8
 include $(shell rospack find mk)/git_checkout.mk
 EIGEN2_INCLUDE_DIR = $(shell rospack find eigen)/include
 
