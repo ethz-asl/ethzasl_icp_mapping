@@ -4,6 +4,7 @@ NABO_DIR = nabo
 GIT_DIR = $(NABO_DIR)/git
 BUILD_DIR = $(NABO_DIR)/build
 GIT_URL = git://github.com/ethz-asl/libnabo.git
+GIT_REVISION = 591e63f0c78f74d1993e
 include $(shell rospack find mk)/git_checkout.mk
 EIGEN2_INCLUDE_DIR = $(shell rospack find eigen)/include
 
