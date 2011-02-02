@@ -4,9 +4,9 @@
     <param name="readingDataPointsFilter/0/name" value="FixstepSamplingDataPointsFilter" />
     <param name="readingDataPointsFilter/0/prob" value="5" />
 
-    <param name="referenceDataPointsFilterCount" value="1" />
-    <param name="referenceDataPointsFilter/0/name" value="SamplingSurfaceNormalDataPointsFilter" />
-    <param name="referenceDataPointsFilter/0/k" value="11" />
+    <param name="keyframeDataPointsFilterCount" value="1" />
+    <param name="keyframeDataPointsFilter/0/name" value="SamplingSurfaceNormalDataPointsFilter" />
+    <param name="keyframeDataPointsFilter/0/k" value="11" />
 
     <param name="matcher/name" value="KDTreeMatcher" />
     <param name="matcher/epsilon" value="0.0" />
