@@ -3,6 +3,7 @@
 #include "ros/ros.h"
 #include "modular_cloud_matcher/MatchClouds.h"
 #include "sensor_msgs/PointCloud.h"
+#include "nav_msgs/Path.h"
 #include <tf/transform_broadcaster.h>
 #include <tf_conversions/tf_eigen.h>
 #include "pointmatcher/PointMatcher.h"
@@ -66,8 +67,10 @@ T getParam(const string& name, const T& defaultValue)
 	return defaultValue;
 }
 
-typedef double Scalar;
+typedef float Scalar;
 typedef MetricSpaceAligner<Scalar> MSA;
+typedef Eigen::Matrix<Scalar, 3, 1> Vector3;
+typedef Eigen::Matrix<Scalar, 3, 3> Matrix3;
 
 
 #define REG(name) (name##Registrar)
@@ -83,6 +86,22 @@ DEF_REGISTRAR(DescriptorOutlierFilter)
 DEF_REGISTRAR(ErrorMinimizer)
 DEF_REGISTRAR(TransformationChecker)
 DEF_REGISTRAR(Inspector)
+
+MSA::DataPointsFilter* createClampOnAxisThresholdDataPointsFilter(const string& root)
+{
+	return new MSA::ClampOnAxisThresholdDataPointsFilter(
+		getParam(root + "dim", 0),
+		getParam(root + "threshold", 1.)
+	);
+}
+
+MSA::DataPointsFilter* createClampOnAxisRatioDataPointsFilter(const string& root)
+{
+	return new MSA::ClampOnAxisRatioDataPointsFilter(
+		getParam(root + "dim", 0),
+		getParam(root + "ratio", 1.)
+	);
+}
 
 MSA::DataPointsFilter* createSurfaceNormalDataPointsFilter(const string& root)
 {
@@ -236,12 +255,15 @@ static DP keyFrameCloud;
 static TP keyFrameTransform(TP::Identity(4, 4));
 static TP curTransform(TP::Identity(4, 4));
 
-static Eigen::Vector3d sumRot(Eigen::Vector3d::Zero(3));
-static Eigen::Vector3d sumTrans(Eigen::Vector3d::Zero(3));
+static Vector3 sumRot(Vector3::Zero(3));
+static Vector3 sumTrans(Vector3::Zero(3));
 
-static double maxSensorDist(-1);
+static Scalar maxSensorDist(-1);
 static string fixedFrame;
 static string sensorFrame;
+
+nav_msgs::Path path;
+ros::Publisher pathPub;
 
 void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 {
@@ -257,9 +279,7 @@ void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 	for (size_t i = 0; i < cloudMsg.points.size(); ++i)
 	{
 		// FIXME: kinect-specific hack, do something better
-		if (!isnan(cloudMsg.points[i].x) &&
-			(cloudMsg.points[i].z < maxSensorDist)
-		)
+		if (!isnan(cloudMsg.points[i].x))
 			++goodCount;
 	}
 	if (goodCount == 0)
@@ -273,9 +293,7 @@ void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 	for (size_t i = 0; i < cloudMsg.points.size(); ++i)
 	{
 		// FIXME: kinect-specific hack, do something better
-		if (!isnan(cloudMsg.points[i].x) &&
-			(cloudMsg.points[i].z < maxSensorDist)
-		)
+		if (!isnan(cloudMsg.points[i].x))
 		{
 			dp.features.coeffRef(0, dIndex) = cloudMsg.points[i].x;
 			dp.features.coeffRef(1, dIndex) = cloudMsg.points[i].y;
@@ -308,13 +326,13 @@ void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 	
 	// broadcast transform
 	const TP globalTransform(icp.getTransform());
-	const Eigen::Quaternion<double> quat(Eigen::Matrix3d(globalTransform.block(0,0,3,3)));
+	const Eigen::Quaternion<Scalar> quat(Matrix3(globalTransform.block(0,0,3,3)));
 	//cerr << "pos:\n" << curTransform << endl;
-	const double a0(atan2(2*(quat.w() * quat.x() + quat.y() * quat.z()), 1-2*(quat.x() * quat.x() + quat.y() * quat.y())));
-	const double a1(asin(2*(quat.w() * quat.y() - quat.z() * quat.x())));
-	const double a2(atan2(2*(quat.w() * quat.z() + quat.x() * quat.y()), 1-2*(quat.y() * quat.y() + quat.z() * quat.z())));
+	const Scalar a0(atan2(2*(quat.w() * quat.x() + quat.y() * quat.z()), 1-2*(quat.x() * quat.x() + quat.y() * quat.y())));
+	const Scalar a1(asin(2*(quat.w() * quat.y() - quat.z() * quat.x())));
+	const Scalar a2(atan2(2*(quat.w() * quat.z() + quat.x() * quat.y()), 1-2*(quat.y() * quat.y() + quat.z() * quat.z())));
 	
-	sumRot += Eigen::Vector3d(a0, a1, a2);
+	sumRot += Vector3(a0, a1, a2);
 	sumTrans += curTransform.block(0,3,3,1);
 	
 	//cerr << "rot mean: " << (sumRot/double(cnt-1)).transpose() << endl;
@@ -323,14 +341,30 @@ void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 	//cerr << "rot: " << a0 << " " << a1 << " " << a2 << endl;
 	
 	tf::Quaternion tfQuat;
-	tf::RotationEigenToTF(quat, tfQuat);
+	tf::RotationEigenToTF(Eigen::Quaterniond(quat), tfQuat);
 	tf::Vector3 tfVect;
-	tf::VectorEigenToTF(globalTransform.block(0,3,3,1), tfVect);
+	tf::VectorEigenToTF(globalTransform.block(0,3,3,1).cast<double>(), tfVect);
 	tf::Transform transform;
 	transform.setRotation(tfQuat);
 	transform.setOrigin(tfVect);
 	//transform.setOrigin(tf::Vector3(0,0,0));
 	//transform.setRotation(tf::createQuaternionFromRPY(0,0,0));
+	
+	if (icp.keyFrameCreatedAtLastCall())
+	{
+		ROS_WARN_STREAM("Keyframe created at " << icp.errorMinimizer->getWeightedPointUsedRatio());
+		geometry_msgs::PoseStamped pose;
+		pose.header.frame_id = sensorFrame;
+		pose.pose.position.x = tfVect.x();
+		pose.pose.position.y = tfVect.y();
+		pose.pose.position.z = tfVect.z();
+		pose.pose.orientation.x = tfQuat.x();
+		pose.pose.orientation.y = tfQuat.y();
+		pose.pose.orientation.z = tfQuat.z();
+		pose.pose.orientation.w = tfQuat.w();
+		path.poses.push_back(pose);
+		pathPub.publish(path);
+	}
 	
 	static tf::TransformBroadcaster br;
 	br.sendTransform(tf::StampedTransform(transform, cloudMsg.header.stamp, fixedFrame, sensorFrame));
@@ -342,6 +376,8 @@ int main(int argc, char **argv)
 	ADD_TO_REGISTRAR(Transformation, TransformDescriptors)
 	
 	ADD_TO_REGISTRAR(DataPointsFilter, IdentityDataPointsFilter)
+	ADD_CUSTOM_TO_REGISTRAR(DataPointsFilter, ClampOnAxisThresholdDataPointsFilter, createClampOnAxisThresholdDataPointsFilter)
+	ADD_CUSTOM_TO_REGISTRAR(DataPointsFilter, ClampOnAxisRatioDataPointsFilter, createClampOnAxisRatioDataPointsFilter)
 	ADD_CUSTOM_TO_REGISTRAR(DataPointsFilter, SurfaceNormalDataPointsFilter, createSurfaceNormalDataPointsFilter)
 	ADD_CUSTOM_TO_REGISTRAR(DataPointsFilter, SamplingSurfaceNormalDataPointsFilter, createSamplingSurfaceNormalDataPointsFilter)
 	ADD_CUSTOM_TO_REGISTRAR(DataPointsFilter, RandomSamplingDataPointsFilter, createRandomSamplingDataPointsFilter)
@@ -373,11 +409,15 @@ int main(int argc, char **argv)
 	
 	string cloudTopic(getParam<string>("cloudTopic", "/camera/depth/points"));
 	ros::Subscriber sub = n.subscribe(cloudTopic, 1, gotCloud);
+	string pathTopic(getParam<string>("path", "/tracker_path"));
+	pathPub = n.advertise<nav_msgs::Path>(pathTopic, 1);
 	
 	maxSensorDist = getParam("maxSensorDist", 2.5);
 	fixedFrame = getParam<string>("fixedFrame",  "/world");
 	sensorFrame = getParam<string>("sensorFrame",  "/openni_rgb_optical_frame");
 	populateParameters();
+	
+	path.header.frame_id = fixedFrame;
 	
 	ros::spin();
 	
