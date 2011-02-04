@@ -137,7 +137,9 @@ MSA::DataPointsFilter* createRandomSamplingDataPointsFilter(const string& root)
 MSA::DataPointsFilter* createFixstepSamplingDataPointsFilter(const string& root)
 {
 	return new MSA::FixstepSamplingDataPointsFilter(
-		getParam(root + "step", 20)
+		getParam(root + "startStep", 7.),
+		getParam(root + "endStep", 7.),
+		getParam(root + "stepMult", 1.)
 	);
 }
 
@@ -214,6 +216,7 @@ void populateParameters(void)
 	// icp parameters
 	const int transformationCount(getParam<int>("transformationCount", 1));
 	const int readingDataPointsFilterCount(getParam<int>("readingDataPointsFilterCount", 1));
+	const int readingStepDataPointsFilterCount(getParam<int>("readingStepDataPointsFilterCount", 0));
 	const int keyframeDataPointsFilterCount(getParam<int>("keyframeDataPointsFilterCount", 1));
 	const int featureOutlierFilterCount(getParam<int>("featureOutlierFilterCount", 1));
 	const int transformationCheckerCount(getParam<int>("transformationCheckerCount", 1));
@@ -222,6 +225,11 @@ void populateParameters(void)
 	{
 		string root((boost::format("readingDataPointsFilter/%1%") % i).str());
 		icp.readingDataPointsFilters.push_back(REG(DataPointsFilter).create(getParam<string>(root+"/name", "FixstepSamplingDataPointsFilter"), root + "/"));
+	}
+	for (int i = 0; i < readingStepDataPointsFilterCount; ++i)
+	{
+		string root((boost::format("readingStepDataPointsFilter/%1%") % i).str());
+		icp.readingStepDataPointsFilters.push_back(REG(DataPointsFilter).create(getParam<string>(root+"/name", "FixstepSamplingDataPointsFilter"), root + "/"));
 	}
 	for (int i = 0; i < keyframeDataPointsFilterCount; ++i)
 	{
@@ -278,7 +286,6 @@ void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 	size_t goodCount(0);
 	for (size_t i = 0; i < cloudMsg.points.size(); ++i)
 	{
-		// FIXME: kinect-specific hack, do something better
 		if (!isnan(cloudMsg.points[i].x))
 			++goodCount;
 	}
@@ -292,7 +299,6 @@ void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 	int dIndex(0);
 	for (size_t i = 0; i < cloudMsg.points.size(); ++i)
 	{
-		// FIXME: kinect-specific hack, do something better
 		if (!isnan(cloudMsg.points[i].x))
 		{
 			dp.features.coeffRef(0, dIndex) = cloudMsg.points[i].x;
@@ -307,7 +313,7 @@ void gotCloud(const sensor_msgs::PointCloud& cloudMsg)
 	const double imageRatio = (double)goodCount / (double)cloudMsg.points.size();
 	
 	//TODO: put that as parameter, tricky to set...
-	if (goodCount < 8000)
+	if (goodCount < 10000)
 	{
 		ROS_ERROR_STREAM("Partial image! Missing " << 100 - imageRatio*100.0 << "% of the image (received " << goodCount << ")");
 		return;

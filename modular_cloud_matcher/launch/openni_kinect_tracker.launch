@@ -1,14 +1,24 @@
 <launch>
   <node name="cloud_matcher_node" type="cloud_matcher_node" pkg="modular_cloud_matcher" output="screen">  
     <param name="readingDataPointsFilterCount" value="2" />
-    <param name="keyframeDataPointsFilter/0/name" value="ClampOnAxisThresholdDataPointsFilter" />
-    <param name="keyframeDataPointsFilter/0/threshold" value="2.5" />
+    <param name="readingDataPointsFilter/0/name" value="ClampOnAxisThresholdDataPointsFilter" />
+    <param name="readingDataPointsFilter/0/threshold" value="2.5" />
+    <param name="readingDataPointsFilter/0/dim" value="2" />
     <param name="readingDataPointsFilter/1/name" value="FixstepSamplingDataPointsFilter" />
-    <param name="readingDataPointsFilter/1/step" value="7" />
+    <param name="readingDataPointsFilter/1/startStep" value="17." />
+    <param name="readingDataPointsFilter/1/endStep" value="17." />
+    <param name="readingDataPointsFilter/1/stepMult" value="1." />
+    
+    <param name="readingStepDataPointsFilterCount" value="0" />
+    <param name="readingStepDataPointsFilter/0/name" value="FixstepSamplingDataPointsFilter" />
+    <param name="readingStepDataPointsFilter/0/startStep" value="111." />
+    <param name="readingStepDataPointsFilter/0/endStep" value="17." />
+    <param name="readingStepDataPointsFilter/0/stepMult" value="0.7" />
 
     <param name="keyframeDataPointsFilterCount" value="2" />
     <param name="keyframeDataPointsFilter/0/name" value="ClampOnAxisThresholdDataPointsFilter" />
     <param name="keyframeDataPointsFilter/0/threshold" value="2.5" />
+    <param name="keyframeDataPointsFilter/0/dim" value="2" />
     <param name="keyframeDataPointsFilter/1/name" value="SamplingSurfaceNormalDataPointsFilter" />
     <param name="keyframeDataPointsFilter/1/k" value="11" />
 
