@@ -1,5 +1,8 @@
 <launch>
-  <node name="cloud_matcher_node" type="cloud_matcher_node" pkg="modular_cloud_matcher" output="screen">  
+  <node name="cloud_matcher_node" type="cloud_matcher_node" pkg="modular_cloud_matcher" output="screen"> 
+    <param name="startupDropCount" value="0" />
+    <param name="statFilePrefix" value="test.stats." />
+    
     <param name="readingDataPointsFilterCount" value="2" />
     <param name="readingDataPointsFilter/0/name" value="ClampOnAxisThresholdDataPointsFilter" />
     <param name="readingDataPointsFilter/0/threshold" value="2.5" />
