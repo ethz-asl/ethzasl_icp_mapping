@@ -24,11 +24,14 @@ def runexperiments():
 	rospy.set_param('/cloud_matcher_node/readingDataPointsFilter/1/endStep', 17.)
 	rospy.set_param('/cloud_matcher_node/readingDataPointsFilter/1/stepMult', 1.)
 	
+	#rospy.set_param('/cloud_matcher_node/readingDataPointsFilter/1/name', 'RandomSamplingDataPointsFilter')
+	#rospy.set_param('/cloud_matcher_node/readingDataPointsFilter/1/prob', 0.2)
+	
 	rospy.set_param('/cloud_matcher_node/readingStepDataPointsFilterCount', 0)
-	rospy.set_param('/cloud_matcher_node/readingStepDataPointsFilter/0/name', 'FixstepSamplingDataPointsFilter')
-	rospy.set_param('/cloud_matcher_node/readingStepDataPointsFilter/0/startStep', 111.)
-	rospy.set_param('/cloud_matcher_node/readingStepDataPointsFilter/0/endStep', 17.)
-	rospy.set_param('/cloud_matcher_node/readingStepDataPointsFilter/0/stepMult', 0.7)
+	#rospy.set_param('/cloud_matcher_node/readingStepDataPointsFilter/0/name', 'FixstepSamplingDataPointsFilter')
+	#rospy.set_param('/cloud_matcher_node/readingStepDataPointsFilter/0/startStep', 111.)
+	#rospy.set_param('/cloud_matcher_node/readingStepDataPointsFilter/0/endStep', 17.)
+	#rospy.set_param('/cloud_matcher_node/readingStepDataPointsFilter/0/stepMult', 0.7)
 
 	rospy.set_param('/cloud_matcher_node/keyframeDataPointsFilterCount', 2)
 	rospy.set_param('/cloud_matcher_node/keyframeDataPointsFilter/0/name', 'ClampOnAxisThresholdDataPointsFilter')
@@ -64,18 +67,64 @@ def runexperiments():
 	rospy.set_param('/cloud_matcher_node/fixedFrame', '/rotated_world')
 	rospy.set_param('/cloud_matcher_node/ratioToSwitchKeyframe', 0.7)
 	
-	# run experiments
-	for fixSamplingStep in range(15, 17):
+	# dump parameters
+	experimentIdentifier = time.strftime('cloud_matcher_experiment.%Y-%m-%d.%H-%M-%S.')
+	time.sleep(1) 
+	os.system('rosparam dump ' + str(experimentIdentifier) + 'params.txt')
+	
+	# first dummy experiment to work around kinect startup time
+	rospy.set_param('/cloud_matcher_node/statFilePrefix', '')
+	tracker = subprocess.Popen(['rosrun','modular_cloud_matcher','cloud_matcher_node'])
+	time.sleep(30)
+	os.system('rosnode kill /cloud_matcher_node')
+	tracker.wait()
+	
+	# run experiments epsilon
+	for fixSamplingStep in range(0, 200, 1):
 		# set param
-		rospy.set_param('/cloud_matcher_node/readingDataPointsFilter/1/startStep', fixSamplingStep)
-		rospy.set_param('/cloud_matcher_node/readingDataPointsFilter/1/endStep', fixSamplingStep)
-		rospy.set_param('/cloud_matcher_node/statFilePrefix', 'test.stats.' + str(fixSamplingStep) + '.')
+		fileNamePrefix = experimentIdentifier + str(fixSamplingStep) + '.'
+		rospy.set_param('/cloud_matcher_node/statFilePrefix', fileNamePrefix)
+		
+		#rospy.set_param('/cloud_matcher_node/readingDataPointsFilter/1/startStep', fixSamplingStep)
+		#rospy.set_param('/cloud_matcher_node/readingDataPointsFilter/1/endStep', fixSamplingStep)
+		
+		#rospy.set_param('/cloud_matcher_node/readingDataPointsFilter/1/prob', fixSamplingStep/100.0)
+		
+		#rospy.set_param('/cloud_matcher_node/keyframeDataPointsFilter/1/k', fixSamplingStep)
+		rospy.set_param('/cloud_matcher_node/matcher/epsilon', fixSamplingStep/10.0)
+		
 		time.sleep(1)
+		# dump parameters
+		os.system('rosparam dump ' + str(fileNamePrefix) + 'params.txt')
 		# run child
 		tracker = subprocess.Popen(['rosrun','modular_cloud_matcher','cloud_matcher_node'])
-		time.sleep(4)
+		time.sleep(60)
 		os.system('rosnode kill /cloud_matcher_node')
 		tracker.wait()
+	
+	## run experiments fix step
+	#rospy.set_param('/cloud_matcher_node/matcher/epsilon', 0.)
+	#for fixSamplingStep in range(0, 200, 1):
+		## set param
+		#fileNamePrefix = experimentIdentifier + str(fixSamplingStep) + '.'
+		#rospy.set_param('/cloud_matcher_node/statFilePrefix', fileNamePrefix)
+		
+		#rospy.set_param('/cloud_matcher_node/readingDataPointsFilter/1/startStep', fixSamplingStep)
+		#rospy.set_param('/cloud_matcher_node/readingDataPointsFilter/1/endStep', fixSamplingStep)
+		
+		##rospy.set_param('/cloud_matcher_node/readingDataPointsFilter/1/prob', fixSamplingStep/100.0)
+		
+		##rospy.set_param('/cloud_matcher_node/keyframeDataPointsFilter/1/k', fixSamplingStep)
+		##rospy.set_param('/cloud_matcher_node/matcher/epsilon', fixSamplingStep/100.0)
+		
+		#time.sleep(1)
+		## dump parameters
+		#os.system('rosparam dump ' + str(fileNamePrefix) + 'params.txt')
+		## run child
+		#tracker = subprocess.Popen(['rosrun','modular_cloud_matcher','cloud_matcher_node'])
+		#time.sleep(120)
+		#os.system('rosnode kill /cloud_matcher_node')
+		#tracker.wait()
 	
 if __name__ == '__main__':
 	runexperiments()
