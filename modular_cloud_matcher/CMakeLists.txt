@@ -81,9 +81,6 @@ endif (OPENCL_LIBRARIES)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-rosbuild_genmsg()
-rosbuild_gensrv()
-
 rosbuild_add_boost_directories()
 rosbuild_add_executable(cloud_matcher_node src/modular_cloud_matcher.cpp)
 if (FETCH_DEPENDENCIES)
