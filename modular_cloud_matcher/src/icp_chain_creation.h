@@ -3,7 +3,7 @@
 
 #include <boost/format.hpp>
 #include "pointmatcher/PointMatcher.h"
-#include "ros/ros.h"
+
 
 // TODO: move this somewhere out
 typedef float Scalar;
@@ -55,19 +55,6 @@ protected:
 	CreatorMap creators;
 };
 
-template<typename T>
-T getParam(const std::string& name, const T& defaultValue)
-{
-	T v;
-	if (ros::param::get(std::string("~")+name, v))
-	{
-		ROS_INFO_STREAM("Found parameter: " << name << ", value: " << v);
-		return v;
-	}
-	else
-		ROS_WARN_STREAM("Cannot find value for parameter: " << name << ", assigning default: " << defaultValue);
-	return defaultValue;
-}
 
 #define REG(name) (name##Registrar)
 #define DEF_REGISTRAR(name) Registrar< MSA::name > name##Registrar;
