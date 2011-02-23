@@ -1,11 +1,13 @@
 #include "ros/ros.h"
 #include "sensor_msgs/PointCloud.h"
+#include "sensor_msgs/PointCloud2.h"
+#include "sensor_msgs/point_cloud_conversion.h"
 #include "tf/transform_listener.h"
 #include <vector>
 
 using namespace std;
 
-tf::TransformListener listener;
+tf::TransformListener *listenerPtr(0);
 
 struct Entry
 {
@@ -20,19 +22,17 @@ typedef vector<Entry> Entries;
 Entries entries;
 int maxCloudCount(0);
 
-void pointCloudCallback(const sensor_msgs::PointCloud& cloudMsg)
+void pointCloudCallback(const sensor_msgs::PointCloud2& cloudMsg)
 {
-	if (int(entries.size()) >= maxCloudCount)
-	{
-		ros::shutdown();
-		return;
-	}
+	// convert cloud
+	sensor_msgs::PointCloud output;
+	sensor_msgs::convertPointCloud2ToPointCloud(cloudMsg, output);
 	
 	// get transform
 	tf::StampedTransform transform;
 	try
 	{
-		listener.lookupTransform("/vicon_vehicle_20", "/ned",  ros::Time(0), transform);
+		listenerPtr->lookupTransform("/vicon_vehicle_20", "/ned",  ros::Time(0), transform);
 	}
 	catch (tf::TransformException ex)
 	{
@@ -40,7 +40,10 @@ void pointCloudCallback(const sensor_msgs::PointCloud& cloudMsg)
 	}
 	
 	// store cloud along transform
-	entries.push_back(Entry(cloudMsg, transform));
+	//ROS_WARN_STREAM("Added cloud " << entries.size());
+	entries.push_back(Entry(output, transform));
+	if (int(entries.size()) >= maxCloudCount)
+		ros::shutdown();
 }
 
 void dumpData()
@@ -74,10 +77,14 @@ int main(int argc, char **argv)
 	
 	ros::init(argc, argv, "kinect_exp_logger");
 	ros::NodeHandle n;
+	tf::TransformListener listener;
+	listenerPtr = &listener;
 	
 	ros::Subscriber sub = n.subscribe("/camera/depth/points2", 10, pointCloudCallback);
 
 	ros::spin();
+	
+	dumpData();
 	
 	return 0;
 }
