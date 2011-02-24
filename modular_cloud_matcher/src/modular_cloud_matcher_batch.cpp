@@ -5,7 +5,6 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
-#include <boost/progress.hpp>
 
 using namespace std;
 using namespace Eigen;
@@ -189,7 +188,7 @@ int main(int argc, char **argv)
 		Histogram<Scalar> e_x(16, "e_x", "", false), e_y(16, "e_y", "", false), e_z(16, "e_z", "", false), e_a(16, "e_a", "", false);
 		
 		// init icp
-		boost::timer t;
+		timer t;
 		DP d;
 		TP T_gt_old(data[0].transform);
 		d = data[0].cloud;
