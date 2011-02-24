@@ -190,8 +190,10 @@ int main(int argc, char **argv)
 		
 		// init icp
 		boost::timer t;
+		DP d;
 		TP T_gt_old(data[0].transform);
-		icp(data[0].cloud);
+		d = data[0].cloud;
+		icp(d);
 		TP T_icp_old(icp.getTransform());
 		
 		// for each cloud, compute error
@@ -202,7 +204,8 @@ int main(int argc, char **argv)
 			const TP T_gt(data[i].transform);
 			try 
 			{
-				icp(data[i].cloud);
+				d = data[i].cloud;
+				icp(d);
 			}
 			catch (MSA::ConvergenceError error)
 			{
@@ -223,7 +226,7 @@ int main(int argc, char **argv)
 			e_y.push_back(e_t(1));
 			e_z.push_back(e_t(2));
 			const Quaternion<Scalar> quat(Matrix3(T_d.topLeftCorner(3,3)));
-			e_a.push_back(2 * acos(quat.w()));
+			e_a.push_back(2 * acos(quat.normalized().w()));
 			
 			// write back transforms
 			T_gt_old = T_gt;
@@ -233,25 +236,24 @@ int main(int argc, char **argv)
 		
 		// write back results
 		// general stats
-		ofs << data.size() - 1 << " " << failCount << " ";
+		ofs << data.size() - 1 << " " << failCount << " * ";
 		// error
-		e_x.dumpStats(ofs); ofs << " ";
-		e_y.dumpStats(ofs); ofs << " ";
-		e_z.dumpStats(ofs); ofs << " ";
-		e_a.dumpStats(ofs); ofs << " ";
+		e_x.dumpStats(ofs); ofs << " * ";
+		e_y.dumpStats(ofs); ofs << " * ";
+		e_z.dumpStats(ofs); ofs << " * ";
+		e_a.dumpStats(ofs); ofs << " * ";
 		// timing
-		ofs << icpTotalDuration << " ";
-		icp.keyFrameDuration.dumpStats(ofs); ofs << " ";
-		icp.convergenceDuration.dumpStats(ofs); ofs << " ";
+		ofs << icpTotalDuration << " * ";
+		icp.keyFrameDuration.dumpStats(ofs); ofs << " * ";
+		icp.convergenceDuration.dumpStats(ofs); ofs << " * ";
 		// algo stats
-		icp.iterationsCount.dumpStats(ofs); ofs << " ";
-		icp.pointCountIn.dumpStats(ofs); ofs << " ";
-		icp.pointCountReading.dumpStats(ofs); ofs << " ";
-		icp.pointCountKeyFrame.dumpStats(ofs); ofs << " ";
-		icp.pointCountTouched.dumpStats(ofs); ofs << " ";
-		icp.overlapRatio.dumpStats(ofs); ofs << " ";
+		icp.iterationsCount.dumpStats(ofs); ofs << " * ";
+		icp.pointCountIn.dumpStats(ofs); ofs << " * ";
+		icp.pointCountReading.dumpStats(ofs); ofs << " * ";
+		icp.pointCountKeyFrame.dumpStats(ofs); ofs << " * ";
+		icp.pointCountTouched.dumpStats(ofs); ofs << " * ";
+		icp.overlapRatio.dumpStats(ofs); ofs << " # ";
 		// params for info
-		ofs << "# ";
 		for (Params::const_iterator it(params.begin()); it != params.end(); ++it)
 			ofs << it->first << "=" << it->second << " ";
 		// finish results
