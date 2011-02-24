@@ -5,6 +5,7 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <boost/progress.hpp>
 
 using namespace std;
 using namespace Eigen;
@@ -22,12 +23,12 @@ T getParam(const std::string& name, const T& defaultValue)
 		T v;
 		istringstream iss(it->second);
 		iss >> v;
-		cerr << "Found parameter: " << name << ", value: " << v;
+		cerr << "Found parameter: " << name << ", value: " << v << endl;
 		return v;
 	}
 	else
 	{
-		cerr << "Cannot find value for parameter: " << name << ", assigning default: " << defaultValue;
+		cerr << "Cannot find value for parameter: " << name << ", assigning default: " << defaultValue << endl;
 		return defaultValue;
 	}
 }
@@ -47,11 +48,13 @@ Data data;
 
 int main(int argc, char **argv)
 {
-	if (argc != 5)
+	if (argc != 4)
 	{
-		cerr << "Usage: " << argv[0] << " data params_names params_values output" << endl;
+		cerr << "Usage: " << argv[0] << " data params output" << endl;
 		return 1;
 	}
+	
+	initParameters();
 	
 	// load data
 	{
@@ -67,6 +70,7 @@ int main(int argc, char **argv)
 		if (!ifs.good())
 		{
 			cerr << "Error, invalid data file " << argv[1] << endl;
+			return 2;
 		}
 		char line[1024];
 		
@@ -130,103 +134,129 @@ int main(int argc, char **argv)
 			ifs.getline(line, 1024);
 		}
 	}
+	if (data.size() < 2)
+	{
+		cerr << "Data must have at least 2 clouds, but only has " << data.size() << endl;
+		return 2;
+	}
 	
 	// load param list
 	
-	/*if (dropCount < startupDropCount)
+	// open file
+	ifstream ifs(argv[2]);
+	if (!ifs.good())
 	{
-		++dropCount;
-		return;
+		cerr << "Error, invalid params file " << argv[2] << endl;
+		return 3;
+	}
+	ofstream ofs(argv[3]);
+	if (!ofs.good())
+	{
+		cerr << "Error, invalid output file " << argv[3] << endl;
+		return 4;
 	}
 	
-	// create labels
-	DP::Labels labels;
-	labels.push_back(DP::Label("x", 1));
-	labels.push_back(DP::Label("y", 1));
-	labels.push_back(DP::Label("z", 1));
-	labels.push_back(DP::Label("pad", 1));
-	
-	// create data points
-	pcl::PointCloud<pcl::PointXYZ> cloud;
-	pcl::fromROSMsg (cloudMsg, cloud);
-
-	size_t goodCount(0);
-	for (size_t i = 0; i < cloud.points.size(); ++i)
+	// for each line in the experiment file
+	unsigned expCount(0);
+	while (ifs.good())
 	{
-		if (!isnan(cloud.points[i].x))
-			++goodCount;
-	}
-	if (goodCount == 0)
-	{
-		ROS_ERROR("I found no good points in the cloud");
-		return;
-	}
-	
-	DP dp(DP::Features(4, goodCount), labels);
-	int dIndex(0);
-	for (size_t i = 0; i < cloud.points.size(); ++i)
-	{
-		if (!isnan(cloud.points[i].x))
+		// read line and load params
+		char line[65536];
+		ifs.getline(line, sizeof(line));
+		params.clear();
+		istringstream iss(line);
+		while (iss.good())
 		{
-			dp.features.coeffRef(0, dIndex) = cloud.points[i].x;
-			dp.features.coeffRef(1, dIndex) = cloud.points[i].y;
-			dp.features.coeffRef(2, dIndex) = cloud.points[i].z;
-			dp.features.coeffRef(3, dIndex) = 1;
-			++dIndex;
+			string keyVal;
+			iss >> keyVal;
+			if (!keyVal.empty())
+			{
+				const size_t delPos = keyVal.find_first_of('=');
+				if (delPos != string::npos)
+				{
+					const string key = keyVal.substr(0, delPos);
+					const string val = keyVal.substr(delPos+1);
+					params[key] = val;
+				}
+			}
 		}
+		cout << "Exp " << expCount << ", loaded " << params.size() << " parameters\n\n";
+		++expCount;
+		
+		// run experiment
+		MSA::ICPSequence icp(3, "", false);
+		populateParameters(icp);
+		Histogram<Scalar> e_x(16, "e_x", "", false), e_y(16, "e_y", "", false), e_z(16, "e_z", "", false), e_a(16, "e_a", "", false);
+		
+		// init icp
+		boost::timer t;
+		TP T_gt_old(data[0].transform);
+		icp(data[0].cloud);
+		TP T_icp_old(icp.getTransform());
+		
+		// for each cloud, compute error
+		unsigned failCount(0);
+		for (size_t i = 1; i < data.size(); ++i)
+		{
+			// apply icp
+			const TP T_gt(data[i].transform);
+			try 
+			{
+				icp(data[i].cloud);
+			}
+			catch (MSA::ConvergenceError error)
+			{
+				++failCount;
+				cerr << "ICP failed to converge at cloud " << i+1 << " : " << error.what() << endl;
+			}
+			const TP T_icp(icp.getTransform());
+			// compute ground-truth transfrom
+			const TP T_d_gt = T_gt * T_gt_old.inverse();
+			// compute icp inverse transform
+			const TP T_di_icp = T_icp_old * T_icp.inverse();
+			// compute diff
+			const TP T_d = T_d_gt * T_di_icp;
+			
+			// compute errors
+			const Vector3 e_t(T_d.topRightCorner(3,1));
+			e_x.push_back(e_t(0));
+			e_y.push_back(e_t(1));
+			e_z.push_back(e_t(2));
+			const Quaternion<Scalar> quat(Matrix3(T_d.topLeftCorner(3,3)));
+			e_a.push_back(2 * acos(quat.w()));
+			
+			// write back transforms
+			T_gt_old = T_gt;
+			T_icp_old = T_icp;
+		}
+		const double icpTotalDuration(t.elapsed());
+		
+		// write back results
+		// general stats
+		ofs << data.size() - 1 << " " << failCount << " ";
+		// error
+		e_x.dumpStats(ofs); ofs << " ";
+		e_y.dumpStats(ofs); ofs << " ";
+		e_z.dumpStats(ofs); ofs << " ";
+		e_a.dumpStats(ofs); ofs << " ";
+		// timing
+		ofs << icpTotalDuration << " ";
+		icp.keyFrameDuration.dumpStats(ofs); ofs << " ";
+		icp.convergenceDuration.dumpStats(ofs); ofs << " ";
+		// algo stats
+		icp.iterationsCount.dumpStats(ofs); ofs << " ";
+		icp.pointCountIn.dumpStats(ofs); ofs << " ";
+		icp.pointCountReading.dumpStats(ofs); ofs << " ";
+		icp.pointCountKeyFrame.dumpStats(ofs); ofs << " ";
+		icp.pointCountTouched.dumpStats(ofs); ofs << " ";
+		icp.overlapRatio.dumpStats(ofs); ofs << " ";
+		// params for info
+		ofs << "# ";
+		for (Params::const_iterator it(params.begin()); it != params.end(); ++it)
+			ofs << it->first << "=" << it->second << " ";
+		// finish results
+		ofs << "\n";
 	}
-	ROS_INFO_STREAM("Got " << cloud.points.size() << " points (" << goodCount << " goods)");
-	
-	const double imageRatio = (double)goodCount / (double)cloud.points.size();
-	
-	//TODO: put that as parameter, tricky to set...
-	if (goodCount < 10000)
-	{
-		ROS_ERROR_STREAM("Partial image! Missing " << 100 - imageRatio*100.0 << "% of the image (received " << goodCount << ")");
-		//return;
-	}
-	
-	// call icp
-	try 
-	{
-		icp(dp);
-		ROS_INFO_STREAM("match ratio: " << icp.errorMinimizer->getWeightedPointUsedRatio() << endl);
-	}
-	catch (MSA::ConvergenceError error)
-	{
-		ROS_WARN_STREAM("ICP failed to converge: " << error.what());
-	}
-	
-	// broadcast transform
-	const TP globalTransform(icp.getTransform());
-	const Eigen::eigen2_Quaternion<Scalar> quat(Matrix3(globalTransform.block(0,0,3,3)));
-	
-	tf::Quaternion tfQuat;
-	tf::RotationEigenToTF(quat.cast<double>(), tfQuat);
-	tf::Vector3 tfVect;
-	tf::VectorEigenToTF(globalTransform.block(0,3,3,1).cast<double>(), tfVect);
-	tf::Transform transform;
-	transform.setRotation(tfQuat);
-	transform.setOrigin(tfVect);
-	
-	if (icp.keyFrameCreatedAtLastCall())
-	{
-		ROS_WARN_STREAM("Keyframe created at " << icp.errorMinimizer->getWeightedPointUsedRatio());
-		geometry_msgs::PoseStamped pose;
-		pose.header.frame_id = sensorFrame;
-		pose.pose.position.x = tfVect.x();
-		pose.pose.position.y = tfVect.y();
-		pose.pose.position.z = tfVect.z();
-		pose.pose.orientation.x = tfQuat.x();
-		pose.pose.orientation.y = tfQuat.y();
-		pose.pose.orientation.z = tfQuat.z();
-		pose.pose.orientation.w = tfQuat.w();
-		path.poses.push_back(pose);
-		pathPub.publish(path);
-	}
-	
-	br.sendTransform(tf::StampedTransform(transform, cloudMsg.header.stamp, fixedFrame, sensorFrame));
-	*/
 
 	return 0;
 }
