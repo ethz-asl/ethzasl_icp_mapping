@@ -50,6 +50,7 @@
 
     <param name="sensorFrame" value="/openni_rgb_optical_frame" />
     <param name="fixedFrame" value="/rotated_world" />
+    <param name="cloudTopic" value="/camera/rgb/points" />
     <param name="ratioToSwitchKeyframe" value="0.7" />
   </node>
 </launch>

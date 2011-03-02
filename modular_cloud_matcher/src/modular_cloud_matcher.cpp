@@ -56,7 +56,7 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix
 	startupDropCount(getParam("startupDropCount", 0)),
 	dropCount(0)
 {
-	const string cloudTopic(getParam<string>("cloudTopic", "/camera/depth/points2"));
+	const string cloudTopic(getParam<string>("cloudTopic", "/camera/rgb/points"));
 	cloudSub = n.subscribe(cloudTopic, 1, &CloudMatcher::gotCloud, this);
 	
 	const string pathTopic(getParam<string>("path", "/tracker_path"));
