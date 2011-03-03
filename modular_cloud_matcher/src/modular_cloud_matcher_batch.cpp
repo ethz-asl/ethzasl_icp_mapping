@@ -179,6 +179,8 @@ int main(int argc, char **argv)
 				}
 			}
 		}
+		if (params.empty())
+			break;
 		cout << "Exp " << expCount << ", loaded " << params.size() << " parameters\n\n";
 		++expCount;
 		
