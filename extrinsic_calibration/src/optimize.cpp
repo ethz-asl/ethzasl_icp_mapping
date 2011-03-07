@@ -57,7 +57,7 @@ struct TrainingEntry
 		is >> q_y;
 		is >> q_z;
 		is >> q_w;
-		odom_rot = Eigen::eigen2_Quaterniond(q_w, q_x, q_y, q_z);
+		odom_rot = Eigen::eigen2_Quaterniond(q_w, q_x, q_y, q_z).normalized();
 		//odom_tr = odom_rot*odom_tr;
 		is >> t_x;
 		is >> t_y;
@@ -67,7 +67,7 @@ struct TrainingEntry
 		is >> q_y;
 		is >> q_z;
 		is >> q_w;
-		icp_rot = Eigen::eigen2_Quaterniond(q_w, q_x, q_y, q_z);
+		icp_rot = Eigen::eigen2_Quaterniond(q_w, q_x, q_y, q_z).normalized();
 		//cerr << icp_rot.x() << " " << icp_rot.y() << " " << icp_rot.z() << " " << icp_rot.w() <<endl;
 		//cerr << icp_tr.x() << " " << icp_tr.y() << " " << icp_tr.z() << endl;
 		// FIXME: bug in Eigen ?
@@ -156,11 +156,11 @@ struct Params
 			"quaternion: x=" << rot.x() << " y=" << rot.y() << " z=" << rot.z() << " w=" << rot.w();
 		*/
 		stream << "<node pkg=\"tf\" type=\"static_transform_publisher\" name=\"base_link_to_kinect\""
-				" args=\"" << tr.x() << " " << tr.y() << " 0 " <<
+				" args=\"" << tr.x() << " " << tr.y() << " " << tr.z() << " " <<
 				rot.x() << " " << rot.y() << " " << rot.z() << " " << rot.w() << " "
 				"/base_link /kinect 100\"/>" 
         " \n\n OR \n\n"
-        "rosrun tf static_transform_publisher " << tr.x() << " " << tr.y() << " 0 " <<
+        "rosrun tf static_transform_publisher " << tr.x() << " " << tr.y() << " " << tr.z() << " " <<
         rot.x() << " " << rot.y() << " " << rot.z() << " " << rot.w() << " "
         "/base_link /kinect 100";
 	}

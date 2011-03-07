@@ -47,9 +47,9 @@ Data data;
 
 int main(int argc, char **argv)
 {
-	if (argc != 4)
+	if (argc < 4)
 	{
-		cerr << "Usage: " << argv[0] << " data params output" << endl;
+		cerr << "Usage: " << argv[0] << " data params output [tf_output] [delta_tf_output]" << endl;
 		return 1;
 	}
 	
@@ -155,6 +155,28 @@ int main(int argc, char **argv)
 		return 4;
 	}
 	
+	// tf output file
+	ofstream tfofs;
+	if (argc >= 5)
+	{
+		tfofs.open(argv[4]);
+		if (!tfofs.good())
+		{
+			cerr << "Error, invalid tf output file " << argv[4] << endl;
+			return 5;
+		}
+	}
+	ofstream dtfofs;
+	if (argc >= 6)
+	{
+		dtfofs.open(argv[5]);
+		if (!tfofs.good())
+		{
+			cerr << "Error, invalid delta tf output file " << argv[5] << endl;
+			return 6;
+		}
+	}
+	
 	// for each line in the experiment file
 	unsigned expCount(0);
 	while (ifs.good())
@@ -188,6 +210,7 @@ int main(int argc, char **argv)
 		MSA::ICPSequence icp(3, "", false);
 		populateParameters(icp);
 		Histogram<Scalar> e_x(16, "e_x", "", false), e_y(16, "e_y", "", false), e_z(16, "e_z", "", false), e_a(16, "e_a", "", false);
+		Histogram<Scalar> e_acc_x(16, "e_acc_x", "", false), e_acc_y(16, "e_acc_y", "", false), e_acc_z(16, "e_acc_z", "", false), e_acc_a(16, "e_acc_a", "", false);
 		
 		// init icp
 		timer t;
@@ -196,6 +219,9 @@ int main(int argc, char **argv)
 		d = data[0].cloud;
 		icp(d);
 		TP T_icp_old(icp.getTransform());
+		
+		TP T_gt_acc(TP::Identity(4,4));
+		TP Ti_icp_acc(TP::Identity(4,4));
 		
 		// for each cloud, compute error
 		unsigned failCount(0);
@@ -221,13 +247,64 @@ int main(int argc, char **argv)
 			// compute diff
 			const TP T_d = T_d_gt * T_di_icp;
 			
+			// write output
+			if (argc >= 5)
+			{
+				// tf
+				const Vector3 t_gt(T_gt.topRightCorner(3,1));
+				const Quaternion<Scalar> q_gt(Matrix3(T_gt.topLeftCorner(3,3)));
+				tfofs << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w() << " ";
+				const Vector3 t_icp(T_icp.topRightCorner(3,1));
+				const Quaternion<Scalar> q_icp(Matrix3(T_icp.topLeftCorner(3,3)));
+				tfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w() << "\n";
+				
+			}
+			if (argc >= 6)
+			{
+				// delta tf
+				const Vector3 t_gt(T_d_gt.topRightCorner(3,1));
+				const Quaternion<Scalar> q_gt(Matrix3(T_d_gt.topLeftCorner(3,3)));
+				dtfofs << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w() << " ";
+				const TP T_d_icp = T_di_icp.inverse();
+				const Vector3 t_icp(T_d_icp.topRightCorner(3,1));
+				const Quaternion<Scalar> q_icp(Matrix3(T_d_icp.topLeftCorner(3,3)));
+				dtfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w() << "\n";
+				
+			}
+			
 			// compute errors
-			const Vector3 e_t(T_d.topRightCorner(3,1));
-			e_x.push_back(e_t(0));
-			e_y.push_back(e_t(1));
-			e_z.push_back(e_t(2));
-			const Quaternion<Scalar> quat(Matrix3(T_d.topLeftCorner(3,3)));
-			e_a.push_back(2 * acos(quat.normalized().w()));
+			{
+				const Vector3 e_t(T_d.topRightCorner(3,1));
+				e_x.push_back(e_t(0));
+				e_y.push_back(e_t(1));
+				e_z.push_back(e_t(2));
+				const Quaternion<Scalar> quat(Matrix3(T_d.topLeftCorner(3,3)));
+				e_a.push_back(2 * acos(quat.normalized().w()));
+			}
+			
+			if (i % 30 == 0)
+			{
+				// compute difference
+				const TP T_d_acc = T_gt_acc * Ti_icp_acc;
+				
+				// compute errors
+				const Vector3 e_t(T_d_acc.topRightCorner(3,1));
+				e_acc_x.push_back(e_t(0));
+				e_acc_y.push_back(e_t(1));
+				e_acc_z.push_back(e_t(2));
+				const Quaternion<Scalar> quat(Matrix3(T_d_acc.topLeftCorner(3,3)));
+				e_acc_a.push_back(2 * acos(quat.normalized().w()));
+				
+				// reset accumulators
+				T_gt_acc = TP::Identity(4,4);
+				Ti_icp_acc = TP::Identity(4,4);
+			}
+			else
+			{
+				T_gt_acc *= T_d_gt;
+				Ti_icp_acc *= T_di_icp;
+			}
+		
 			
 			// write back transforms
 			T_gt_old = T_gt;
@@ -238,11 +315,16 @@ int main(int argc, char **argv)
 		// write back results
 		// general stats
 		ofs << data.size() - 1 << " " << failCount << " * ";
-		// error
+		// error on each dt
 		e_x.dumpStats(ofs); ofs << " * ";
 		e_y.dumpStats(ofs); ofs << " * ";
 		e_z.dumpStats(ofs); ofs << " * ";
 		e_a.dumpStats(ofs); ofs << " * ";
+		// error every sect
+		e_acc_x.dumpStats(ofs); ofs << " * ";
+		e_acc_y.dumpStats(ofs); ofs << " * ";
+		e_acc_z.dumpStats(ofs); ofs << " * ";
+		e_acc_a.dumpStats(ofs); ofs << " * ";
 		// timing
 		ofs << icpTotalDuration << " * ";
 		icp.keyFrameDuration.dumpStats(ofs); ofs << " * ";
