@@ -44,16 +44,35 @@ struct Datum
 typedef vector<Datum> Data;
 
 Data data;
+TP T_v_to_k(TP::Identity(4, 4));
+TP T_k_to_v(TP::Identity(4, 4));
 
 int main(int argc, char **argv)
 {
 	if (argc < 4)
 	{
-		cerr << "Usage: " << argv[0] << " data params output [tf_output] [delta_tf_output]" << endl;
+		cerr << "Usage: " << argv[0] << " data params output [tf_output] [delta_tf_output] [transform from gt to icp: t_x t_y t_z q_x q_y q_z q_w]" << endl;
 		return 1;
 	}
 	
 	initParameters();
+	
+	if (argc >= 13)
+	{
+		Eigen::Vector3f tr;
+		tr(0) = atof(argv[6]);
+		tr(1) = atof(argv[7]);
+		tr(2) = atof(argv[8]);
+		Eigen::eigen2_Quaternionf rot;
+		rot.x() = atof(argv[9]);
+		rot.y() = atof(argv[10]);
+		rot.z() = atof(argv[11]);
+		rot.w() = atof(argv[12]);
+		T_k_to_v = (Eigen::eigen2_Translation3f(tr) * rot).matrix();
+		T_v_to_k = T_k_to_v.inverse();
+		cout << "Using correction:\n";
+		cout << T_k_to_v << "\n";
+	}
 	
 	// load data
 	{
@@ -215,20 +234,20 @@ int main(int argc, char **argv)
 		// init icp
 		timer t;
 		DP d;
-		TP T_gt_old(data[0].transform);
+		const TP T_gt_init(data[0].transform);
+		TP T_gt_old(T_gt_init);
 		d = data[0].cloud;
 		icp(d);
-		TP T_icp_old(icp.getTransform());
+		TP T_icp_old(T_gt_init * T_k_to_v * icp.getTransform() * T_v_to_k);
 		
-		TP T_gt_acc(TP::Identity(4,4));
-		TP Ti_icp_acc(TP::Identity(4,4));
+		TP T_d_gt_acc(TP::Identity(4,4));
+		TP T_d_icp_acc(TP::Identity(4,4));
 		
 		// for each cloud, compute error
 		unsigned failCount(0);
 		for (size_t i = 1; i < data.size(); ++i)
 		{
 			// apply icp
-			const TP T_gt(data[i].transform);
 			try 
 			{
 				d = data[i].cloud;
@@ -239,13 +258,18 @@ int main(int argc, char **argv)
 				++failCount;
 				cerr << "ICP failed to converge at cloud " << i+1 << " : " << error.what() << endl;
 			}
-			const TP T_icp(icp.getTransform());
+			
+			// get ground-truth
+			const TP T_gt(data[i].transform); 
+			// compute T given ICP in ground-truth coordinates
+			const TP T_icp = T_gt_init * T_k_to_v * icp.getTransform() * T_v_to_k;
 			// compute ground-truth transfrom
-			const TP T_d_gt = T_gt * T_gt_old.inverse();
+			const TP T_d_gt = T_gt.inverse() * T_gt_old;
 			// compute icp inverse transform
-			const TP T_di_icp = T_icp_old * T_icp.inverse();
-			// compute diff
-			const TP T_d = T_d_gt * T_di_icp;
+			const TP T_d_icp = T_icp.inverse() * T_icp_old;
+			
+			/*cerr << "T_gt_init:\n" << T_gt_init << "\nT_gt:\n" << T_gt << "\nT_k_to_v:\n" << T_k_to_v << "\nicp::getTransform:\n" << icp.getTransform() << "\nT_v_to_k:\n" << T_v_to_k << "\n\nT_icp:\n" << T_icp << endl;
+			cerr << "det icp::getTransform: " << icp.getTransform().determinant() << ", det T_icp: " << T_icp .determinant() << endl;*/
 			
 			// write output
 			if (argc >= 5)
@@ -257,22 +281,22 @@ int main(int argc, char **argv)
 				const Vector3 t_icp(T_icp.topRightCorner(3,1));
 				const Quaternion<Scalar> q_icp(Matrix3(T_icp.topLeftCorner(3,3)));
 				tfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w() << "\n";
-				
 			}
-			if (argc >= 6)
+			
+			// dump deltas
+			/*if (argc >= 6)
 			{
 				// delta tf
 				const Vector3 t_gt(T_d_gt.topRightCorner(3,1));
 				const Quaternion<Scalar> q_gt(Matrix3(T_d_gt.topLeftCorner(3,3)));
 				dtfofs << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w() << " ";
-				const TP T_d_icp = T_di_icp.inverse();
 				const Vector3 t_icp(T_d_icp.topRightCorner(3,1));
 				const Quaternion<Scalar> q_icp(Matrix3(T_d_icp.topLeftCorner(3,3)));
 				dtfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w() << "\n";
-				
-			}
+			}*/
 			
 			// compute errors
+			const TP T_d = T_d_gt * T_d_icp.inverse();
 			{
 				const Vector3 e_t(T_d.topRightCorner(3,1));
 				e_x.push_back(e_t(0));
@@ -285,7 +309,8 @@ int main(int argc, char **argv)
 			if (i % 30 == 0)
 			{
 				// compute difference
-				const TP T_d_acc = T_gt_acc * Ti_icp_acc;
+				const TP T_d_acc = T_d_gt_acc * T_d_icp_acc.inverse();
+				// FIXME: check if above code is correct
 				
 				// compute errors
 				const Vector3 e_t(T_d_acc.topRightCorner(3,1));
@@ -295,16 +320,27 @@ int main(int argc, char **argv)
 				const Quaternion<Scalar> quat(Matrix3(T_d_acc.topLeftCorner(3,3)));
 				e_acc_a.push_back(2 * acos(quat.normalized().w()));
 				
+				// dump deltas
+				if (argc >= 6)
+				{
+					// delta tf
+					const Vector3 t_gt(T_d_gt_acc.topRightCorner(3,1));
+					const Quaternion<Scalar> q_gt(Matrix3(T_d_gt_acc.topLeftCorner(3,3)));
+					dtfofs << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w() << " ";
+					const Vector3 t_icp(T_d_icp_acc.topRightCorner(3,1));
+					const Quaternion<Scalar> q_icp(Matrix3(T_d_icp_acc.topLeftCorner(3,3)));
+					dtfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w() << "\n";
+				}
+				
 				// reset accumulators
-				T_gt_acc = TP::Identity(4,4);
-				Ti_icp_acc = TP::Identity(4,4);
+				T_d_gt_acc = TP::Identity(4,4);
+				T_d_icp_acc = TP::Identity(4,4);
 			}
 			else
 			{
-				T_gt_acc *= T_d_gt;
-				Ti_icp_acc *= T_di_icp;
+				T_d_gt_acc = T_d_gt * T_d_gt_acc;
+				T_d_icp_acc = T_d_icp * T_d_icp_acc;
 			}
-		
 			
 			// write back transforms
 			T_gt_old = T_gt;
