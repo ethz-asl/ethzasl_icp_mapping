@@ -49,25 +49,25 @@ TP T_k_to_v(TP::Identity(4, 4));
 
 int main(int argc, char **argv)
 {
-	if (argc < 4)
+	if (argc < 11)
 	{
-		cerr << "Usage: " << argv[0] << " data params output [tf_output] [delta_tf_output] [transform from gt to icp: t_x t_y t_z q_x q_y q_z q_w]" << endl;
+		cerr << "Usage: " << argv[0] << " data params output t_x t_y t_z q_x q_y q_z q_w (transform from gt to icp, for correction) [tf_output] [delta_tf_output] [delta_tf_steps]" << endl;
 		return 1;
 	}
 	
 	initParameters();
 	
-	if (argc >= 13)
+	// read correction
 	{
 		Eigen::Vector3f tr;
-		tr(0) = atof(argv[6]);
-		tr(1) = atof(argv[7]);
-		tr(2) = atof(argv[8]);
+		tr(0) = atof(argv[4]);
+		tr(1) = atof(argv[5]);
+		tr(2) = atof(argv[6]);
 		Eigen::eigen2_Quaternionf rot;
-		rot.x() = atof(argv[9]);
-		rot.y() = atof(argv[10]);
-		rot.z() = atof(argv[11]);
-		rot.w() = atof(argv[12]);
+		rot.x() = atof(argv[7]);
+		rot.y() = atof(argv[8]);
+		rot.z() = atof(argv[9]);
+		rot.w() = atof(argv[10]);
 		T_k_to_v = (Eigen::eigen2_Translation3f(tr) * rot).matrix();
 		T_v_to_k = T_k_to_v.inverse();
 		cout << "Using correction:\n";
@@ -176,9 +176,9 @@ int main(int argc, char **argv)
 	
 	// tf output file
 	ofstream tfofs;
-	if (argc >= 5)
+	if (argc >= 12)
 	{
-		tfofs.open(argv[4]);
+		tfofs.open(argv[11]);
 		if (!tfofs.good())
 		{
 			cerr << "Error, invalid tf output file " << argv[4] << endl;
@@ -186,14 +186,20 @@ int main(int argc, char **argv)
 		}
 	}
 	ofstream dtfofs;
-	if (argc >= 6)
+	if (argc >= 13)
 	{
-		dtfofs.open(argv[5]);
+		dtfofs.open(argv[12]);
 		if (!tfofs.good())
 		{
 			cerr << "Error, invalid delta tf output file " << argv[5] << endl;
 			return 6;
 		}
+	}
+	int deltaTfSteps(30);
+	if (argc >= 14)
+	{
+		deltaTfSteps = atoi(argv[13]);
+		cout << "Using tf steps of " << deltaTfSteps << endl;
 	}
 	
 	// for each line in the experiment file
@@ -272,7 +278,7 @@ int main(int argc, char **argv)
 			cerr << "det icp::getTransform: " << icp.getTransform().determinant() << ", det T_icp: " << T_icp .determinant() << endl;*/
 			
 			// write output
-			if (argc >= 5)
+			if (argc >= 12)
 			{
 				// tf
 				const Vector3 t_gt(T_gt.topRightCorner(3,1));
@@ -306,11 +312,10 @@ int main(int argc, char **argv)
 				e_a.push_back(2 * acos(quat.normalized().w()));
 			}
 			
-			if (i % 30 == 0)
+			if (i % deltaTfSteps == 0)
 			{
 				// compute difference
 				const TP T_d_acc = T_d_gt_acc * T_d_icp_acc.inverse();
-				// FIXME: check if above code is correct
 				
 				// compute errors
 				const Vector3 e_t(T_d_acc.topRightCorner(3,1));
@@ -321,7 +326,7 @@ int main(int argc, char **argv)
 				e_acc_a.push_back(2 * acos(quat.normalized().w()));
 				
 				// dump deltas
-				if (argc >= 6)
+				if (argc >= 13)
 				{
 					// delta tf
 					const Vector3 t_gt(T_d_gt_acc.topRightCorner(3,1));

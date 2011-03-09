@@ -33,16 +33,20 @@ void pointCloudCallback(const sensor_msgs::PointCloud2& cloudMsg)
 	tf::StampedTransform transform;
 	try
 	{
-		listenerPtr->lookupTransform( "/ned", "/vicon_vehicle_20",  ros::Time(0), transform);
+		listenerPtr->waitForTransform("/ned", "/vicon_vehicle_20", cloudMsg.header.stamp, ros::Duration(0.1));
+		listenerPtr->lookupTransform( "/ned", "/vicon_vehicle_20", cloudMsg.header.stamp, transform);
 	}
 	catch (tf::TransformException ex)
 	{
 		ROS_ERROR("%s",ex.what());
+		return;
 	}
 	
 	// store cloud along transform
 	//ROS_WARN_STREAM("Added cloud " << entries.size());
 	entries.push_back(Entry(output, transform));
+	
+	cerr << "We have " << entries.size() << " clouds\n";
 	if (int(entries.size()) >= maxCloudCount)
 		ros::shutdown();
 }
@@ -86,7 +90,7 @@ int main(int argc, char **argv)
 	tf::TransformListener listener;
 	listenerPtr = &listener;
 	
-	ros::Subscriber sub = n.subscribe("/camera/depth/points2", 10, pointCloudCallback);
+	ros::Subscriber sub = n.subscribe("/camera/depth/points2", 20, pointCloudCallback);
 
 	ros::spin();
 	
