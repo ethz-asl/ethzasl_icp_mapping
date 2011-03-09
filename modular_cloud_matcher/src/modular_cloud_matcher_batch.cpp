@@ -1,3 +1,5 @@
+
+#define EIGEN2_SUPPORT_STAGE30_FULL_EIGEN3_API
 #include <Eigen/Core>
 #include <Eigen/Geometry> 
 #include <map>
