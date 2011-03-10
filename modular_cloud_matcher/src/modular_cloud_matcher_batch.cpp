@@ -5,6 +5,11 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
+
+
 
 using namespace std;
 using namespace Eigen;
@@ -54,6 +59,8 @@ int main(int argc, char **argv)
 		cerr << "Usage: " << argv[0] << " data params output t_x t_y t_z q_x q_y q_z q_w (transform from gt to icp, for correction) [tf_output] [delta_tf_output] [delta_tf_steps]" << endl;
 		return 1;
 	}
+	
+	srand(time(0));
 	
 	initParameters();
 	
