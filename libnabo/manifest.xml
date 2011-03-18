@@ -1,0 +1,19 @@
+<package>
+  <description brief="libnabo">
+
+     Fetches and compiles (http://github.com/ethz-asl/libnabo)
+
+  </description>
+  <author>Stéphane Magnenat</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/libnabo</url>
+  <depend package="eigen"/>
+  
+  <export>
+	<cpp cflags="-I${prefix}/build/include" lflags="-L${prefix}/build/lib -lnabo"/>
+  </export>
+
+</package>
+
+
