@@ -252,14 +252,23 @@ int main(int argc, char **argv)
 		const TP T_gt_init(data[0].transform);
 		TP T_gt_old(T_gt_init);
 		d = data[0].cloud;
-		icp(d);
-		TP T_icp_old(T_gt_init * T_k_to_v * icp.getTransform() * T_v_to_k);
+		unsigned failCount(0);
+		try
+    {
+      icp(d);
+    }
+    catch (MSA::ConvergenceError error)
+    {
+      ++failCount;
+      cerr << "ICP failed to converge at cloud 0 : " << error.what() << endl;
+    }
+		
+    TP T_icp_old(T_gt_init * T_k_to_v * icp.getTransform() * T_v_to_k);
 		
 		TP T_d_gt_acc(TP::Identity(4,4));
 		TP T_d_icp_acc(TP::Identity(4,4));
 		
 		// for each cloud, compute error
-		unsigned failCount(0);
 		for (size_t i = 1; i < data.size(); ++i)
 		{
 			// apply icp
