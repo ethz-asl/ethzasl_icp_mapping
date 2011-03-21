@@ -17,6 +17,7 @@ T getParam(const std::string& name, const T& defaultValue)
 #include "icp_chain_creation.h"
 
 #include "sensor_msgs/PointCloud2.h"
+#include "geometry_msgs/PoseWithCovariance.h"
 #include "nav_msgs/Path.h"
 #include "pcl/point_types.h"
 #include "pcl/point_cloud.h" 
@@ -33,6 +34,7 @@ class CloudMatcher
 	
 	MSA::ICPSequence icp;
 	
+	const bool sendPoseMessage;
 	const string fixedFrame;
 	const string sensorFrame;
 	const unsigned startupDropCount;
@@ -42,15 +44,17 @@ class CloudMatcher
 	ros::Publisher pathPub;
 	nav_msgs::Path path;
 	tf::TransformBroadcaster br;
+	ros::Publisher posePub;
 	
 public:
-	CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix);
+	CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix, const bool sendPoseMessage);
 	void gotCloud(const sensor_msgs::PointCloud2& cloudMsg);
 };
 
-CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix):
+CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix, const bool sendPoseMessage):
 	n(n),
 	icp(3, statFilePrefix),
+	sendPoseMessage(sendPoseMessage),
 	fixedFrame(getParam<string>("fixedFrame",  "/world")),
 	sensorFrame(getParam<string>("sensorFrame",  "/openni_rgb_optical_frame")),
 	startupDropCount(getParam("startupDropCount", 0)),
@@ -65,6 +69,9 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix
 	path.header.frame_id = fixedFrame;
 	
 	populateParameters(icp);
+	
+	if (sendPoseMessage)
+		posePub = n.advertise<geometry_msgs::PoseWithCovariance>(getParam<string>("poseTopic", "/openni_pose"), 3);
 }
 
 void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
@@ -123,6 +130,7 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 	}
 	
 	// call icp
+	bool icpWasSuccess(true);
 	try 
 	{
 		icp(dp);
@@ -130,6 +138,7 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 	}
 	catch (MSA::ConvergenceError error)
 	{
+		icpWasSuccess = false;
 		ROS_WARN_STREAM("ICP failed to converge: " << error.what());
 	}
 	
@@ -144,6 +153,32 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 	tf::Transform transform;
 	transform.setRotation(tfQuat);
 	transform.setOrigin(tfVect);
+	
+	if (sendPoseMessage)
+	{
+		geometry_msgs::PoseWithCovariance pose;
+		if (icpWasSuccess)
+		{
+			pose.pose.position.x = tfVect.x();
+			pose.pose.position.y = tfVect.y();
+			pose.pose.position.z = tfVect.z();
+			pose.pose.orientation.x = tfQuat.x();
+			pose.pose.orientation.y = tfQuat.y();
+			pose.pose.orientation.z = tfQuat.z();
+			pose.pose.orientation.w = tfQuat.w();
+		}
+		else
+		{
+			pose.pose.position.x = numeric_limits<float>::quiet_NaN();
+			pose.pose.position.y = numeric_limits<float>::quiet_NaN();
+			pose.pose.position.z = numeric_limits<float>::quiet_NaN();
+			pose.pose.orientation.x = numeric_limits<float>::quiet_NaN();
+			pose.pose.orientation.y = numeric_limits<float>::quiet_NaN();
+			pose.pose.orientation.z = numeric_limits<float>::quiet_NaN();
+			pose.pose.orientation.w = numeric_limits<float>::quiet_NaN();
+		}
+		posePub.publish(pose);
+	}
 	
 	if (icp.keyFrameCreatedAtLastCall())
 	{
@@ -170,8 +205,13 @@ int main(int argc, char **argv)
 	
 	ros::init(argc, argv, "cloud_matcher_node");
 	ros::NodeHandle n;
+	bool sendPoseMessage(false);
 	
-	CloudMatcher matcher(n, getParam<string>("statFilePrefix",  ""));
+	for (int i = 1; i < argc; ++i)
+		if (strcmp(argv[i], "--sendpose") == 0)
+			sendPoseMessage = true;
+	
+	CloudMatcher matcher(n, getParam<string>("statFilePrefix",  ""), sendPoseMessage);
 	
 	ros::spin();
 	
