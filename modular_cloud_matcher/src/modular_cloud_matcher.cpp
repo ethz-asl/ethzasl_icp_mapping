@@ -34,7 +34,7 @@ class CloudMatcher
 	
 	MSA::ICPSequence icp;
 	
-	const bool sendPoseMessage;
+	const bool sendDeltaPoseMessage;
 	const string fixedFrame;
 	const string sensorFrame;
 	const unsigned startupDropCount;
@@ -47,14 +47,14 @@ class CloudMatcher
 	ros::Publisher posePub;
 	
 public:
-	CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix, const bool sendPoseMessage);
+	CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix, const bool sendDeltaPoseMessage);
 	void gotCloud(const sensor_msgs::PointCloud2& cloudMsg);
 };
 
-CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix, const bool sendPoseMessage):
+CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix, const bool sendDeltaPoseMessage):
 	n(n),
 	icp(3, statFilePrefix),
-	sendPoseMessage(sendPoseMessage),
+	sendDeltaPoseMessage(sendDeltaPoseMessage),
 	fixedFrame(getParam<string>("fixedFrame",  "/world")),
 	sensorFrame(getParam<string>("sensorFrame",  "/openni_rgb_optical_frame")),
 	startupDropCount(getParam("startupDropCount", 0)),
@@ -70,8 +70,8 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix
 	
 	populateParameters(icp);
 	
-	if (sendPoseMessage)
-		posePub = n.advertise<geometry_msgs::PoseWithCovariance>(getParam<string>("poseTopic", "/openni_pose"), 3);
+	if (sendDeltaPoseMessage)
+		posePub = n.advertise<geometry_msgs::PoseWithCovariance>(getParam<string>("poseTopic", "/openni_delta_pose"), 3);
 }
 
 void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
@@ -143,32 +143,28 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 	}
 	
 	// broadcast transform
-	const TP globalTransform(icp.getTransform());
-	const Eigen::eigen2_Quaternion<Scalar> quat(Matrix3(globalTransform.block(0,0,3,3)));
-	
-	tf::Quaternion tfQuat;
-	tf::RotationEigenToTF(quat.cast<double>(), tfQuat);
-	tf::Vector3 tfVect;
-	tf::VectorEigenToTF(globalTransform.block(0,3,3,1).cast<double>(), tfVect);
-	tf::Transform transform;
-	transform.setRotation(tfQuat);
-	transform.setOrigin(tfVect);
-	
-	if (sendPoseMessage)
+	if (sendDeltaPoseMessage)
 	{
+		const TP dTransform(icp.getDeltaTransform());
+		const Eigen::eigen2_Quaternion<Scalar> dTquat(Matrix3(dTransform.block(0,0,3,3)));
+		const Vector3 dTtr(dTransform.block(0,3,3,1));
 		geometry_msgs::PoseWithCovariance pose;
 		if (icpWasSuccess)
 		{
-			pose.pose.position.x = tfVect.x();
-			pose.pose.position.y = tfVect.y();
-			pose.pose.position.z = tfVect.z();
-			pose.pose.orientation.x = tfQuat.x();
-			pose.pose.orientation.y = tfQuat.y();
-			pose.pose.orientation.z = tfQuat.z();
-			pose.pose.orientation.w = tfQuat.w();
+			pose.pose.position.x = dTtr(0);
+			pose.pose.position.y = dTtr(1);
+			pose.pose.position.z = dTtr(2);
+			pose.pose.orientation.x = dTquat.x();
+			pose.pose.orientation.y = dTquat.y();
+			pose.pose.orientation.z = dTquat.z();
+			pose.pose.orientation.w = dTquat.w();
 		}
 		else
 		{
+			ROS_WARN_STREAM("ICP failure in sendDeltaPose mode, resetting tracker");
+			// we have a failure, so we are sure that we did not create a key frame, 
+			// so dp is not affected. We can thus create a new keyframe
+			icp.resetTracking(dp);
 			pose.pose.position.x = numeric_limits<float>::quiet_NaN();
 			pose.pose.position.y = numeric_limits<float>::quiet_NaN();
 			pose.pose.position.z = numeric_limits<float>::quiet_NaN();
@@ -180,6 +176,19 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 		posePub.publish(pose);
 	}
 	
+	// FIXME: should we continue publishing absolute pose as tf in sendDeltaPoseMessage mode?
+	
+	const TP globalTransform(icp.getTransform());
+	const Eigen::eigen2_Quaternion<Scalar> quat(Matrix3(globalTransform.block(0,0,3,3)));
+	
+	tf::Quaternion tfQuat;
+	tf::RotationEigenToTF(quat.cast<double>(), tfQuat);
+	tf::Vector3 tfVect;
+	tf::VectorEigenToTF(globalTransform.block(0,3,3,1).cast<double>(), tfVect);
+	tf::Transform transform;
+	transform.setRotation(tfQuat);
+	transform.setOrigin(tfVect);
+
 	if (icp.keyFrameCreatedAtLastCall())
 	{
 		ROS_WARN_STREAM("Keyframe created at " << icp.errorMinimizer->getWeightedPointUsedRatio());
@@ -205,13 +214,13 @@ int main(int argc, char **argv)
 	
 	ros::init(argc, argv, "cloud_matcher_node");
 	ros::NodeHandle n;
-	bool sendPoseMessage(false);
+	bool sendDeltaPoseMessage(false);
 	
 	for (int i = 1; i < argc; ++i)
-		if (strcmp(argv[i], "--sendpose") == 0)
-			sendPoseMessage = true;
+		if (strcmp(argv[i], "--senddeltapose") == 0)
+			sendDeltaPoseMessage = true;
 	
-	CloudMatcher matcher(n, getParam<string>("statFilePrefix",  ""), sendPoseMessage);
+	CloudMatcher matcher(n, getParam<string>("statFilePrefix",  ""), sendDeltaPoseMessage);
 	
 	ros::spin();
 	
