@@ -28,7 +28,7 @@
     <param name="matcher/name" value="KDTreeMatcher" />
     <param name="matcher/epsilon" value="0.0" />
 
-    <param name="transformationCheckerCount" value="3" />  
+    <param name="transformationCheckerCount" value="2" />  
     <param name="transformationCheckers/0/name" value="ErrorTransformationChecker" />
     <param name="transformationCheckers/0/minRotErrorDelta" value="0.001" />
     <param name="transformationCheckers/0/minTransErrorDelta" value="0.01" />

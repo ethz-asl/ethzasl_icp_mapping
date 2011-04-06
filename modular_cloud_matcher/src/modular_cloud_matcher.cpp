@@ -71,7 +71,7 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix
 	populateParameters(icp);
 	
 	if (sendDeltaPoseMessage)
-		posePub = n.advertise<geometry_msgs::PoseWithCovariance>(getParam<string>("poseTopic", "/openni_delta_pose"), 3);
+		posePub = n.advertise<geometry_msgs::PoseWithCovariance>(getParam<string>("deltaPoseTopic", "/openni_delta_pose"), 3);
 }
 
 void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
