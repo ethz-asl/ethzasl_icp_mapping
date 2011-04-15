@@ -3,7 +3,7 @@
 
 #include <boost/format.hpp>
 #include "pointmatcher/PointMatcher.h"
-
+#include <limits>
 
 // TODO: move this somewhere out
 typedef float Scalar;
@@ -128,9 +128,12 @@ MSA::DataPointsFilter* createFixstepSamplingDataPointsFilter(const std::string& 
 
 MSA::Matcher* createKDTreeMatcher(const std::string& root)
 {
+	const int knn(getParam(root + "knn", 1));
 	return new MSA::KDTreeMatcher(
-		getParam(root + "knn", 1),
-		getParam(root + "epsilon", 0.)
+		knn,
+		getParam(root + "epsilon", 0.),
+		knn < 50 ? MSA::NNS::KDTREE_LINEAR_HEAP : MSA::NNS::KDTREE_TREE_HEAP,
+		Scalar(getParam(root + "maxDist", std::numeric_limits<double>::infinity()))
 	);
 }
 

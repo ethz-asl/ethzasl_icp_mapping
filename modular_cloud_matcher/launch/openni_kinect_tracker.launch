@@ -27,6 +27,7 @@
 
     <param name="matcher/name" value="KDTreeMatcher" />
     <param name="matcher/epsilon" value="0.0" />
+    <param name="matcher/maxDist" value="0.2" />
 
     <param name="transformationCheckerCount" value="2" />  
     <param name="transformationCheckers/0/name" value="ErrorTransformationChecker" />
@@ -39,11 +40,9 @@
     <param name="transformationCheckers/2/maxRotationNorm" value="1" />
     <param name="transformationCheckers/2/maxTranslationNorm" value="0.5" />
 
-    <param name="featureOutlierFilterCount" value="2" />
-    <param name="featureOutlierFilters/0/name" value="MaxDistOutlierFilter" />
-    <param name="featureOutlierFilters/0/maxDist" value=".2" />
-    <param name="featureOutlierFilters/1/name" value="MedianDistOutlierFilter" />
-    <param name="featureOutlierFilters/1/factor" value="4" />
+    <param name="featureOutlierFilterCount" value="1" />
+    <param name="featureOutlierFilters/0/name" value="MedianDistOutlierFilter" />
+    <param name="featureOutlierFilters/0/factor" value="4" />
 
     <param name="inspector/name" value="Inspector" />
     <param name="errorMinimizer/name" value="PointToPlaneErrorMinimizer" />
