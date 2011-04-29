@@ -17,7 +17,7 @@ T getParam(const std::string& name, const T& defaultValue)
 #include "icp_chain_creation.h"
 
 #include "sensor_msgs/PointCloud2.h"
-#include "geometry_msgs/PoseWithCovariance.h"
+#include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "nav_msgs/Path.h"
 #include "pcl/point_types.h"
 #include "pcl/point_cloud.h" 
@@ -71,7 +71,7 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix
 	populateParameters(icp);
 	
 	if (sendDeltaPoseMessage)
-		posePub = n.advertise<geometry_msgs::PoseWithCovariance>(getParam<string>("deltaPoseTopic", "/openni_delta_pose"), 3);
+		posePub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>(getParam<string>("deltaPoseTopic", "/openni_delta_pose"), 3);
 }
 
 void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
@@ -102,6 +102,24 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 	if (goodCount == 0)
 	{
 		ROS_ERROR("I found no good points in the cloud");
+		if (sendDeltaPoseMessage)
+		{
+			geometry_msgs::PoseWithCovarianceStamped pose;
+			geometry_msgs::Point& position(pose.pose.pose.position);
+			geometry_msgs::Quaternion& orientation(pose.pose.pose.orientation);
+			
+			pose.header.stamp = cloudMsg.header.stamp;
+			
+			position.x = numeric_limits<float>::quiet_NaN();
+			position.y = numeric_limits<float>::quiet_NaN();
+			position.z = numeric_limits<float>::quiet_NaN();
+			orientation.x = numeric_limits<float>::quiet_NaN();
+			orientation.y = numeric_limits<float>::quiet_NaN();
+			orientation.z = numeric_limits<float>::quiet_NaN();
+			orientation.w = numeric_limits<float>::quiet_NaN();
+			
+			posePub.publish(pose);
+		}
 		return;
 	}
 	
@@ -148,16 +166,22 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 		const TP dTransform(icp.getDeltaTransform());
 		const Eigen::eigen2_Quaternion<Scalar> dTquat(Matrix3(dTransform.block(0,0,3,3)));
 		const Vector3 dTtr(dTransform.block(0,3,3,1));
-		geometry_msgs::PoseWithCovariance pose;
+		
+		geometry_msgs::PoseWithCovarianceStamped pose;
+		geometry_msgs::Point& position(pose.pose.pose.position);
+		geometry_msgs::Quaternion& orientation(pose.pose.pose.orientation);
+		
+		pose.header.stamp = cloudMsg.header.stamp;
+		
 		if (icpWasSuccess)
 		{
-			pose.pose.position.x = dTtr(0);
-			pose.pose.position.y = dTtr(1);
-			pose.pose.position.z = dTtr(2);
-			pose.pose.orientation.x = dTquat.x();
-			pose.pose.orientation.y = dTquat.y();
-			pose.pose.orientation.z = dTquat.z();
-			pose.pose.orientation.w = dTquat.w();
+			position.x = dTtr(0);
+			position.y = dTtr(1);
+			position.z = dTtr(2);
+			orientation.x = dTquat.x();
+			orientation.y = dTquat.y();
+			orientation.z = dTquat.z();
+			orientation.w = dTquat.w();
 		}
 		else
 		{
@@ -165,13 +189,13 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 			// we have a failure, so we are sure that we did not create a key frame, 
 			// so dp is not affected. We can thus create a new keyframe
 			icp.resetTracking(dp);
-			pose.pose.position.x = numeric_limits<float>::quiet_NaN();
-			pose.pose.position.y = numeric_limits<float>::quiet_NaN();
-			pose.pose.position.z = numeric_limits<float>::quiet_NaN();
-			pose.pose.orientation.x = numeric_limits<float>::quiet_NaN();
-			pose.pose.orientation.y = numeric_limits<float>::quiet_NaN();
-			pose.pose.orientation.z = numeric_limits<float>::quiet_NaN();
-			pose.pose.orientation.w = numeric_limits<float>::quiet_NaN();
+			position.x = numeric_limits<float>::quiet_NaN();
+			position.y = numeric_limits<float>::quiet_NaN();
+			position.z = numeric_limits<float>::quiet_NaN();
+			orientation.x = numeric_limits<float>::quiet_NaN();
+			orientation.y = numeric_limits<float>::quiet_NaN();
+			orientation.z = numeric_limits<float>::quiet_NaN();
+			orientation.w = numeric_limits<float>::quiet_NaN();
 		}
 		posePub.publish(pose);
 	}
