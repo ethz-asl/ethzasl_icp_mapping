@@ -1,4 +1,0 @@
-sensor_msgs/PointCloud reference
-sensor_msgs/PointCloud readings
----
-geometry_msgs/Transform transform
