@@ -10,11 +10,13 @@
   <url>http://ros.org/wiki/modular_cloud_matcher</url>
   <depend package="roscpp"/>
   <depend package="rospy"/>
+  <depend package="rosbag"/>
   <depend package="std_msgs"/>
   <depend package="geometry_msgs"/>
   <depend package="sensor_msgs"/>
   <depend package="nav_msgs"/>
   <depend package="tf"/>
+  <depend package="tf2"/>
   <depend package="tf_conversions"/>
   <depend package="eigen"/>
   <depend package="pcl"/>

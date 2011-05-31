@@ -33,8 +33,8 @@ void pointCloudCallback(const sensor_msgs::PointCloud2& cloudMsg)
 	tf::StampedTransform transform;
 	try
 	{
-		listenerPtr->waitForTransform("/ned", "/vicon_vehicle_20", cloudMsg.header.stamp, ros::Duration(0.1));
-		listenerPtr->lookupTransform( "/ned", "/vicon_vehicle_20", cloudMsg.header.stamp, transform);
+		listenerPtr->waitForTransform("/world", "/vicon_object", cloudMsg.header.stamp, ros::Duration(0.1));
+		listenerPtr->lookupTransform( "/world", "/vicon_object", cloudMsg.header.stamp, transform);
 	}
 	catch (tf::TransformException ex)
 	{
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
 	tf::TransformListener listener;
 	listenerPtr = &listener;
 	
-	ros::Subscriber sub = n.subscribe("/camera/depth/points2", 20, pointCloudCallback);
+	ros::Subscriber sub = n.subscribe("/camera/depth/points", 20, pointCloudCallback);
 
 	ros::spin();
 	
