@@ -11,6 +11,9 @@ set(ROS_BUILD_TYPE RelWithDebInfo)
 
 rosbuild_init()
 
+rosbuild_genmsg()
+rosbuild_gensrv()
+
 # dependencies
 
 if (FETCH_DEPENDENCIES)
@@ -83,14 +86,17 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 rosbuild_add_boost_directories()
 rosbuild_add_executable(cloud_matcher_node src/modular_cloud_matcher.cpp)
+rosbuild_add_executable(cloud_matcher_service src/modular_cloud_matcher_service.cpp)
 rosbuild_add_executable(cloud_matcher_batch src/modular_cloud_matcher_batch.cpp)
 rosbuild_add_executable(cloud_matcher_bag src/modular_cloud_matcher_bag.cpp)
 if (FETCH_DEPENDENCIES)
 	target_link_libraries(cloud_matcher_node pointmatcher nabo ${EXTRA_LIBS} rt)
+	target_link_libraries(cloud_matcher_service pointmatcher nabo ${EXTRA_LIBS} rt)
 	target_link_libraries(cloud_matcher_batch pointmatcher nabo ${EXTRA_LIBS} rt)
 	target_link_libraries(cloud_matcher_bag pointmatcher nabo ${EXTRA_LIBS} argtable2 rt)
 else (FETCH_DEPENDENCIES)
 	target_link_libraries(cloud_matcher_node ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY} ${EXTRA_LIBS} rt)
+	target_link_libraries(cloud_matcher_service ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY}  ${EXTRA_LIBS} rt)
 	target_link_libraries(cloud_matcher_batch ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY} ${EXTRA_LIBS} rt)
 	target_link_libraries(cloud_matcher_bag ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY} ${EXTRA_LIBS} argtable2 rt)
 endif (FETCH_DEPENDENCIES)

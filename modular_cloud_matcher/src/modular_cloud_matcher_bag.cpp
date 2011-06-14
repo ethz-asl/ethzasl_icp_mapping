@@ -90,17 +90,6 @@ void openWriteFile(ofstream& stream, arg_file * file, const int errorVal)
 	}
 }
 
-/** Inherits from message_filters::SimpleFilter<M>
-    to use protected signalMessage function */
-template <class M>
-struct BagSubscriber : public message_filters::SimpleFilter<M>
-{
-	void newMessage(const boost::shared_ptr<M const> &msg) 
-	{
-		signalMessage(msg);
-	}
-};
-
 #include "icp_chain_creation.h"
 #include "pointmatcher/PointMatcher.h"
 
@@ -129,26 +118,26 @@ TP msgTransformToTP(const geometry_msgs::Transform& transform)
 
 int main(int argc, char **argv)
 {
-	arg_file * bagFile = arg_file1(NULL, NULL, "<bag>", "bag file");
-	arg_str  * cloudTopic = arg_str1(NULL, NULL, "<cloud_topic>", "cloud topic");
-	arg_file * paramsFile = arg_file1(NULL, NULL, "<params>", "params file");
-	arg_file * statFile = arg_file0(NULL, "stat", NULL, "statistic output file");
+	arg_file * bagFile = arg_file1(NULL, NULL, "<bag>", "bag file (mandatory)");
+	arg_str  * cloudTopic = arg_str1(NULL, NULL, "<cloud_topic>", "cloud topic (mandatory)");
+	arg_file * paramsFile = arg_file1(NULL, NULL, "<params>", "params file (mandatory)");
+	arg_file * statFile = arg_file0(NULL, "stat", NULL, "statistic output file (default: no output)");
 	
 	arg_rex  * cmdGt = arg_rex1(NULL, NULL, "gt", NULL, REG_ICASE, "use ground truth");
 
-	arg_str  * gtTargetFrame = arg_str1(NULL, "gt_target_frame", NULL, "tf target frame of ground truth");
-	arg_str  * gtSourceFrame = arg_str1(NULL, "gt_source_frame", NULL, "tf source frame of ground truth");
+	arg_str  * gtTargetFrame = arg_str1(NULL, "gt_target_frame", NULL, "tf target frame of ground truth (mandatory)");
+	arg_str  * gtSourceFrame = arg_str1(NULL, "gt_source_frame", NULL, "tf source frame of ground truth (mandatory)");
 	
-	arg_dbl  * t_x = arg_dbl0(NULL, "t_x", NULL, "correction from gt to icp, translation on x");
-	arg_dbl  * t_y = arg_dbl0(NULL, "t_y", NULL, "correction from gt to icp, translation on y");
-	arg_dbl  * t_z = arg_dbl0(NULL, "t_z", NULL, "correction from gt to icp, translation on z");
-	arg_dbl  * q_x = arg_dbl0(NULL, "q_x", NULL, "correction from gt to icp, quaternion component x");
-	arg_dbl  * q_y = arg_dbl0(NULL, "q_y", NULL, "correction from gt to icp, quaternion component y");
-	arg_dbl  * q_z = arg_dbl0(NULL, "q_z", NULL, "correction from gt to icp, quaternion component z");
-	arg_dbl  * q_w = arg_dbl0(NULL, "q_w", NULL, "correction from gt to icp, quaternion component w");
+	arg_dbl  * t_x = arg_dbl0(NULL, "t_x", NULL, "correction from gt to icp, translation on x (default: 0)");
+	arg_dbl  * t_y = arg_dbl0(NULL, "t_y", NULL, "correction from gt to icp, translation on y (default: 0)");
+	arg_dbl  * t_z = arg_dbl0(NULL, "t_z", NULL, "correction from gt to icp, translation on z (default: 0)");
+	arg_dbl  * q_x = arg_dbl0(NULL, "q_x", NULL, "correction from gt to icp, quaternion component x (default: 0)");
+	arg_dbl  * q_y = arg_dbl0(NULL, "q_y", NULL, "correction from gt to icp, quaternion component y (default: 0)");
+	arg_dbl  * q_z = arg_dbl0(NULL, "q_z", NULL, "correction from gt to icp, quaternion component z (default: 0)");
+	arg_dbl  * q_w = arg_dbl0(NULL, "q_w", NULL, "correction from gt to icp, quaternion component w (default: 1)");
 	
-	arg_file * tfFile = arg_file0(NULL, "tf", NULL, "tf output file");
-	arg_file * dtfFile = arg_file0(NULL, "dtf", NULL, "delta tf output file");
+	arg_file * tfFile = arg_file0(NULL, "tf", NULL, "tf output file (default: no output)");
+	arg_file * dtfFile = arg_file0(NULL, "dtf", NULL, "delta tf output file (default: no output)");
 	arg_int  * dtfSteps = arg_int0(NULL, "dtf_steps", NULL, "steps for computing delta tf (default: 30)");
 	struct arg_end  * end = arg_end(20);
 	

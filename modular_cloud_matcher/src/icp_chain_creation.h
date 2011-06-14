@@ -238,6 +238,7 @@ void populateParameters(MSA::ICPSequence& icp)
 	const int readingStepDataPointsFilterCount(getParam<int>("readingStepDataPointsFilterCount", 0));
 	const int keyframeDataPointsFilterCount(getParam<int>("keyframeDataPointsFilterCount", 1));
 	const int featureOutlierFilterCount(getParam<int>("featureOutlierFilterCount", 1));
+	const int descriptorOutlierFilterCount(getParam<int>("descriptorOutlierFilterCount", 0));
 	const int transformationCheckerCount(getParam<int>("transformationCheckerCount", 1));
 	
 	for (int i = 0; i < readingDataPointsFilterCount; ++i)
@@ -266,7 +267,11 @@ void populateParameters(MSA::ICPSequence& icp)
 		std::string root((boost::format("featureOutlierFilters/%1%") % i).str());
 		icp.featureOutlierFilters.push_back(REG(FeatureOutlierFilter).create(getParam<std::string>(root+"/name", "MedianDistOutlierFilter"), root + "/"));
 	}
-	icp.descriptorOutlierFilter = REG(DescriptorOutlierFilter).create(getParam<std::string>("descriptorOutlierFilter/name", "NullDescriptorOutlierFilter"), "descriptorOutlierFilter/");
+	for (int i = 0; i < descriptorOutlierFilterCount; ++i)
+	{
+		std::string root((boost::format("descriptorOutlierFilters/%1%") % i).str());
+		icp.descriptorOutlierFilters.push_back(REG(DescriptorOutlierFilter).create(getParam<std::string>(root+"/name", "NullDescriptorOutlierFilter"), root + "/"));
+	}
 	icp.errorMinimizer = REG(ErrorMinimizer).create(getParam<std::string>("errorMinimizer/name", "PointToPlaneErrorMinimizer"), "errorMinimizer/");
 	for (int i = 0; i < transformationCheckerCount; ++i)
 	{
