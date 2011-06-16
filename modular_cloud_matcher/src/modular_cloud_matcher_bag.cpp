@@ -383,12 +383,15 @@ int main(int argc, char **argv)
 				++failCount;
 				cerr << "ICP failed to converge at cloud " << i+1 << " : " << error.what() << endl;
 			}
-			//DEBUG: remove after
-      cout << "Model id: " << i-1 << " with data id: " << i << endl;
-      if(i==1)
-        abort();
 			
-      // get ground-truth
+			/*
+			//DEBUG: remove after
+			cout << "Model id: " << i-1 << " with data id: " << i << endl;
+			if(i==1)
+				abort();
+			*/
+			
+			// get ground-truth
 			const TP T_gt(data[i].transform); 
 			// compute T given ICP in ground-truth coordinates
 			const TP T_icp = T_gt_init * T_k_to_v * icp.getTransform() * T_v_to_k;
