@@ -301,6 +301,12 @@ int main(int argc, char **argv)
 		return 2;
 	}
 	
+  if(data.empty())
+  {
+    cerr << "No cloud loaded" << endl;
+    return 2;
+  }
+
 	// load param list
 	ifstream ifs(paramsFile->filename[0]);
 	if (!ifs.good())
@@ -377,8 +383,12 @@ int main(int argc, char **argv)
 				++failCount;
 				cerr << "ICP failed to converge at cloud " << i+1 << " : " << error.what() << endl;
 			}
+			//DEBUG: remove after
+      cout << "Model id: " << i-1 << " with data id: " << i << endl;
+      if(i==1)
+        abort();
 			
-			// get ground-truth
+      // get ground-truth
 			const TP T_gt(data[i].transform); 
 			// compute T given ICP in ground-truth coordinates
 			const TP T_icp = T_gt_init * T_k_to_v * icp.getTransform() * T_v_to_k;
