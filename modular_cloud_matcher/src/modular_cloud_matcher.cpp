@@ -15,16 +15,12 @@ T getParam(const std::string& name, const T& defaultValue)
 }
 
 #include "icp_chain_creation.h"
+#include "cloud_conversion.h"
 
-#include "sensor_msgs/PointCloud2.h"
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "nav_msgs/Path.h"
-#include "pcl/point_types.h"
-#include "pcl/point_cloud.h" 
-#include "pcl/ros/conversions.h"
 #include "tf/transform_broadcaster.h"
 #include "tf_conversions/tf_eigen.h"
-#include "pointmatcher/PointMatcher.h"
 
 using namespace std;
 
@@ -82,23 +78,9 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 		return;
 	}
 	
-	// create labels
-	DP::Labels labels;
-	labels.push_back(DP::Label("x", 1));
-	labels.push_back(DP::Label("y", 1));
-	labels.push_back(DP::Label("z", 1));
-	labels.push_back(DP::Label("pad", 1));
-	
-	// create data points
-	pcl::PointCloud<pcl::PointXYZ> cloud;
-	pcl::fromROSMsg (cloudMsg, cloud);
-
 	size_t goodCount(0);
-	for (size_t i = 0; i < cloud.points.size(); ++i)
-	{
-		if (!isnan(cloud.points[i].x))
-			++goodCount;
-	}
+	DP dp(rosMsgToPointMatcherCloud(cloudMsg, goodCount));
+	
 	if (goodCount == 0)
 	{
 		ROS_ERROR("I found no good points in the cloud");
@@ -123,27 +105,14 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 		return;
 	}
 	
-	DP dp(DP::Features(4, goodCount), labels);
-	int dIndex(0);
-	for (size_t i = 0; i < cloud.points.size(); ++i)
-	{
-		if (!isnan(cloud.points[i].x))
-		{
-			dp.features.coeffRef(0, dIndex) = cloud.points[i].x;
-			dp.features.coeffRef(1, dIndex) = cloud.points[i].y;
-			dp.features.coeffRef(2, dIndex) = cloud.points[i].z;
-			dp.features.coeffRef(3, dIndex) = 1;
-			++dIndex;
-		}
-	}
-	ROS_INFO_STREAM("Got " << cloud.points.size() << " points (" << goodCount << " goods)");
-	
-	const double imageRatio = (double)goodCount / (double)cloud.points.size();
+	const unsigned pointCount(cloudMsg.width * cloudMsg.height);
+	ROS_INFO_STREAM("Got " << pointCount << " points (" << goodCount << " goods)");
+	const double imageRatio = (double)goodCount / (double)pointCount;
 	
 	//TODO: put that as parameter, tricky to set...
-	if (goodCount < 10000)
+	if (imageRatio < 0.5)
 	{
-		ROS_ERROR_STREAM("Partial image! Missing " << 100 - imageRatio*100.0 << "% of the image (received " << goodCount << ")");
+		ROS_ERROR_STREAM("Partial cloud! Missing " << 100 - imageRatio*100.0 << "% of the cloud (received " << goodCount << ")");
 		//return;
 	}
 	

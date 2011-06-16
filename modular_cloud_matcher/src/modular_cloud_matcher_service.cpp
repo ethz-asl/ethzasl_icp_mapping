@@ -15,19 +15,9 @@ T getParam(const std::string& name, const T& defaultValue)
 }
 
 #include "icp_chain_creation.h"
+#include "cloud_conversion.h"
 
-#include "sensor_msgs/PointCloud2.h"
-#include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "modular_cloud_matcher/MatchClouds.h"
-#include "nav_msgs/Path.h"
-#include "pcl/point_types.h"
-#include "pcl/point_cloud.h" 
-#include "pcl/ros/conversions.h"
-#include "tf/transform_broadcaster.h"
-#include "tf_conversions/tf_eigen.h"
-#include "pointmatcher/PointMatcher.h"
-
-#if 0
 
 using namespace std;
 
@@ -44,7 +34,7 @@ class CloudMatcher
 	
 public:
 	CloudMatcher(ros::NodeHandle& n);
-	void gotCloud(const sensor_msgs::PointCloud2& cloudMsg);
+	bool match(modular_cloud_matcher::MatchClouds::Request& req, modular_cloud_matcher::MatchClouds::Response& res);
 };
 
 CloudMatcher::CloudMatcher(ros::NodeHandle& n):
@@ -53,186 +43,81 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n):
 	sensorFrame(getParam<string>("sensorFrame",  "/openni_rgb_optical_frame")),
 	service(n.advertiseService(getParam<string>("serviceName","matchClouds"), &CloudMatcher::match, this))
 {
-	populateParameters(icp);
+	populateParametersBase(icp);
 }
 
 bool CloudMatcher::match(modular_cloud_matcher::MatchClouds::Request& req, modular_cloud_matcher::MatchClouds::Response& res)
 {
-	if (dropCount < startupDropCount)
+	// get and check reference
+	size_t referenceGoodCount;
+	DP referenceCloud(rosMsgToPointMatcherCloud(req.reference, referenceGoodCount));
+	const unsigned referencePointCount(req.reference.width * req.reference.height);
+	const double referenceGoodRatio(double(referenceGoodCount) / double(referencePointCount));
+	
+	if (referenceGoodCount == 0)
 	{
-		++dropCount;
-		return;
+		ROS_ERROR("I found no good points in the reference cloud");
+		return false;
+	}
+	if (referenceGoodRatio < 0.5)
+	{
+		ROS_WARN_STREAM("Partial reference cloud! Missing " << 100 - referenceGoodRatio*100.0 << "% of the cloud (received " << referenceGoodCount << ")");
 	}
 	
-	// create labels
-	DP::Labels labels;
-	labels.push_back(DP::Label("x", 1));
-	labels.push_back(DP::Label("y", 1));
-	labels.push_back(DP::Label("z", 1));
-	labels.push_back(DP::Label("pad", 1));
+	// get and check reading
+	size_t readingGoodCount;
+	DP readingCloud(rosMsgToPointMatcherCloud(req.readings, readingGoodCount));
+	const unsigned readingPointCount(req.readings.width * req.readings.height);
+	const double readingGoodRatio(double(readingGoodCount) / double(readingPointCount));
 	
-	// create data points
-	pcl::PointCloud<pcl::PointXYZ> cloud;
-	pcl::fromROSMsg (cloudMsg, cloud);
-
-	size_t goodCount(0);
-	for (size_t i = 0; i < cloud.points.size(); ++i)
+	if (readingGoodCount == 0)
 	{
-		if (!isnan(cloud.points[i].x))
-			++goodCount;
+		ROS_ERROR("I found no good points in the reading cloud");
+		return false;
 	}
-	if (goodCount == 0)
+	if (readingGoodRatio < 0.5)
 	{
-		ROS_ERROR("I found no good points in the cloud");
-		if (sendDeltaPoseMessage)
-		{
-			geometry_msgs::PoseWithCovarianceStamped pose;
-			geometry_msgs::Point& position(pose.pose.pose.position);
-			geometry_msgs::Quaternion& orientation(pose.pose.pose.orientation);
-			
-			pose.header.stamp = cloudMsg.header.stamp;
-			
-			position.x = numeric_limits<float>::quiet_NaN();
-			position.y = numeric_limits<float>::quiet_NaN();
-			position.z = numeric_limits<float>::quiet_NaN();
-			orientation.x = numeric_limits<float>::quiet_NaN();
-			orientation.y = numeric_limits<float>::quiet_NaN();
-			orientation.z = numeric_limits<float>::quiet_NaN();
-			orientation.w = numeric_limits<float>::quiet_NaN();
-			
-			posePub.publish(pose);
-		}
-		return;
-	}
-	
-	DP dp(DP::Features(4, goodCount), labels);
-	int dIndex(0);
-	for (size_t i = 0; i < cloud.points.size(); ++i)
-	{
-		if (!isnan(cloud.points[i].x))
-		{
-			dp.features.coeffRef(0, dIndex) = cloud.points[i].x;
-			dp.features.coeffRef(1, dIndex) = cloud.points[i].y;
-			dp.features.coeffRef(2, dIndex) = cloud.points[i].z;
-			dp.features.coeffRef(3, dIndex) = 1;
-			++dIndex;
-		}
-	}
-	ROS_INFO_STREAM("Got " << cloud.points.size() << " points (" << goodCount << " goods)");
-	
-	const double imageRatio = (double)goodCount / (double)cloud.points.size();
-	
-	//TODO: put that as parameter, tricky to set...
-	if (goodCount < 10000)
-	{
-		ROS_ERROR_STREAM("Partial image! Missing " << 100 - imageRatio*100.0 << "% of the image (received " << goodCount << ")");
-		//return;
+		ROS_WARN_STREAM("Partial reference cloud! Missing " << 100 - readingGoodRatio*100.0 << "% of the cloud (received " << readingGoodCount << ")");
 	}
 	
 	// call icp
-	bool icpWasSuccess(true);
+	TP transform;
 	try 
 	{
-		icp(dp);
+		transform = icp(readingCloud, referenceCloud);
 		ROS_INFO_STREAM("match ratio: " << icp.errorMinimizer->getWeightedPointUsedRatio() << endl);
 	}
 	catch (MSA::ConvergenceError error)
 	{
-		icpWasSuccess = false;
-		ROS_WARN_STREAM("ICP failed to converge: " << error.what());
+		ROS_ERROR_STREAM("ICP failed to converge: " << error.what());
+		return false;
 	}
 	
-	// broadcast transform
-	if (sendDeltaPoseMessage)
-	{
-		const TP dTransform(icp.getDeltaTransform());
-		const Eigen::eigen2_Quaternion<Scalar> dTquat(Matrix3(dTransform.block(0,0,3,3)));
-		const Vector3 dTtr(dTransform.block(0,3,3,1));
-		
-		geometry_msgs::PoseWithCovarianceStamped pose;
-		geometry_msgs::Point& position(pose.pose.pose.position);
-		geometry_msgs::Quaternion& orientation(pose.pose.pose.orientation);
-		
-		pose.header.stamp = cloudMsg.header.stamp;
-		
-		if (icpWasSuccess)
-		{
-			position.x = dTtr(0);
-			position.y = dTtr(1);
-			position.z = dTtr(2);
-			orientation.x = dTquat.x();
-			orientation.y = dTquat.y();
-			orientation.z = dTquat.z();
-			orientation.w = dTquat.w();
-		}
-		else
-		{
-			ROS_WARN_STREAM("ICP failure in sendDeltaPose mode, resetting tracker");
-			// we have a failure, so we are sure that we did not create a key frame, 
-			// so dp is not affected. We can thus create a new keyframe
-			icp.resetTracking(dp);
-			position.x = numeric_limits<float>::quiet_NaN();
-			position.y = numeric_limits<float>::quiet_NaN();
-			position.z = numeric_limits<float>::quiet_NaN();
-			orientation.x = numeric_limits<float>::quiet_NaN();
-			orientation.y = numeric_limits<float>::quiet_NaN();
-			orientation.z = numeric_limits<float>::quiet_NaN();
-			orientation.w = numeric_limits<float>::quiet_NaN();
-		}
-		posePub.publish(pose);
-	}
+	// fill return value
+	res.transform.translation.x = transform.coeff(0,3);
+	res.transform.translation.y = transform.coeff(1,3);
+	res.transform.translation.z = transform.coeff(2,3);
+	const Eigen::Quaternion<Scalar> quat(Matrix3(transform.block(0,0,3,3)));
+	res.transform.rotation.x = quat.x();
+	res.transform.rotation.y = quat.y();
+	res.transform.rotation.z = quat.z();
+	res.transform.rotation.w = quat.w();
 	
-	// FIXME: should we continue publishing absolute pose as tf in sendDeltaPoseMessage mode?
-	
-	const TP globalTransform(icp.getTransform());
-	const Eigen::eigen2_Quaternion<Scalar> quat(Matrix3(globalTransform.block(0,0,3,3)));
-	
-	tf::Quaternion tfQuat;
-	tf::RotationEigenToTF(quat.cast<double>(), tfQuat);
-	tf::Vector3 tfVect;
-	tf::VectorEigenToTF(globalTransform.block(0,3,3,1).cast<double>(), tfVect);
-	tf::Transform transform;
-	transform.setRotation(tfQuat);
-	transform.setOrigin(tfVect);
-
-	if (icp.keyFrameCreatedAtLastCall())
-	{
-		ROS_WARN_STREAM("Keyframe created at " << icp.errorMinimizer->getWeightedPointUsedRatio());
-		geometry_msgs::PoseStamped pose;
-		pose.header.frame_id = sensorFrame;
-		pose.pose.position.x = tfVect.x();
-		pose.pose.position.y = tfVect.y();
-		pose.pose.position.z = tfVect.z();
-		pose.pose.orientation.x = tfQuat.x();
-		pose.pose.orientation.y = tfQuat.y();
-		pose.pose.orientation.z = tfQuat.z();
-		pose.pose.orientation.w = tfQuat.w();
-		path.poses.push_back(pose);
-		pathPub.publish(path);
-	}
-	
-	br.sendTransform(tf::StampedTransform(transform, cloudMsg.header.stamp, fixedFrame, sensorFrame));
+	return true;
 }
 
-#endif
 
 int main(int argc, char **argv)
 {
-#if 0
 	initParameters();
 	
 	ros::init(argc, argv, "cloud_matcher_node");
 	ros::NodeHandle n;
-	bool sendDeltaPoseMessage(false);
 	
-	for (int i = 1; i < argc; ++i)
-		if (strcmp(argv[i], "--senddeltapose") == 0)
-			sendDeltaPoseMessage = true;
-	
-	CloudMatcher matcher(n, getParam<string>("statFilePrefix",  ""), sendDeltaPoseMessage);
+	CloudMatcher matcher(n);
 	
 	ros::spin();
-#endif
+	
 	return 0;
 }
 

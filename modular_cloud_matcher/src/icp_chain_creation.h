@@ -1,16 +1,10 @@
 #ifndef __ICP_CHAIN_CREATION_H
 #define __ICP_CHAIN_CREATION_H
 
+#include <limits>
 #include <boost/format.hpp>
 #include "pointmatcher/PointMatcher.h"
-#include <limits>
-
-// TODO: move this somewhere out
-typedef float Scalar;
-typedef MetricSpaceAligner<Scalar> MSA;
-typedef Eigen::Matrix<Scalar, 3, 1> Vector3;
-typedef Eigen::Matrix<Scalar, 3, 3> Matrix3;
-
+#include "aliases.h"
 
 template<typename I, typename C>
 I* createInstance(const std::string& root)
@@ -189,9 +183,6 @@ MSA::Inspector* createVTKFileInspector(const std::string& root)
 	);
 }
 
-typedef MSA::TransformationParameters TP;
-typedef MSA::DataPoints DP;
-
 void initParameters()
 {
 	ADD_TO_REGISTRAR(Transformation, TransformFeatures)
@@ -227,11 +218,8 @@ void initParameters()
 	ADD_CUSTOM_TO_REGISTRAR(Inspector, VTKFileInspector, createVTKFileInspector)
 }
 
-void populateParameters(MSA::ICPSequence& icp)
+void populateParametersBase(MSA::ICPChainBase& icp)
 {
-	// global parameters
-	icp.ratioToSwitchKeyframe = getParam("ratioToSwitchKeyframe", 0.8);
-	
 	// icp parameters
 	const int transformationCount(getParam<int>("transformationCount", 1));
 	const int readingDataPointsFilterCount(getParam<int>("readingDataPointsFilterCount", 1));
@@ -281,6 +269,13 @@ void populateParameters(MSA::ICPSequence& icp)
 	icp.inspector = REG(Inspector).create(getParam<std::string>("inspector/name", "Inspector"), "inspector");
 	//icp.inspector = REG(Inspector).create(getParam<std::string>("inspector", "VTKFileInspector"), "inspector");
 	icp.outlierMixingWeight = getParam<double>("outlierMixingWeight", 1);
+}
+
+void populateParameters(MSA::ICPSequence& icp)
+{
+	icp.ratioToSwitchKeyframe = getParam("ratioToSwitchKeyframe", 0.8);
+	
+	populateParametersBase(icp);
 }
 
 #endif // __ICP_CHAIN_CREATION_H
