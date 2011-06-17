@@ -40,6 +40,7 @@ double gaussianRand(double mean, double sigm)
 
 struct TrainingEntry
 {
+	double timeStamp;
 	Eigen::Vector3d odom_tr;
 	Eigen::eigen2_Quaterniond odom_rot;
 	Eigen::Vector3d icp_tr;
@@ -48,7 +49,17 @@ struct TrainingEntry
 	TrainingEntry(){}
 	TrainingEntry(std::istream& is)
 	{
+		is >> timeStamp;
 		double t_x = 0, t_y = 0, t_z = 0, q_x = 0, q_y = 0, q_z = 0, q_w = 1;
+		is >> t_x;
+		is >> t_y;
+		is >> t_z;
+		icp_tr = Eigen::Vector3d(t_x, t_y, t_z);
+		is >> q_x;
+		is >> q_y;
+		is >> q_z;
+		is >> q_w;
+		icp_rot = Eigen::eigen2_Quaterniond(q_w, q_x, q_y, q_z).normalized();
 		is >> t_x;
 		is >> t_y;
 		is >> t_z;
@@ -59,15 +70,6 @@ struct TrainingEntry
 		is >> q_w;
 		odom_rot = Eigen::eigen2_Quaterniond(q_w, q_x, q_y, q_z).normalized();
 		//odom_tr = odom_rot*odom_tr;
-		is >> t_x;
-		is >> t_y;
-		is >> t_z;
-		icp_tr = Eigen::Vector3d(t_x, t_y, t_z);
-		is >> q_x;
-		is >> q_y;
-		is >> q_z;
-		is >> q_w;
-		icp_rot = Eigen::eigen2_Quaterniond(q_w, q_x, q_y, q_z).normalized();
 		//cerr << icp_rot.x() << " " << icp_rot.y() << " " << icp_rot.z() << " " << icp_rot.w() <<endl;
 		//cerr << icp_tr.x() << " " << icp_tr.y() << " " << icp_tr.z() << endl;
 		// FIXME: bug in Eigen ?
@@ -78,10 +80,11 @@ struct TrainingEntry
 	void dump(ostream& stream) const
 	{
 		stream << 
-			odom_tr.x() << " " << odom_tr.y() << " " << odom_tr.z() << " " <<
-			odom_rot.x() << " " << odom_rot.y() << " " << odom_rot.z() << " " << odom_rot.w() << " " <<
+			timeStamp << " : " << 
 			icp_tr.x() << " " << icp_tr.y() << " " << icp_tr.z() << " " <<
-			icp_rot.x() << " " << icp_rot.y() << " " << icp_rot.z() << " " << icp_rot.w();
+			icp_rot.x() << " " << icp_rot.y() << " " << icp_rot.z() << " " << icp_rot.w() << " " <<
+			odom_tr.x() << " " << odom_tr.y() << " " << odom_tr.z() << " " <<
+			odom_rot.x() << " " << odom_rot.y() << " " << odom_rot.z() << " " << odom_rot.w();
 	}
 };
 

@@ -410,13 +410,13 @@ int main(int argc, char **argv)
 				
 				const Vector3 t_icp(T_icp.topRightCorner(3,1));
 				const Quaternion<Scalar> q_icp(Matrix3(T_icp.topLeftCorner(3,3)));
-				tfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w() << "\n";
+				tfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w() << " ";
 				
 				if (useGt)
 				{
 					const Vector3 t_gt(T_gt.topRightCorner(3,1));
 					const Quaternion<Scalar> q_gt(Matrix3(T_gt.topLeftCorner(3,3)));
-					tfofs << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w() << " ";
+					tfofs << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w() << "\n";
 				}
 			}
 			
