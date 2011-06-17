@@ -420,20 +420,9 @@ int main(int argc, char **argv)
 				}
 			}
 			
-			// dump deltas
-			/*if (argc >= 6)
-			{
-				// delta tf
-				const Vector3 t_gt(T_d_gt.topRightCorner(3,1));
-				const Quaternion<Scalar> q_gt(Matrix3(T_d_gt.topLeftCorner(3,3)));
-				dtfofs << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w() << " ";
-				const Vector3 t_icp(T_d_icp.topRightCorner(3,1));
-				const Quaternion<Scalar> q_icp(Matrix3(T_d_icp.topLeftCorner(3,3)));
-				dtfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w() << "\n";
-			}*/
-			
 			// compute errors
 			const TP T_d = T_d_gt * T_d_icp.inverse();
+			if (useGt)
 			{
 				const Vector3 e_t(T_d.topRightCorner(3,1));
 				e_x.push_back(e_t(0));
@@ -445,27 +434,35 @@ int main(int argc, char **argv)
 			
 			if (i % deltaTfSteps == 0)
 			{
-				// compute difference
-				const TP T_d_acc = T_d_gt_acc * T_d_icp_acc.inverse();
-				
-				// compute errors
-				const Vector3 e_t(T_d_acc.topRightCorner(3,1));
-				e_acc_x.push_back(e_t(0));
-				e_acc_y.push_back(e_t(1));
-				e_acc_z.push_back(e_t(2));
-				const Quaternion<Scalar> quat(Matrix3(T_d_acc.topLeftCorner(3,3)));
-				e_acc_a.push_back(2 * acos(quat.normalized().w()));
+				if (useGt)
+				{
+					// compute difference
+					const TP T_d_acc = T_d_gt_acc * T_d_icp_acc.inverse();
+					
+					// compute errors
+					const Vector3 e_t(T_d_acc.topRightCorner(3,1));
+					e_acc_x.push_back(e_t(0));
+					e_acc_y.push_back(e_t(1));
+					e_acc_z.push_back(e_t(2));
+					const Quaternion<Scalar> quat(Matrix3(T_d_acc.topLeftCorner(3,3)));
+					e_acc_a.push_back(2 * acos(quat.normalized().w()));
+				}
 				
 				// dump deltas
 				if (dtfofs.good())
 				{
-					// delta tf
-					const Vector3 t_gt(T_d_gt_acc.topRightCorner(3,1));
-					const Quaternion<Scalar> q_gt(Matrix3(T_d_gt_acc.topLeftCorner(3,3)));
-					dtfofs << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w() << " ";
+					tfofs << data[i].stamp << " ";
+					
 					const Vector3 t_icp(T_d_icp_acc.topRightCorner(3,1));
 					const Quaternion<Scalar> q_icp(Matrix3(T_d_icp_acc.topLeftCorner(3,3)));
-					dtfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w() << "\n";
+					dtfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w() << " ";
+					
+					if (useGt)
+					{
+						const Vector3 t_gt(T_d_gt_acc.topRightCorner(3,1));
+						const Quaternion<Scalar> q_gt(Matrix3(T_d_gt_acc.topLeftCorner(3,3)));
+						dtfofs << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w() << "\n";
+					}
 				}
 				
 				// reset accumulators
