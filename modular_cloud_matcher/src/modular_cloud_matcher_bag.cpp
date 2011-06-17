@@ -451,7 +451,7 @@ int main(int argc, char **argv)
 				// dump deltas
 				if (dtfofs.good())
 				{
-					tfofs << data[i].stamp << " ";
+					dtfofs << data[i].stamp << " ";
 					
 					const Vector3 t_icp(T_d_icp_acc.topRightCorner(3,1));
 					const Quaternion<Scalar> q_icp(Matrix3(T_d_icp_acc.topLeftCorner(3,3)));
