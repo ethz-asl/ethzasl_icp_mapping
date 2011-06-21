@@ -27,9 +27,6 @@ class CloudMatcher
 	
 	MSA::ICP icp;
 	
-	const string fixedFrame;
-	const string sensorFrame;
-	
 	ros::ServiceServer service;
 	
 public:
@@ -39,8 +36,6 @@ public:
 
 CloudMatcher::CloudMatcher(ros::NodeHandle& n):
 	n(n),
-	fixedFrame(getParam<string>("fixedFrame",  "/world")),
-	sensorFrame(getParam<string>("sensorFrame",  "/openni_rgb_optical_frame")),
 	service(n.advertiseService(getParam<string>("serviceName","matchClouds"), &CloudMatcher::match, this))
 {
 	populateParametersBase(icp);
@@ -111,7 +106,7 @@ int main(int argc, char **argv)
 {
 	initParameters();
 	
-	ros::init(argc, argv, "cloud_matcher_node");
+	ros::init(argc, argv, "cloud_matcher_service");
 	ros::NodeHandle n;
 	
 	CloudMatcher matcher(n);
