@@ -1,26 +1,28 @@
 #!/usr/bin/env python
 import sys
+import re
 import roslib; roslib.load_manifest('modular_cloud_matcher')
 import rospy
+import point_cloud
+from roslib.msg import *
 from std_msgs.msg import String
 from sensor_msgs.msg import PointCloud
 from geometry_msgs.msg import *
 from modular_cloud_matcher.srv import *
-import point_cloud
+
 
 def createCloud(fileName):
 	points = []
 	for line in open(fileName):
-		coord = map(float, line.split())
-		point = Point32()
+		splittedLine = re.split('(?:\s|[,]|\n)+', line.strip())
+		coord = map(float, splittedLine)
 		while len(coord) < 3:
 			coord.append(0)
-		point.x, point.y, point.z = coord
-		points.append(point)
-	return point_cloud.create_cloud_xyz32(Header(),pts)
+		points.append(coord)
+	return point_cloud.create_cloud_xyz32(roslib.msg.Header(),points)
 
 def icpcontrol(referenceFileName, readingsFileName):
-	serviceName = '/modular_cloud_matcher/matchClouds'
+	serviceName = '/matchClouds'
 	rospy.init_node('cloud_matcher_control')
 	rospy.wait_for_service(serviceName)
 	# read reference
