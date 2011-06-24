@@ -122,27 +122,23 @@ int main(int argc, char **argv)
 	arg_str  * cloudTopic = arg_str1(NULL, NULL, "<cloud_topic>", "cloud topic (mandatory)");
 	arg_file * paramsFile = arg_file1(NULL, NULL, "<params>", "params file (mandatory)");
 	arg_file * statFile = arg_file0(NULL, "stat", NULL, "statistic output file (default: no output)");
+	arg_int  * onlyFirsts = arg_int0(NULL, "only_firsts", "<N>", "use only first <N> clouds (default: unlimited)");
 	
 	arg_rex  * cmdGt = arg_rex1(NULL, NULL, "gt", NULL, REG_ICASE, "use ground truth");
 
 	arg_str  * gtTargetFrame = arg_str1(NULL, "gt_target_frame", NULL, "tf target frame of ground truth (mandatory)");
 	arg_str  * gtSourceFrame = arg_str1(NULL, "gt_source_frame", NULL, "tf source frame of ground truth (mandatory)");
 	
-	arg_dbl  * t_x = arg_dbl0(NULL, "t_x", NULL, "correction from gt to icp, translation on x (default: 0)");
-	arg_dbl  * t_y = arg_dbl0(NULL, "t_y", NULL, "correction from gt to icp, translation on y (default: 0)");
-	arg_dbl  * t_z = arg_dbl0(NULL, "t_z", NULL, "correction from gt to icp, translation on z (default: 0)");
-	arg_dbl  * q_x = arg_dbl0(NULL, "q_x", NULL, "correction from gt to icp, quaternion component x (default: 0)");
-	arg_dbl  * q_y = arg_dbl0(NULL, "q_y", NULL, "correction from gt to icp, quaternion component y (default: 0)");
-	arg_dbl  * q_z = arg_dbl0(NULL, "q_z", NULL, "correction from gt to icp, quaternion component z (default: 0)");
-	arg_dbl  * q_w = arg_dbl0(NULL, "q_w", NULL, "correction from gt to icp, quaternion component w (default: 1)");
+	arg_str  * corr = arg_str0(NULL, "corr", NULL, "correction from gt to icp, as a string containing \"t_x t_y t_z q_x q_y q_z q_w\" (default: no correction)");
 	
 	arg_file * tfFile = arg_file0(NULL, "tf", NULL, "tf output file (default: no output)");
 	arg_file * dtfFile = arg_file0(NULL, "dtf", NULL, "delta tf output file (default: no output)");
 	arg_int  * dtfSteps = arg_int0(NULL, "dtf_steps", NULL, "steps for computing delta tf (default: 30)");
+	
 	struct arg_end  * end = arg_end(20);
 	
-	void *argTableCloud[] = {bagFile, cloudTopic, paramsFile, statFile, tfFile, end};
-	void* argTableCloudGt[] = {bagFile, cloudTopic, paramsFile, cmdGt, gtTargetFrame, gtSourceFrame, t_x, t_y, t_z, q_x, q_y, q_z, q_w, statFile, tfFile, dtfFile, dtfSteps, end};
+	void *argTableCloud[] = {bagFile, cloudTopic, paramsFile, onlyFirsts, statFile, tfFile, end};
+	void* argTableCloudGt[] = {bagFile, cloudTopic, paramsFile, cmdGt, gtTargetFrame, gtSourceFrame, corr, onlyFirsts, statFile, tfFile, dtfFile, dtfSteps, end};
 		
 	if (arg_nullcheck(argTableCloud) != 0 || 
 		arg_nullcheck(argTableCloudGt) != 0)
@@ -174,17 +170,18 @@ int main(int argc, char **argv)
 	initParameters();
 
 	// setup correction
-	if (useGt)
+	if (useGt && corr->count > 0)
 	{
+		istringstream iss(corr->sval[0]);
 		Eigen::Vector3f tr;
-		tr(0) = t_x->count > 0 ? t_x->dval[0] : 0;
-		tr(1) = t_y->count > 0 ? t_y->dval[0] : 0;
-		tr(2) = t_z->count > 0 ? t_z->dval[0] : 0;
+		iss >> tr(0);
+		iss >> tr(1);
+		iss >> tr(2);
 		Eigen::eigen2_Quaternionf rot;
-		rot.x() = q_x->count > 0 ? q_x->dval[0] : 0;
-		rot.y() = q_y->count > 0 ? q_y->dval[0] : 0;
-		rot.z() = q_z->count > 0 ? q_z->dval[0] : 0;
-		rot.w() = q_w->count > 0 ? q_w->dval[0] : 1;
+		iss >> rot.x();
+		iss >> rot.y();
+		iss >> rot.z();
+		iss >> rot.w();
 		T_k_to_v = (Eigen::eigen2_Translation3f(tr) * rot).matrix();
 		T_v_to_k = T_k_to_v.inverse();
 		cout << "Using ground-truth with correction:\n";
@@ -233,11 +230,17 @@ int main(int argc, char **argv)
 		{
 			// second pass, read points
 			rosbag::Bag bag(argv[1]);
+			unsigned cloudLimit(onlyFirsts->count > 0 ? onlyFirsts->ival[0] : numeric_limits<unsigned>::max());
 			
 			rosbag::View view(bag, rosbag::TopicQuery(cloudTopic->sval[0]));
 			BOOST_FOREACH(rosbag::MessageInstance const m, view)
 			{
 				sensor_msgs::PointCloud2::ConstPtr cloudMsg = m.instantiate<sensor_msgs::PointCloud2>();
+				if (cloudMsg == 0)
+				{
+					cerr << "Null cloud message after deserialization, are you sure the cloud topic is really " << cloudTopic->sval[0] << " ?" << endl;
+					abort();
+				}
 				
 				string err;
 				TP tp = TP::Identity(4,4);
@@ -291,6 +294,8 @@ int main(int argc, char **argv)
 				cout << dIndex << " good points on " << pointCount << "\n\n";
 				datum.cloud = DP(tempCloud.leftCols(dIndex), labels);
 				data.push_back(datum);
+				if (data.size() >= cloudLimit)
+					break;
 			}
 			bag.close();
 		}
@@ -301,12 +306,12 @@ int main(int argc, char **argv)
 		return 2;
 	}
 	
-  if(data.empty())
-  {
-    cerr << "No cloud loaded" << endl;
-    return 2;
-  }
-
+	if(data.empty())
+	{
+		cerr << "No cloud loaded" << endl;
+		return 2;
+	}
+	
 	// load param list
 	ifstream ifs(paramsFile->filename[0]);
 	if (!ifs.good())
@@ -366,6 +371,23 @@ int main(int argc, char **argv)
 		
 		TP T_icp_old(T_gt_init * T_k_to_v * icp.getTransform() * T_v_to_k);
 		
+		// write tf output for first point
+		if (tfofs.good())
+		{
+			tfofs << data[0].stamp << " ";
+			
+			const Vector3 t_icp(T_icp_old.topRightCorner(3,1));
+			const Quaternion<Scalar> q_icp(Matrix3(T_icp_old.topLeftCorner(3,3)));
+			tfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w();
+			if (useGt)
+			{
+				const Vector3 t_gt(T_gt_old.topRightCorner(3,1));
+				const Quaternion<Scalar> q_gt(Matrix3(T_gt_old.topLeftCorner(3,3)));
+				tfofs << " " << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w();
+			}
+			tfofs << "\n";
+		}
+		
 		TP T_d_gt_acc(TP::Identity(4,4));
 		TP T_d_icp_acc(TP::Identity(4,4));
 		
@@ -381,7 +403,7 @@ int main(int argc, char **argv)
 			catch (MSA::ConvergenceError error)
 			{
 				++failCount;
-				cerr << "ICP failed to converge at cloud " << i+1 << " : " << error.what() << endl;
+				cerr << "ICP failed to converge at cloud " << i << " : " << error.what() << endl;
 			}
 			
 			/*
