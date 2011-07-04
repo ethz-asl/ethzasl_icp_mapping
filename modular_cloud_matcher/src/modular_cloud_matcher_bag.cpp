@@ -170,22 +170,27 @@ int main(int argc, char **argv)
 	initParameters();
 
 	// setup correction
-	if (useGt && corr->count > 0)
+	if (useGt)
 	{
-		istringstream iss(corr->sval[0]);
-		Eigen::Vector3f tr;
-		iss >> tr(0);
-		iss >> tr(1);
-		iss >> tr(2);
-		Eigen::eigen2_Quaternionf rot;
-		iss >> rot.x();
-		iss >> rot.y();
-		iss >> rot.z();
-		iss >> rot.w();
-		T_k_to_v = (Eigen::eigen2_Translation3f(tr) * rot).matrix();
-		T_v_to_k = T_k_to_v.inverse();
-		cout << "Using ground-truth with correction:\n";
-		cout << T_k_to_v << "\n";
+		if (corr->count > 0)
+		{
+			istringstream iss(corr->sval[0]);
+			Eigen::Vector3f tr;
+			iss >> tr(0);
+			iss >> tr(1);
+			iss >> tr(2);
+			Eigen::eigen2_Quaternionf rot;
+			iss >> rot.x();
+			iss >> rot.y();
+			iss >> rot.z();
+			iss >> rot.w();
+			T_k_to_v = (Eigen::eigen2_Translation3f(tr) * rot).matrix();
+			T_v_to_k = T_k_to_v.inverse();
+			cout << "Using ground-truth with correction:\n";
+			cout << T_k_to_v << "\n";
+		}
+		else
+			cout << "Using ground-truth without correction" << endl;
 	}
 	else
 		cout << "Not using ground-truth" << endl;
@@ -482,7 +487,7 @@ int main(int argc, char **argv)
 					{
 						const Vector3 t_gt(T_d_gt_acc.topRightCorner(3,1));
 						const Quaternion<Scalar> q_gt(Matrix3(T_d_gt_acc.topLeftCorner(3,3)));
-						dtfofs << " " << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w() << "\n";
+						dtfofs << " " << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w();
 					}
 					dtfofs << "\n";
 				}
