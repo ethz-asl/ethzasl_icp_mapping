@@ -11,6 +11,8 @@
 
 using namespace std;
 
+static double inlierRatio(0.8);
+
 double uniformRand()
 {
 	return double(rand())/RAND_MAX;
@@ -224,14 +226,21 @@ double computeError(const Params& p, const TrainingEntry& e)
 	return e_tr + e_rot;
 }
 
+// compute errors with outlier rejection
 double computeError(const Params& p)
 {
-	double error = 0;
+	vector<double> errors;
+	errors.reserve(trainingSet.size());
 	for (TrainingSet::const_iterator it(trainingSet.begin()); it != trainingSet.end(); ++it)
 	{
 		const TrainingEntry& entry(*it);
-		error += computeError(p, entry);
+		errors.push_back(computeError(p, entry));
 	}
+	sort(errors.begin(), errors.end());
+	const size_t inlierCount(errors.size() * inlierRatio);
+	double error = 0;
+	for (size_t i = 0; i < inlierCount; ++i)
+		error += errors[i];
 	return error;
 }
 
@@ -287,10 +296,16 @@ int main(int argc, char** argv)
 {
 	srand(time(0));
 	
-	if (argc != 2)
+	if (argc < 2)
 	{
-		cerr << "Usage " << argv[0] << " LOG_FILE_NAME" << endl;
+		cerr << "Usage " << argv[0] << " LOG_FILE_NAME [INLIER_RATIO]\n";
+		cerr << "  LOG_FILE_NAME   name of file to load containing delta tf\n";
+		cerr << "  INLIER_RATIO    ratio of inlier to use for error computation (range: ]0:1], default: 0.8)" << endl;
 		return 1;
+	}
+	if (argc == 3)
+	{
+		inlierRatio = atof(argv[2]);
 	}
 	
 	ifstream ifs(argv[1]);
