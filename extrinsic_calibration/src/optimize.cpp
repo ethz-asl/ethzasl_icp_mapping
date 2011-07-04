@@ -1,3 +1,6 @@
+// kate: replace-tabs off; indent-width 4; indent-mode normal
+// vim: ts=4:sw=4:noexpandtab
+
 #define EIGEN_DONT_VECTORIZE
 #define EIGEN_DISABLE_UNALIGNED_ARRAY_ASSERT
 #include <Eigen/Eigen>
@@ -12,6 +15,7 @@
 using namespace std;
 
 static double inlierRatio(0.8);
+static int restartCount(1);
 
 double uniformRand()
 {
@@ -110,12 +114,16 @@ struct Params
 	Eigen::Vector3d tr;
 	Eigen::eigen2_Quaterniond rot;
 	
-	//Params():tr(0,0,0),rot(1,0,0,0) {}
-	Params():
+	Params():tr(0,0,0),rot(1,0,0,0) {}
+	Params(const Eigen::Vector3d& _tr, const Eigen::eigen2_Quaterniond& _rot):
+		tr(_tr),
+		rot(_rot)
+		{}
+	Params(const double transVariance):
 		tr(
-			gaussianRand(0, 0.5),
-			gaussianRand(0, 0.5),
-			gaussianRand(0, 0.5)
+			gaussianRand(0, transVariance),
+			gaussianRand(0, transVariance),
+			gaussianRand(0, transVariance)
 		),
 		rot(
 			Eigen::eigen2_Quaterniond(1,0,0,0) *
@@ -126,12 +134,12 @@ struct Params
 		{}
 	
 	// add random noise
-	const Params& mutate(double amount = 1.0)
+	const Params& mutate(const double amount = 1.0)
 	{
-		double count = fabs(gaussianRand(0, 1));
+		const double count = fabs(gaussianRand(0, 1));
 		for (int i = 0; i < int(count + 1); i++)
 		{
-			int toMutate = rand() % 6;
+			const int toMutate = rand() % 6;
 			switch (toMutate)
 			{
 				case 0: tr.x() += gaussianRand(0, 0.1) * amount; break;
@@ -154,24 +162,90 @@ struct Params
 		return *this;
 	}
 	
-	void dump(ostream& stream) const
+	// renormalize quaternion
+	void normalize()
+	{
+		rot.normalize();
+		if (rot.x() < 0)
+		{
+			rot.x() = -rot.x();
+			rot.y() = -rot.y();
+			rot.z() = -rot.z();
+			rot.w() = -rot.w();
+		}
+	}
+	
+	// dump content of this transform
+	void dumpTransform(ostream& stream) const
+	{
+		stream << tr.x() << " " << tr.y() << " " << tr.z() << " " <<
+				rot.x() << " " << rot.y() << " " << rot.z() << " " << rot.w();
+	}
+	
+	// dump what to copy/paste
+	void dumpCopyPaste(ostream& stream) const
 	{
 		/*stream <<
 			"translation: x=" << tr.x() << " y=" << tr.y() << " z=" << tr.z() << " " <<
 			"quaternion: x=" << rot.x() << " y=" << rot.y() << " z=" << rot.z() << " w=" << rot.w();
 		*/
-		stream << "<node pkg=\"tf\" type=\"static_transform_publisher\" name=\"base_link_to_kinect\""
-				" args=\"" << tr.x() << " " << tr.y() << " " << tr.z() << " " <<
-				rot.x() << " " << rot.y() << " " << rot.z() << " " << rot.w() << " "
-				"/base_link /kinect 100\"/>" 
-        " \n\n OR \n\n"
-        "rosrun tf static_transform_publisher " << tr.x() << " " << tr.y() << " " << tr.z() << " " <<
-        rot.x() << " " << rot.y() << " " << rot.z() << " " << rot.w() << " "
-        "/base_link /kinect 100";
+		stream << "<node pkg=\"tf\" type=\"static_transform_publisher\" name=\"base_link_to_kinect\" args=\"";
+		dumpTransform(stream);
+		stream << " /base_link /kinect 100\"/>" 
+		" \n\n OR \n\n"
+		"rosrun tf static_transform_publisher ";
+		dumpTransform(stream);
+		stream << " /base_link /kinect 100\n";
 	}
 };
 
+// we have two typedefs for the same physical object because they are conceptually different
 typedef vector<Params> Genome;
+typedef vector<Params> ParamsVector;
+
+void normalizeParams(ParamsVector& params)
+{
+	for (size_t i = 0; i < params.size(); ++i)
+		params[i].normalize();
+}
+
+void dumpParamsStats(ostream& stream, const ParamsVector& params)
+{
+	Eigen::Vector3d trMean(0,0,0);
+	Eigen::eigen2_Quaterniond::Coefficients rotMean(0,0,0,0);
+	for (size_t i = 0; i < params.size(); ++i)
+	{
+		trMean += params[i].tr;
+		rotMean += params[i].rot.coeffs();
+	}
+	trMean /= double(params.size());
+	rotMean /= double(params.size());
+	
+	Params mean(trMean,Eigen::eigen2_Quaterniond(rotMean));
+	mean.normalize();
+	mean.dumpCopyPaste(stream); stream << "\n";
+	
+	Eigen::Vector3d trVar(0,0,0);
+	Eigen::eigen2_Quaterniond::Coefficients rotVar(0,0,0,0);
+	for (size_t i = 0; i < params.size(); ++i)
+	{
+		trVar += (params[i].tr - trMean).cwise() * (params[i].tr - trMean);
+		rotVar += (params[i].rot.coeffs() - rotMean).cwise() * (params[i].rot.coeffs() - rotMean);
+	}
+	trVar /= double(params.size());
+	rotVar /= double(params.size());
+	
+	stream << "\nVariance:\n";
+	Params var(trVar,Eigen::eigen2_Quaterniond(rotVar));
+	var.dumpTransform(stream); stream << "\n";
+	
+	stream << "\nValues:\n";
+	for (size_t i = 0; i < params.size(); ++i)
+	{
+		params[i].dumpTransform(stream); stream << "\n";
+	}
+	stream << endl;
+}
 
 double computeError(const Params& p, const TrainingEntry& e)
 {
@@ -244,7 +318,7 @@ double computeError(const Params& p)
 	return error;
 }
 
-double evolveOneGen(Genome& genome, double annealing = 1.0, bool showBest = false)
+double evolveOneGen(Genome& genome, double annealing = 1.0, Params* bestParams = 0)
 {
 	typedef multimap<double, Params> EvaluationMap;
 	typedef EvaluationMap::iterator EvaluationMapIterator;
@@ -270,12 +344,8 @@ double evolveOneGen(Genome& genome, double annealing = 1.0, bool showBest = fals
 		cout << " = " << error << "\n";*/
 	}
 
-	if (showBest)
-	{
-		//cout << "Best of gen: ";
-		genome[bestInd].dump(cout);
-		cout << endl;
-	}
+	if (bestParams)
+		*bestParams = genome[bestInd];
 
 	assert((genome.size() / 4) * 4 == genome.size());
 
@@ -298,15 +368,32 @@ int main(int argc, char** argv)
 	
 	if (argc < 2)
 	{
-		cerr << "Usage " << argv[0] << " LOG_FILE_NAME [INLIER_RATIO]\n";
+		cerr << "Usage " << argv[0] << " LOG_FILE_NAME [INLIER_RATIO] [RESTART_COUNT]\n";
 		cerr << "  LOG_FILE_NAME   name of file to load containing delta tf\n";
-		cerr << "  INLIER_RATIO    ratio of inlier to use for error computation (range: ]0:1], default: 0.8)" << endl;
+		cerr << "  INLIER_RATIO    ratio of inlier to use for error computation (range: ]0:1], default: 0.8)\n";
+		cerr << "  RESTART_COUNT   number of random restart (default: 1)" << endl;
 		return 1;
 	}
-	if (argc == 3)
+	if (argc >= 3)
 	{
 		inlierRatio = atof(argv[2]);
+		if (inlierRatio <= 0 || inlierRatio > 1)
+		{
+			cerr << "Invalid inline ratio: " << inlierRatio << ", must be within range ]0:1]" << endl;
+			return 2;
+		}
 	}
+	cout << "Inlier ratio: " << inlierRatio << endl;
+	if (argc >= 4)
+	{
+		restartCount = atoi(argv[3]);
+		if (restartCount < 1)
+		{
+			cerr << "Invalid restart count: " << restartCount << ", must be than 0" << endl;
+			return 3;
+		}
+	}
+	cout << "Restart count: " << restartCount << endl;
 	
 	ifstream ifs(argv[1]);
 	while (ifs.good())
@@ -321,21 +408,34 @@ int main(int argc, char** argv)
 	cout << "Loaded " << trainingSet.size() << " training entries" << endl;
 	//trainingSet.dump();
 	
-	Genome genome(1024);
-	//Genome genome(4);
-	int generationCount = 64;
-	for (int i = 0; i < generationCount; i++)
+	ParamsVector bests;
+	for (int i = 0; i < restartCount; ++i)
 	{
-		cout << i << " best has error " << evolveOneGen(genome, 2. * (double)(generationCount - i) / (double)(generationCount)) << endl;
+		cout << "Starting " << i << " restart on " << restartCount << endl;
+		Genome genome(1024);
+		for (size_t g = 0; g < genome.size(); ++g)
+			genome[g] = Params(0.5);
+		int generationCount = 64;
+		for (int g = 0; g < generationCount; ++g)
+		{
+			cout << "\r" << g << " best has error " << evolveOneGen(genome, 2. * (double)(generationCount - g) / (double)(generationCount)) << "            ";
+			cout.flush();
+		}
+		Params best;
+		cout << "\r  Best error of restart " << i << ": " << evolveOneGen(genome, 1.0, &best) << endl;
+		bests.push_back(best);
 	}
-	/*generationCount = 200;
-	for (int i = 0; i < generationCount; i++)
-	{
-		cout << 50 + i << " best has error " << evolve_one_gen(genome, 1.) << endl;
-	}*/
+	
 	cout << "\nOptimization completed, code to COPY-PASTE in to use the transformation:\n\n";
-	evolveOneGen(genome, 1.0, true);
-	cout << endl;
+	if (restartCount == 1)
+	{
+		bests[0].dumpCopyPaste(cout);
+	}
+	else
+	{
+		normalizeParams(bests);
+		dumpParamsStats(cout, bests);
+	}
 	
 	return 0;
 }
