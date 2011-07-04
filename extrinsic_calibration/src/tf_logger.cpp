@@ -96,13 +96,12 @@ int main(int argc, char** argv)
 			break;
 		if (!t.waitForTransform(kinectFrame, curTime, kinectFrame, lastTime, worldFrame, ros::Duration(3)))
 			break;
+		ofs << curTime << " ";
 		t.lookupTransform(baseLinkFrame, curTime, baseLinkFrame, lastTime, odomFrame, tr_o);
 		ofs << tr_o.getOrigin() << " " << tr_o.getRotation() << " ";
 		t.lookupTransform(kinectFrame, curTime, kinectFrame, lastTime, worldFrame, tr_i);
 		ofs << tr_i.getOrigin() << " " << tr_i.getRotation() << endl;
-		
 	}
 	
-
 	return 0;
 }
