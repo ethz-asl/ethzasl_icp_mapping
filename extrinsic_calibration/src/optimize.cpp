@@ -402,7 +402,7 @@ int main(int argc, char** argv)
 		if (ifs.good())
 		{
 			trainingSet.push_back(e);
-//			e.dump(cerr); cerr << endl;
+			//e.dump(cerr); cerr << endl;
 		}
 	}
 	cout << "Loaded " << trainingSet.size() << " training entries" << endl;

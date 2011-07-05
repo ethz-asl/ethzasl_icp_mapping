@@ -195,128 +195,6 @@ int main(int argc, char **argv)
 	else
 		cout << "Not using ground-truth" << endl;
 	
-	// load data
-	try
-	{
-		sensor_msgs::CameraInfo camInfo;
-		
-		// 1 year of buffer
-		tf2::BufferCore tfBuffer(ros::Duration(31536000,0));
-		//TP firstTP;
-		//bool gotFirstTP(false);
-		if (useGt)
-		{
-			// first pass, read tf
-			rosbag::Bag bag(bagFile->filename[0]);
-			
-			rosbag::View view(bag, rosbag::TopicQuery("/tf"));
-			BOOST_FOREACH(rosbag::MessageInstance const m, view)
-			{
-				// TODO: filter
-				typedef geometry_msgs::TransformStamped TS;
-				tf::tfMessage::ConstPtr tfMsg = m.instantiate<tf::tfMessage>();
-				for (tf::tfMessage::_transforms_type::const_iterator it = tfMsg->transforms.begin(); it != tfMsg->transforms.end(); ++it)
-				{
-					const TS& ts(*it);
-					cout << ts.header.stamp << ":" << ts.header.frame_id << " <- " << ts.child_frame_id << endl;
-					tfBuffer.setTransform(ts, "default");
-				}
-			}
-			bag.close();
-		}
-		
-		// create labels
-		DP::Labels labels;
-		labels.push_back(DP::Label("x", 1));
-		labels.push_back(DP::Label("y", 1));
-		labels.push_back(DP::Label("z", 1));
-		labels.push_back(DP::Label("pad", 1));
-		// TODO: add if use point cloud
-		{
-			// second pass, read points
-			rosbag::Bag bag(argv[1]);
-			unsigned cloudLimit(onlyFirsts->count > 0 ? onlyFirsts->ival[0] : numeric_limits<unsigned>::max());
-			
-			rosbag::View view(bag, rosbag::TopicQuery(cloudTopic->sval[0]));
-			BOOST_FOREACH(rosbag::MessageInstance const m, view)
-			{
-				sensor_msgs::PointCloud2::ConstPtr cloudMsg = m.instantiate<sensor_msgs::PointCloud2>();
-				if (cloudMsg == 0)
-				{
-					cerr << "Null cloud message after deserialization, are you sure the cloud topic is really " << cloudTopic->sval[0] << " ?" << endl;
-					abort();
-				}
-				
-				string err;
-				TP tp = TP::Identity(4,4);
-				if (useGt)
-				{
-					cout << "adding cloud with transform from " << gtSourceFrame->sval[0] << " to " << gtTargetFrame->sval[0] << " at time: " <<  cloudMsg->header.stamp <<  "..." << endl;
-					if (tfBuffer.canTransform(gtTargetFrame->sval[0], gtSourceFrame->sval[0], cloudMsg->header.stamp, &err))
-					{
-						const geometry_msgs::TransformStamped ts = tfBuffer.lookupTransform(gtTargetFrame->sval[0], gtSourceFrame->sval[0], cloudMsg->header.stamp);
-						tp = msgTransformToTP(ts.transform);
-						cout << "success" << endl;
-					}
-					else
-					{
-						cout << "error" << endl;
-						continue;
-					}
-				}
-				
-				Datum datum;
-				datum.transform = tp;
-				datum.stamp = cloudMsg->header.stamp;
-				
-				// create data points
-				pcl::PointCloud<pcl::PointXYZ> cloud;
-				pcl::fromROSMsg(*cloudMsg, cloud);
-				
-				// point count
-				const size_t pointCount(cloud.points.size());
-				DP::Features tempCloud(4, pointCount);
-				int dIndex(0);
-				for (size_t i = 0; i < pointCount; ++i)
-				{
-					if (!isnan(cloud.points[i].x) && 
-						!isnan(cloud.points[i].y) &&
-						!isnan(cloud.points[i].z)
-					)
-					{
-						tempCloud(0, dIndex) = cloud.points[i].x;
-						tempCloud(1, dIndex) = cloud.points[i].y;
-						tempCloud(2, dIndex) = cloud.points[i].z;
-						tempCloud(3, dIndex) = 1;
-						++dIndex;
-					}
-					else
-					{
-						//cout << i << " : " << cloud.points[i].x <<", " << cloud.points[i].y << ", " << cloud.points[i].z << endl;
-						//cout << "nan at pos " << j << "\n";
-					}
-				}
-				cout << dIndex << " good points on " << pointCount << "\n\n";
-				datum.cloud = DP(tempCloud.leftCols(dIndex), labels);
-				data.push_back(datum);
-				if (data.size() >= cloudLimit)
-					break;
-			}
-			bag.close();
-		}
-	}
-	catch (rosbag::BagException e)
-	{
-		cerr << "Error, error reading bag file: " << e.what() << endl;
-		return 2;
-	}
-	
-	if(data.empty())
-	{
-		cerr << "No cloud loaded" << endl;
-		return 2;
-	}
-	
 	// load param list
 	ifstream ifs(paramsFile->filename[0]);
 	if (!ifs.good())
@@ -338,212 +216,300 @@ int main(int argc, char **argv)
 		cout << "Using tf steps of " << deltaTfSteps << endl;
 	}
 	
-	cout << endl;
-	
-	// for each line in the experiment file
-	unsigned expCount(0);
-	while (ifs.good())
+	// load data
+	try
 	{
-		// read line and load params
-		reloadParamsFromLine(ifs);
-		if (params.empty())
-			break;
-		cout << "Exp " << expCount << ", loaded " << params.size() << " parameters\n\n";
-		++expCount;
+		sensor_msgs::CameraInfo camInfo;
 		
-		// run experiment
-		MSA::ICPSequence icp(3, "", false);
-		populateParameters(icp);
-		Histogram<Scalar> e_x(16, "e_x", "", false), e_y(16, "e_y", "", false), e_z(16, "e_z", "", false), e_a(16, "e_a", "", false);
-		Histogram<Scalar> e_acc_x(16, "e_acc_x", "", false), e_acc_y(16, "e_acc_y", "", false), e_acc_z(16, "e_acc_z", "", false), e_acc_a(16, "e_acc_a", "", false);
-		
-		// init icp
-		timer t;
-		DP d;
-		const TP T_gt_init(data[0].transform);
-		TP T_gt_old(T_gt_init);
-		d = data[0].cloud;
-		unsigned failCount(0);
-		try
+		// 1 year of buffer
+		tf2::BufferCore tfBuffer(ros::Duration(31536000,0));
+		//TP firstTP;
+		//bool gotFirstTP(false);
+		if (useGt)
 		{
-			icp(d);
-		}
-		catch (MSA::ConvergenceError error)
-		{
-			++failCount;
-			cerr << "ICP failed to converge at cloud 0 : " << error.what() << endl;
-		}
-		
-		TP T_icp_old(T_gt_init * T_k_to_v * icp.getTransform() * T_v_to_k);
-		
-		// write tf output for first point
-		if (tfofs.good())
-		{
-			tfofs << data[0].stamp << " ";
+			// first pass, read tf
+			cout << "Loading tf..." << endl;
+			rosbag::Bag bag(bagFile->filename[0]);
 			
-			const Vector3 t_icp(T_icp_old.topRightCorner(3,1));
-			const Quaternion<Scalar> q_icp(Matrix3(T_icp_old.topLeftCorner(3,3)));
-			tfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w();
-			if (useGt)
+			rosbag::View view(bag, rosbag::TopicQuery("/tf"));
+			BOOST_FOREACH(rosbag::MessageInstance const m, view)
 			{
-				const Vector3 t_gt(T_gt_old.topRightCorner(3,1));
-				const Quaternion<Scalar> q_gt(Matrix3(T_gt_old.topLeftCorner(3,3)));
-				tfofs << " " << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w();
-			}
-			tfofs << "\n";
-		}
-		
-		TP T_d_gt_acc(TP::Identity(4,4));
-		TP T_d_icp_acc(TP::Identity(4,4));
-		
-		// for each cloud, compute error
-		for (size_t i = 1; i < data.size(); ++i)
-		{
-			// apply icp
-			try 
-			{
-				d = data[i].cloud;
-				icp(d);
-			}
-			catch (MSA::ConvergenceError error)
-			{
-				++failCount;
-				cerr << "ICP failed to converge at cloud " << i << " : " << error.what() << endl;
-			}
-			
-			/*
-			//DEBUG: remove after
-			cout << "Model id: " << i-1 << " with data id: " << i << endl;
-			if(i==1)
-				abort();
-			*/
-			
-			// get ground-truth
-			const TP T_gt(data[i].transform); 
-			// compute T given ICP in ground-truth coordinates
-			const TP T_icp = T_gt_init * T_k_to_v * icp.getTransform() * T_v_to_k;
-			// compute ground-truth transfrom
-			const TP T_d_gt = T_gt.inverse() * T_gt_old;
-			// compute icp inverse transform
-			const TP T_d_icp = T_icp.inverse() * T_icp_old;
-			
-			/*cerr << "T_gt_init:\n" << T_gt_init << "\nT_gt:\n" << T_gt << "\nT_k_to_v:\n" << T_k_to_v << "\nicp::getTransform:\n" << icp.getTransform() << "\nT_v_to_k:\n" << T_v_to_k << "\n\nT_icp:\n" << T_icp << endl;
-			cerr << "det icp::getTransform: " << icp.getTransform().determinant() << ", det T_icp: " << T_icp .determinant() << endl;*/
-			
-			// write tf output
-			if (tfofs.good())
-			{
-				tfofs << data[i].stamp << " ";
-				
-				const Vector3 t_icp(T_icp.topRightCorner(3,1));
-				const Quaternion<Scalar> q_icp(Matrix3(T_icp.topLeftCorner(3,3)));
-				tfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w();
-				if (useGt)
+				// TODO: filter
+				typedef geometry_msgs::TransformStamped TS;
+				tf::tfMessage::ConstPtr tfMsg = m.instantiate<tf::tfMessage>();
+				for (tf::tfMessage::_transforms_type::const_iterator it = tfMsg->transforms.begin(); it != tfMsg->transforms.end(); ++it)
 				{
-					const Vector3 t_gt(T_gt.topRightCorner(3,1));
-					const Quaternion<Scalar> q_gt(Matrix3(T_gt.topLeftCorner(3,3)));
-					tfofs << " " << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w();
+					const TS& ts(*it);
+					cout << ts.header.stamp << ":" << ts.header.frame_id << " <- " << ts.child_frame_id << endl;
+					tfBuffer.setTransform(ts, "default");
 				}
-				tfofs << "\n";
 			}
+			bag.close();
+			cout << endl;
+		}
+		
+		// create labels
+		DP::Labels labels;
+		labels.push_back(DP::Label("x", 1));
+		labels.push_back(DP::Label("y", 1));
+		labels.push_back(DP::Label("z", 1));
+		labels.push_back(DP::Label("pad", 1));
+		
+		// for each line in the experiment file
+		unsigned expCount(0);
+		while (ifs.good())
+		{
+			// read line and load params
+			reloadParamsFromLine(ifs);
+			if (params.empty())
+				break;
+			cout << "Exp " << expCount << ", loaded " << params.size() << " parameters\n" << end;
+			++expCount;
 			
-			// compute errors
-			const TP T_d = T_d_gt * T_d_icp.inverse();
-			if (useGt)
-			{
-				const Vector3 e_t(T_d.topRightCorner(3,1));
-				e_x.push_back(e_t(0));
-				e_y.push_back(e_t(1));
-				e_z.push_back(e_t(2));
-				const Quaternion<Scalar> quat(Matrix3(T_d.topLeftCorner(3,3)));
-				e_a.push_back(2 * acos(quat.normalized().w()));
-			}
+			// run experiment
+			MSA::ICPSequence icp(3, "", false);
+			populateParameters(icp);
+			unsigned failCount(0);
+			double icpTotalDuration(0);
+			TP T_gt_init;
+			TP T_gt_old;
+			TP T_icp_old;
 			
-			if (i % deltaTfSteps == 0)
+			TP T_d_gt_acc(TP::Identity(4,4));
+			TP T_d_icp_acc(TP::Identity(4,4));
+			
+			Histogram<Scalar> e_x(16, "e_x", "", false), e_y(16, "e_y", "", false), e_z(16, "e_z", "", false), e_a(16, "e_a", "", false);
+			Histogram<Scalar> e_acc_x(16, "e_acc_x", "", false), e_acc_y(16, "e_acc_y", "", false), e_acc_z(16, "e_acc_z", "", false), e_acc_a(16, "e_acc_a", "", false);
+			
+			// open bag
+			rosbag::Bag bag(argv[1]);
+			unsigned cloudLimit(onlyFirsts->count > 0 ? onlyFirsts->ival[0] : numeric_limits<unsigned>::max());
+			unsigned cloudCount(0);
+			rosbag::View view(bag, rosbag::TopicQuery(cloudTopic->sval[0]));
+			BOOST_FOREACH(rosbag::MessageInstance const m, view)
 			{
-				if (useGt)
+				// get cloud message
+				sensor_msgs::PointCloud2::ConstPtr cloudMsg = m.instantiate<sensor_msgs::PointCloud2>();
+				if (cloudMsg == 0)
 				{
-					// compute difference
-					const TP T_d_acc = T_d_gt_acc * T_d_icp_acc.inverse();
-					
-					// compute errors
-					const Vector3 e_t(T_d_acc.topRightCorner(3,1));
-					e_acc_x.push_back(e_t(0));
-					e_acc_y.push_back(e_t(1));
-					e_acc_z.push_back(e_t(2));
-					const Quaternion<Scalar> quat(Matrix3(T_d_acc.topLeftCorner(3,3)));
-					e_acc_a.push_back(2 * acos(quat.normalized().w()));
+					cerr << "Null cloud message after deserialization, are you sure the cloud topic is really " << cloudTopic->sval[0] << " ?" << endl;
+					abort();
 				}
 				
-				// dump deltas
-				if (dtfofs.good())
+				// getting transform, if gt is used
+				string err;
+				TP T_gt = TP::Identity(4,4);
+				if (useGt)
 				{
-					dtfofs << data[i].stamp << " ";
+					cout << "getting transform from " << gtSourceFrame->sval[0] << " to " << gtTargetFrame->sval[0] << " at time: " <<  cloudMsg->header.stamp <<  "..." << endl;
+					if (tfBuffer.canTransform(gtTargetFrame->sval[0], gtSourceFrame->sval[0], cloudMsg->header.stamp, &err))
+					{
+						const geometry_msgs::TransformStamped ts = tfBuffer.lookupTransform(gtTargetFrame->sval[0], gtSourceFrame->sval[0], cloudMsg->header.stamp);
+						T_gt = msgTransformToTP(ts.transform);
+						cout << "success" << endl;
+					}
+					else
+					{
+						cout << "error" << endl;
+						continue;
+					}
+				}
+				
+				// create cloud
+				pcl::PointCloud<pcl::PointXYZ> cloud;
+				pcl::fromROSMsg(*cloudMsg, cloud);
+				const size_t pointCount(cloud.points.size());
+				DP::Features tempCloud(4, pointCount);
+				int dIndex(0);
+				for (size_t i = 0; i < pointCount; ++i)
+				{
+					if (!isnan(cloud.points[i].x) && 
+						!isnan(cloud.points[i].y) &&
+						!isnan(cloud.points[i].z)
+					)
+					{
+						tempCloud(0, dIndex) = cloud.points[i].x;
+						tempCloud(1, dIndex) = cloud.points[i].y;
+						tempCloud(2, dIndex) = cloud.points[i].z;
+						tempCloud(3, dIndex) = 1;
+						++dIndex;
+					}
+				}
+				cout << dIndex << " good points on " << pointCount << "\n";
+				DP d(tempCloud.leftCols(dIndex), labels);
+				
+				// apply icp
+				bool mustInitICP(!icp.hasKeyFrame());
+				timer t;
+				try
+				{
+					icp(d);
+					icpTotalDuration += t.elapsed();
+				}
+				catch (MSA::ConvergenceError error)
+				{
+					icpTotalDuration += t.elapsed();
+					++failCount;
+					cerr << "ICP failed to converge at cloud " << cloudCount << " : " << error.what() << endl;
+				}
+				
+				// if icp has no key frame, init transforms
+				if (mustInitICP)
+				{
+					T_gt_init = T_gt;
+					T_gt_old = T_gt;
+				}
+				
+				// compute T given ICP in ground-truth coordinates
+				const TP T_icp = T_gt_init * T_k_to_v * icp.getTransform() * T_v_to_k;
+				
+				// if icp has no key frame, init transforms
+				if (mustInitICP)
+					T_icp_old = T_icp;
+				
+				// write tf output
+				if (tfofs.good())
+				{
+					tfofs << cloudMsg->header.stamp << " ";
 					
-					const Vector3 t_icp(T_d_icp_acc.topRightCorner(3,1));
-					const Quaternion<Scalar> q_icp(Matrix3(T_d_icp_acc.topLeftCorner(3,3)));
-					dtfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w();
+					const Vector3 t_icp(T_icp.topRightCorner(3,1));
+					const Quaternion<Scalar> q_icp(Matrix3(T_icp.topLeftCorner(3,3)));
+					tfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w();
 					if (useGt)
 					{
-						const Vector3 t_gt(T_d_gt_acc.topRightCorner(3,1));
-						const Quaternion<Scalar> q_gt(Matrix3(T_d_gt_acc.topLeftCorner(3,3)));
-						dtfofs << " " << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w();
+						const Vector3 t_gt(T_gt.topRightCorner(3,1));
+						const Quaternion<Scalar> q_gt(Matrix3(T_gt.topLeftCorner(3,3)));
+						tfofs << " " << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w();
 					}
-					dtfofs << "\n";
+					tfofs << "\n";
 				}
 				
-				// reset accumulators
-				T_d_gt_acc = TP::Identity(4,4);
-				T_d_icp_acc = TP::Identity(4,4);
+				// if not the first frame
+				if (!mustInitICP)
+				{
+					// compute ground-truth transfrom
+					const TP T_d_gt = T_gt.inverse() * T_gt_old;
+					// compute icp inverse transform
+					const TP T_d_icp = T_icp.inverse() * T_icp_old;
+					
+					// compute errors
+					const TP T_d = T_d_gt * T_d_icp.inverse();
+					if (useGt)
+					{
+						const Vector3 e_t(T_d.topRightCorner(3,1));
+						e_x.push_back(e_t(0));
+						e_y.push_back(e_t(1));
+						e_z.push_back(e_t(2));
+						const Quaternion<Scalar> quat(Matrix3(T_d.topLeftCorner(3,3)));
+						e_a.push_back(2 * acos(quat.normalized().w()));
+					}
+					
+					if (cloudCount % deltaTfSteps == 0)
+					{
+						if (useGt)
+						{
+							// compute difference
+							const TP T_d_acc = T_d_gt_acc * T_d_icp_acc.inverse();
+							
+							// compute errors
+							const Vector3 e_t(T_d_acc.topRightCorner(3,1));
+							e_acc_x.push_back(e_t(0));
+							e_acc_y.push_back(e_t(1));
+							e_acc_z.push_back(e_t(2));
+							const Quaternion<Scalar> quat(Matrix3(T_d_acc.topLeftCorner(3,3)));
+							e_acc_a.push_back(2 * acos(quat.normalized().w()));
+						}
+						
+						// dump deltas
+						if (dtfofs.good())
+						{
+							dtfofs << cloudMsg->header.stamp << " ";
+							
+							const Vector3 t_icp(T_d_icp_acc.topRightCorner(3,1));
+							const Quaternion<Scalar> q_icp(Matrix3(T_d_icp_acc.topLeftCorner(3,3)));
+							dtfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w();
+							if (useGt)
+							{
+								const Vector3 t_gt(T_d_gt_acc.topRightCorner(3,1));
+								const Quaternion<Scalar> q_gt(Matrix3(T_d_gt_acc.topLeftCorner(3,3)));
+								dtfofs << " " << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w();
+							}
+							dtfofs << "\n";
+						}
+						
+						// reset accumulators
+						T_d_gt_acc = TP::Identity(4,4);
+						T_d_icp_acc = TP::Identity(4,4);
+					}
+					else
+					{
+						T_d_gt_acc = T_d_gt * T_d_gt_acc;
+						T_d_icp_acc = T_d_icp * T_d_icp_acc;
+					}
+					
+					// dump deltas
+					if (dtfofs.good())
+					{
+						dtfofs << cloudMsg->header.stamp << " ";
+						
+						const Vector3 t_icp(T_d_icp_acc.topRightCorner(3,1));
+						const Quaternion<Scalar> q_icp(Matrix3(T_d_icp_acc.topLeftCorner(3,3)));
+						dtfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w();
+						if (useGt)
+						{
+							const Vector3 t_gt(T_d_gt_acc.topRightCorner(3,1));
+							const Quaternion<Scalar> q_gt(Matrix3(T_d_gt_acc.topLeftCorner(3,3)));
+							dtfofs << " " << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w();
+						}
+						dtfofs << "\n";
+					}
+				}
+				if (++cloudCount >= cloudLimit)
+					break;
 			}
-			else
-			{
-				T_d_gt_acc = T_d_gt * T_d_gt_acc;
-				T_d_icp_acc = T_d_icp * T_d_icp_acc;
-			}
+			bag.close();
 			
-			// write back transforms
-			T_gt_old = T_gt;
-			T_icp_old = T_icp;
-		}
-		const double icpTotalDuration(t.elapsed());
-		
-		// write back results
-		// general stats
-		if (statofs.good())
-		{
-			statofs << data.size() - 1 << " " << failCount << " * ";
-			if (useGt)
+			// write general stats
+			if (statofs.good())
 			{
-				// error on each dt
-				e_x.dumpStats(statofs); statofs << " * ";
-				e_y.dumpStats(statofs); statofs << " * ";
-				e_z.dumpStats(statofs); statofs << " * ";
-				e_a.dumpStats(statofs); statofs << " * ";
-				// error every sect
-				e_acc_x.dumpStats(statofs); statofs << " * ";
-				e_acc_y.dumpStats(statofs); statofs << " * ";
-				e_acc_z.dumpStats(statofs); statofs << " * ";
-				e_acc_a.dumpStats(statofs); statofs << " * ";
+				statofs << data.size() - 1 << " " << failCount << " * ";
+				if (useGt)
+				{
+					// error on each dt
+					e_x.dumpStats(statofs); statofs << " * ";
+					e_y.dumpStats(statofs); statofs << " * ";
+					e_z.dumpStats(statofs); statofs << " * ";
+					e_a.dumpStats(statofs); statofs << " * ";
+					// error every sect
+					e_acc_x.dumpStats(statofs); statofs << " * ";
+					e_acc_y.dumpStats(statofs); statofs << " * ";
+					e_acc_z.dumpStats(statofs); statofs << " * ";
+					e_acc_a.dumpStats(statofs); statofs << " * ";
+				}
+				// timing
+				statofs << icpTotalDuration << " * ";
+				icp.keyFrameDuration.dumpStats(statofs); statofs << " * ";
+				icp.convergenceDuration.dumpStats(statofs); statofs << " * ";
+				// algo stats
+				icp.iterationsCount.dumpStats(statofs); statofs << " * ";
+				icp.pointCountIn.dumpStats(statofs); statofs << " * ";
+				icp.pointCountReading.dumpStats(statofs); statofs << " * ";
+				icp.pointCountKeyFrame.dumpStats(statofs); statofs << " * ";
+				icp.pointCountTouched.dumpStats(statofs); statofs << " * ";
+				icp.overlapRatio.dumpStats(statofs); statofs << " # ";
+				// params for info
+				for (Params::const_iterator it(params.begin()); it != params.end(); ++it)
+					statofs << it->first << "=" << it->second << " ";
+				// finish results
+				statofs << "\n";
 			}
-			// timing
-			statofs << icpTotalDuration << " * ";
-			icp.keyFrameDuration.dumpStats(statofs); statofs << " * ";
-			icp.convergenceDuration.dumpStats(statofs); statofs << " * ";
-			// algo stats
-			icp.iterationsCount.dumpStats(statofs); statofs << " * ";
-			icp.pointCountIn.dumpStats(statofs); statofs << " * ";
-			icp.pointCountReading.dumpStats(statofs); statofs << " * ";
-			icp.pointCountKeyFrame.dumpStats(statofs); statofs << " * ";
-			icp.pointCountTouched.dumpStats(statofs); statofs << " * ";
-			icp.overlapRatio.dumpStats(statofs); statofs << " # ";
-			// params for info
-			for (Params::const_iterator it(params.begin()); it != params.end(); ++it)
-				statofs << it->first << "=" << it->second << " ";
-			// finish results
-			statofs << "\n";
 		}
 	}
-
+	catch (rosbag::BagException e)
+	{
+		cerr << "Error, error reading bag file: " << e.what() << endl;
+		return 2;
+	}
+	
 	return 0;
 }
