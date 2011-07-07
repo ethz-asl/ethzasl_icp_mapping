@@ -344,7 +344,7 @@ int main(int argc, char **argv)
 						++dIndex;
 					}
 				}
-				cout << "  " << dIndex << " good points on " << pointCount << "\n";
+				cout << "  Using " << dIndex << " good points on " << pointCount << "\n";
 				DP d(tempCloud.leftCols(dIndex), labels);
 				
 				// apply icp
@@ -359,7 +359,7 @@ int main(int argc, char **argv)
 				{
 					icpTotalDuration += t.elapsed();
 					++failCount;
-					cerr << "  ICP failed to converge at cloud " << cloudCount << " : " << error.what() << endl;
+					cerr << "W ICP failed to converge at cloud " << cloudCount << " : " << error.what() << endl;
 				}
 				
 				// if icp has no key frame, init transforms
