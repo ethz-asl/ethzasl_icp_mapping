@@ -454,28 +454,12 @@ int main(int argc, char **argv)
 						T_d_gt_acc = T_d_gt * T_d_gt_acc;
 						T_d_icp_acc = T_d_icp * T_d_icp_acc;
 					}
-					
-					// dump deltas
-					if (dtfofs.good())
-					{
-						dtfofs << cloudMsg->header.stamp << " ";
-						
-						const Vector3 t_icp(T_d_icp_acc.topRightCorner(3,1));
-						const Quaternion<Scalar> q_icp(Matrix3(T_d_icp_acc.topLeftCorner(3,3)));
-						dtfofs << t_icp(0) << " " << t_icp(1) << " " << t_icp(2) << " " << q_icp.x() << " " << q_icp.y() << " " << q_icp.z() << " " << q_icp.w();
-						if (useGt)
-						{
-							const Vector3 t_gt(T_d_gt_acc.topRightCorner(3,1));
-							const Quaternion<Scalar> q_gt(Matrix3(T_d_gt_acc.topLeftCorner(3,3)));
-							dtfofs << " " << t_gt(0) << " " << t_gt(1) << " " << t_gt(2) << " " << q_gt.x() << " " << q_gt.y() << " " << q_gt.z() << " " << q_gt.w();
-						}
-						dtfofs << "\n";
-					}
 				}
 				
-				++cloudCount;
 				T_gt_old = T_gt;
 				T_icp_old = T_icp;
+				
+				++cloudCount;
 			}
 			bag.close();
 			
