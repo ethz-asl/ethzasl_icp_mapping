@@ -126,8 +126,8 @@ int main(int argc, char **argv)
 	
 	arg_rex  * cmdGt = arg_rex1(NULL, NULL, "gt", NULL, REG_ICASE, "use ground truth");
 
-	arg_str  * gtTargetFrame = arg_str1(NULL, "gt_target_frame", NULL, "tf target frame of ground truth (mandatory)");
-	arg_str  * gtSourceFrame = arg_str1(NULL, "gt_source_frame", NULL, "tf source frame of ground truth (mandatory)");
+	arg_str  * gtTargetFrame = arg_str1(NULL, "gt_target_frame", NULL, "tf target frame of ground truth, without heading \"/\" (mandatory)");
+	arg_str  * gtSourceFrame = arg_str1(NULL, "gt_source_frame", NULL, "tf source frame of ground truth, without heading \"/\" (mandatory)");
 	
 	arg_str  * corr = arg_str0(NULL, "corr", NULL, "correction from gt to icp, as a string containing \"t_x t_y t_z q_x q_y q_z q_w\" (default: no correction)");
 	
@@ -223,29 +223,32 @@ int main(int argc, char **argv)
 		
 		// 1 year of buffer
 		tf2::BufferCore tfBuffer(ros::Duration(31536000,0));
-		//TP firstTP;
-		//bool gotFirstTP(false);
 		if (useGt)
 		{
 			// first pass, read tf
-			cout << "Loading tf..." << endl;
 			rosbag::Bag bag(bagFile->filename[0]);
 			
+			unsigned tfCount(0);
 			rosbag::View view(bag, rosbag::TopicQuery("/tf"));
 			BOOST_FOREACH(rosbag::MessageInstance const m, view)
 			{
-				// TODO: filter
 				typedef geometry_msgs::TransformStamped TS;
 				tf::tfMessage::ConstPtr tfMsg = m.instantiate<tf::tfMessage>();
 				for (tf::tfMessage::_transforms_type::const_iterator it = tfMsg->transforms.begin(); it != tfMsg->transforms.end(); ++it)
 				{
 					const TS& ts(*it);
-					cout << ts.header.stamp << ":" << ts.header.frame_id << " <- " << ts.child_frame_id << endl;
+					if (tfCount % 100 == 0)
+					{
+						cout << "\rLoading tf: " << tfCount << " loaded...";
+						cout.flush();
+					}
+					//cout << ts.header.stamp << ":" << ts.header.frame_id << " <- " << ts.child_frame_id << endl;
 					tfBuffer.setTransform(ts, "default");
+					++tfCount;
 				}
 			}
 			bag.close();
-			cout << endl;
+			cout << "\r" << tfCount << " tf loaded             " << endl;
 		}
 		
 		// create labels
@@ -263,12 +266,13 @@ int main(int argc, char **argv)
 			reloadParamsFromLine(ifs);
 			if (params.empty())
 				break;
-			cout << "Exp " << expCount << ", loaded " << params.size() << " parameters\n" << end;
+			cout << "Exp " << expCount << ", loaded " << params.size() << " parameters:\n";
 			++expCount;
 			
 			// run experiment
 			MSA::ICPSequence icp(3, "", false);
 			populateParameters(icp);
+			cout << endl;
 			unsigned failCount(0);
 			double icpTotalDuration(0);
 			TP T_gt_init;
@@ -282,17 +286,21 @@ int main(int argc, char **argv)
 			Histogram<Scalar> e_acc_x(16, "e_acc_x", "", false), e_acc_y(16, "e_acc_y", "", false), e_acc_z(16, "e_acc_z", "", false), e_acc_a(16, "e_acc_a", "", false);
 			
 			// open bag
-			rosbag::Bag bag(argv[1]);
+			rosbag::Bag bag(bagFile->filename[0]);
 			unsigned cloudLimit(onlyFirsts->count > 0 ? onlyFirsts->ival[0] : numeric_limits<unsigned>::max());
 			unsigned cloudCount(0);
 			rosbag::View view(bag, rosbag::TopicQuery(cloudTopic->sval[0]));
 			BOOST_FOREACH(rosbag::MessageInstance const m, view)
 			{
+				// make sure we have not reached the limit
+				if (cloudCount >= cloudLimit)
+					break;
+				
 				// get cloud message
 				sensor_msgs::PointCloud2::ConstPtr cloudMsg = m.instantiate<sensor_msgs::PointCloud2>();
 				if (cloudMsg == 0)
 				{
-					cerr << "Null cloud message after deserialization, are you sure the cloud topic is really " << cloudTopic->sval[0] << " ?" << endl;
+					cerr << "E " << cloudCount << " : Null cloud message after deserialization, are you sure the cloud topic is really " << cloudTopic->sval[0] << " ?" << endl;
 					abort();
 				}
 				
@@ -301,16 +309,16 @@ int main(int argc, char **argv)
 				TP T_gt = TP::Identity(4,4);
 				if (useGt)
 				{
-					cout << "getting transform from " << gtSourceFrame->sval[0] << " to " << gtTargetFrame->sval[0] << " at time: " <<  cloudMsg->header.stamp <<  "..." << endl;
 					if (tfBuffer.canTransform(gtTargetFrame->sval[0], gtSourceFrame->sval[0], cloudMsg->header.stamp, &err))
 					{
 						const geometry_msgs::TransformStamped ts = tfBuffer.lookupTransform(gtTargetFrame->sval[0], gtSourceFrame->sval[0], cloudMsg->header.stamp);
 						T_gt = msgTransformToTP(ts.transform);
-						cout << "success" << endl;
+						cout << "* " << cloudCount << " : Got transform from " << gtSourceFrame->sval[0] << " to " << gtTargetFrame->sval[0] << " at time: " <<  cloudMsg->header.stamp << endl;
 					}
 					else
 					{
-						cout << "error" << endl;
+						cout << "W " << cloudCount << " : Cannot get transform from " << gtSourceFrame->sval[0] << " to " << gtTargetFrame->sval[0] << " at time: " <<  cloudMsg->header.stamp << endl;
+						++cloudCount;
 						continue;
 					}
 				}
@@ -335,7 +343,7 @@ int main(int argc, char **argv)
 						++dIndex;
 					}
 				}
-				cout << dIndex << " good points on " << pointCount << "\n";
+				cout << "  " << dIndex << " good points on " << pointCount << "\n";
 				DP d(tempCloud.leftCols(dIndex), labels);
 				
 				// apply icp
@@ -350,7 +358,7 @@ int main(int argc, char **argv)
 				{
 					icpTotalDuration += t.elapsed();
 					++failCount;
-					cerr << "ICP failed to converge at cloud " << cloudCount << " : " << error.what() << endl;
+					cerr << "  ICP failed to converge at cloud " << cloudCount << " : " << error.what() << endl;
 				}
 				
 				// if icp has no key frame, init transforms
@@ -464,10 +472,18 @@ int main(int argc, char **argv)
 						dtfofs << "\n";
 					}
 				}
-				if (++cloudCount >= cloudLimit)
-					break;
+				
+				++cloudCount;
+				T_gt_old = T_gt;
+				T_icp_old = T_icp;
 			}
 			bag.close();
+			
+			if (cloudCount == 0)
+			{
+				cerr << "E : No cloud processed, are you sure the cloud topic is really " << cloudTopic->sval[0] << " ?" << endl;
+				return 0;
+			}
 			
 			// write general stats
 			if (statofs.good())
