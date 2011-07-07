@@ -102,7 +102,6 @@ struct Datum
 
 typedef vector<Datum> Data;
 
-Data data;
 TP T_v_to_k(TP::Identity(4, 4));
 TP T_k_to_v(TP::Identity(4, 4));
 
@@ -274,6 +273,7 @@ int main(int argc, char **argv)
 			populateParameters(icp);
 			cout << endl;
 			unsigned failCount(0);
+			unsigned processedCount(0);
 			double icpTotalDuration(0);
 			TP T_gt_init;
 			TP T_gt_old;
@@ -324,6 +324,7 @@ int main(int argc, char **argv)
 				}
 				
 				// create cloud
+				++processedCount;
 				pcl::PointCloud<pcl::PointXYZ> cloud;
 				pcl::fromROSMsg(*cloudMsg, cloud);
 				const size_t pointCount(cloud.points.size());
@@ -469,10 +470,15 @@ int main(int argc, char **argv)
 				return 0;
 			}
 			
+			if (failCount > 0)
+			{
+				cerr << "W : " << failCount << " registration failed on " << processedCount-1 << " processed clouds (" << 100*double(failCount)/double(processedCount-1) << " %)" << endl;
+			}
+			
 			// write general stats
 			if (statofs.good())
 			{
-				statofs << data.size() - 1 << " " << failCount << " * ";
+				statofs << processedCount-1 << " " << failCount << " * ";
 				if (useGt)
 				{
 					// error on each dt
