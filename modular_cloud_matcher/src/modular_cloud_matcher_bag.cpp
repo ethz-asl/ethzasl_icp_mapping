@@ -472,7 +472,7 @@ int main(int argc, char **argv)
 			
 			if (failCount > 0)
 			{
-				cerr << "W : " << failCount << " registration failed on " << processedCount-1 << " processed clouds (" << 100*double(failCount)/double(processedCount-1) << " %)" << endl;
+				cerr << "W : " << failCount << " registrations failed on " << processedCount-1 << " (" << 100.*double(failCount)/double(processedCount-1) << " %)" << endl;
 			}
 			
 			// write general stats
