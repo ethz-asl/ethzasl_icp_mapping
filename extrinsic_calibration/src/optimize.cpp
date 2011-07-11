@@ -16,6 +16,7 @@ using namespace std;
 
 static double inlierRatio(0.8);
 static int restartCount(1);
+static int generationCount(64);
 
 double uniformRand()
 {
@@ -368,10 +369,12 @@ int main(int argc, char** argv)
 	
 	if (argc < 2)
 	{
-		cerr << "Usage " << argv[0] << " LOG_FILE_NAME [INLIER_RATIO] [RESTART_COUNT]\n";
+		cerr << "Usage " << argv[0] << " LOG_FILE_NAME [INLIER_RATIO] [RESTART_COUNT] [GEN_COUNT]\n";
 		cerr << "  LOG_FILE_NAME   name of file to load containing delta tf\n";
 		cerr << "  INLIER_RATIO    ratio of inlier to use for error computation (range: ]0:1], default: 0.8)\n";
-		cerr << "  RESTART_COUNT   number of random restart (default: 1)" << endl;
+		cerr << "  RESTART_COUNT   number of random restart (default: 1)\n";
+		cerr << "  GEN_COUNT       number of generation for the ES (default: 64)\n";
+		cerr << endl;
 		return 1;
 	}
 	if (argc >= 3)
@@ -389,11 +392,21 @@ int main(int argc, char** argv)
 		restartCount = atoi(argv[3]);
 		if (restartCount < 1)
 		{
-			cerr << "Invalid restart count: " << restartCount << ", must be than 0" << endl;
+			cerr << "Invalid restart count: " << restartCount << ", must be greater than 0" << endl;
 			return 3;
 		}
 	}
 	cout << "Restart count: " << restartCount << endl;
+	if (argc >= 5)
+	{
+		generationCount = atoi(argv[4]);
+		if (generationCount < 1)
+		{
+			cerr << "Invalid generation count: " << generationCount << ", must be greater than 0" << endl;
+			return 4;
+		}
+	}
+	cout << "Generation count: " << generationCount << endl;
 	
 	ifstream ifs(argv[1]);
 	while (ifs.good())
@@ -415,7 +428,6 @@ int main(int argc, char** argv)
 		Genome genome(1024);
 		for (size_t g = 0; g < genome.size(); ++g)
 			genome[g] = Params(0.5);
-		int generationCount = 64;
 		for (int g = 0; g < generationCount; ++g)
 		{
 			cout << "\r" << g << " best has error " << evolveOneGen(genome, 2. * (double)(generationCount - g) / (double)(generationCount)) << "            ";
