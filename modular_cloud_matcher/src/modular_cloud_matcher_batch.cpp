@@ -9,13 +9,22 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include "pointmatcher/PointMatcher.h"
 
 using namespace std;
 using namespace Eigen;
+using namespace PointMatcherSupport;
+
+// FIXME: switch to yaml?
 
 typedef map<string, string> Params;
 
 Params params;
+
+bool hasParam(const std::string& name)
+{
+	return params.find(name) != params.end();
+}
 
 template<typename T>
 T getParam(const std::string& name, const T& defaultValue)
@@ -36,8 +45,26 @@ T getParam(const std::string& name, const T& defaultValue)
 	}
 }
 
+template<typename T>
+T getParam(const std::string& name)
+{
+	Params::const_iterator it(params.find(name));
+	if (it != params.end())
+	{
+		T v;
+		istringstream iss(it->second);
+		iss >> v;
+		cerr << "Found parameter: " << name << ", value: " << v << endl;
+		return v;
+	}
+	else
+	{
+		cerr << "Cannot find value for parameter: " << name;
+		return T();
+	}
+}
+
 #include "icp_chain_creation.h"
-#include "pointmatcher/PointMatcher.h"
 
 struct Datum
 {
@@ -60,8 +87,6 @@ int main(int argc, char **argv)
 	}
 	
 	srand(time(0));
-	
-	initParameters();
 	
 	// read correction
 	{
@@ -238,7 +263,7 @@ int main(int argc, char **argv)
 		++expCount;
 		
 		// run experiment
-		MSA::ICPSequence icp(3, "", false);
+		PM::ICPSequence icp(3, "", false);
 		populateParameters(icp);
 		Histogram<Scalar> e_x(16, "e_x", "", false), e_y(16, "e_y", "", false), e_z(16, "e_z", "", false), e_a(16, "e_a", "", false);
 		Histogram<Scalar> e_acc_x(16, "e_acc_x", "", false), e_acc_y(16, "e_acc_y", "", false), e_acc_z(16, "e_acc_z", "", false), e_acc_a(16, "e_acc_a", "", false);
@@ -254,7 +279,7 @@ int main(int argc, char **argv)
     {
       icp(d);
     }
-    catch (MSA::ConvergenceError error)
+    catch (PM::ConvergenceError error)
     {
       ++failCount;
       cerr << "ICP failed to converge at cloud 0 : " << error.what() << endl;
@@ -274,7 +299,7 @@ int main(int argc, char **argv)
 				d = data[i].cloud;
 				icp(d);
 			}
-			catch (MSA::ConvergenceError error)
+			catch (PM::ConvergenceError error)
 			{
 				++failCount;
 				cerr << "ICP failed to converge at cloud " << i+1 << " : " << error.what() << endl;

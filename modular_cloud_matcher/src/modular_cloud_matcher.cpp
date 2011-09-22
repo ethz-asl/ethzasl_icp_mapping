@@ -1,19 +1,7 @@
 #include "ros/ros.h"
+#include "pointmatcher/PointMatcher.h"
 
-template<typename T>
-T getParam(const std::string& name, const T& defaultValue)
-{
-	T v;
-	if (ros::param::get(std::string("~")+name, v))
-	{
-		ROS_INFO_STREAM("Found parameter: " << name << ", value: " << v);
-		return v;
-	}
-	else
-		ROS_WARN_STREAM("Cannot find value for parameter: " << name << ", assigning default: " << defaultValue);
-	return defaultValue;
-}
-
+#include "get_params_from_server.h"
 #include "icp_chain_creation.h"
 #include "cloud_conversion.h"
 
@@ -28,7 +16,7 @@ class CloudMatcher
 {
 	ros::NodeHandle& n;
 	
-	MSA::ICPSequence icp;
+	PM::ICPSequence icp;
 	
 	const bool sendDeltaPoseMessage;
 	const string fixedFrame;
@@ -123,7 +111,7 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 		icp(dp);
 		ROS_INFO_STREAM("match ratio: " << icp.errorMinimizer->getWeightedPointUsedRatio() << endl);
 	}
-	catch (MSA::ConvergenceError error)
+	catch (PM::ConvergenceError error)
 	{
 		icpWasSuccess = false;
 		ROS_WARN_STREAM("ICP failed to converge: " << error.what());
@@ -203,8 +191,6 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 
 int main(int argc, char **argv)
 {
-	initParameters();
-	
 	ros::init(argc, argv, "cloud_matcher_node");
 	ros::NodeHandle n;
 	bool sendDeltaPoseMessage(false);

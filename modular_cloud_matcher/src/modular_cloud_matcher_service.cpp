@@ -1,19 +1,7 @@
 #include "ros/ros.h"
+#include "pointmatcher/PointMatcher.h"
 
-template<typename T>
-T getParam(const std::string& name, const T& defaultValue)
-{
-	T v;
-	if (ros::param::get(std::string("~")+name, v))
-	{
-		ROS_INFO_STREAM("Found parameter: " << name << ", value: " << v);
-		return v;
-	}
-	else
-		ROS_WARN_STREAM("Cannot find value for parameter: " << name << ", assigning default: " << defaultValue);
-	return defaultValue;
-}
-
+#include "get_params_from_server.h"
 #include "icp_chain_creation.h"
 #include "cloud_conversion.h"
 
@@ -25,7 +13,7 @@ class CloudMatcher
 {
 	ros::NodeHandle& n;
 	
-	MSA::ICP icp;
+	PM::ICP icp;
 	
 	ros::ServiceServer service;
 	
@@ -82,7 +70,7 @@ bool CloudMatcher::match(modular_cloud_matcher::MatchClouds::Request& req, modul
 		transform = icp(readingCloud, referenceCloud);
 		ROS_INFO_STREAM("match ratio: " << icp.errorMinimizer->getWeightedPointUsedRatio() << endl);
 	}
-	catch (MSA::ConvergenceError error)
+	catch (PM::ConvergenceError error)
 	{
 		ROS_ERROR_STREAM("ICP failed to converge: " << error.what());
 		return false;
@@ -104,8 +92,6 @@ bool CloudMatcher::match(modular_cloud_matcher::MatchClouds::Request& req, modul
 
 int main(int argc, char **argv)
 {
-	initParameters();
-	
 	ros::init(argc, argv, "cloud_matcher_service");
 	ros::NodeHandle n;
 	

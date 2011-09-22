@@ -25,13 +25,22 @@
 #include "sensor_msgs/CameraInfo.h"
 #include <argtable2.h>
 #include <regex.h>      /* REG_ICASE */
+#include "pointmatcher/PointMatcher.h"
 
 using namespace std;
 using namespace Eigen;
+using namespace PointMatcherSupport;
 
 typedef map<string, string> Params;
 
+// FIXME: use yaml ?
+
 Params params;
+
+bool hasParam(const std::string& name)
+{
+	return params.find(name) != params.end();
+}
 
 template<typename T>
 T getParam(const std::string& name, const T& defaultValue)
@@ -49,6 +58,25 @@ T getParam(const std::string& name, const T& defaultValue)
 	{
 		cerr << "Cannot find value for parameter: " << name << ", assigning default: " << defaultValue << endl;
 		return defaultValue;
+	}
+}
+
+template<typename T>
+T getParam(const std::string& name)
+{
+	Params::const_iterator it(params.find(name));
+	if (it != params.end())
+	{
+		T v;
+		istringstream iss(it->second);
+		iss >> v;
+		cerr << "Found parameter: " << name << ", value: " << v << endl;
+		return v;
+	}
+	else
+	{
+		cerr << "Cannot find value for parameter: " << name << endl;
+		return T();
 	}
 }
 
@@ -91,7 +119,6 @@ void openWriteFile(ofstream& stream, arg_file * file, const int errorVal)
 }
 
 #include "icp_chain_creation.h"
-#include "pointmatcher/PointMatcher.h"
 
 struct Datum
 {
@@ -166,8 +193,6 @@ int main(int argc, char **argv)
 	
 	srand(time(0));
 	
-	initParameters();
-
 	// setup correction
 	if (useGt)
 	{
@@ -269,7 +294,7 @@ int main(int argc, char **argv)
 			++expCount;
 			
 			// run experiment
-			MSA::ICPSequence icp(3, "", false);
+			PM::ICPSequence icp(3, "", false);
 			populateParameters(icp);
 			cout << endl;
 			unsigned failCount(0);
@@ -355,7 +380,7 @@ int main(int argc, char **argv)
 					icp(d);
 					icpTotalDuration += t.elapsed();
 				}
-				catch (MSA::ConvergenceError error)
+				catch (PM::ConvergenceError error)
 				{
 					icpTotalDuration += t.elapsed();
 					++failCount;
