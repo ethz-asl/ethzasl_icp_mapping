@@ -263,7 +263,7 @@ int main(int argc, char **argv)
 		++expCount;
 		
 		// run experiment
-		PM::ICPSequence icp(3, "", false);
+		PM::ICPSequence icp("", false);
 		populateParameters(icp);
 		Histogram<Scalar> e_x(16, "e_x", "", false), e_y(16, "e_y", "", false), e_z(16, "e_z", "", false), e_a(16, "e_a", "", false);
 		Histogram<Scalar> e_acc_x(16, "e_acc_x", "", false), e_acc_y(16, "e_acc_y", "", false), e_acc_z(16, "e_acc_z", "", false), e_acc_a(16, "e_acc_a", "", false);

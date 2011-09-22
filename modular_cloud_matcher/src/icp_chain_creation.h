@@ -26,7 +26,7 @@ typename R::TargetType* initModuleFromRegistrar(const std::string& root, const R
 }
 
 template<typename R>
-void initModulesFromRegistrar(const std::string& paramNamespace, const R& registrar, std::vector<typename R::TargetType*>& modules)
+void initModulesFromRegistrar(const std::string& paramNamespace, const R& registrar, PointMatcherSupport::SharedPtrVector<typename R::TargetType>& modules)
 {
 	const int count(getParam<int>(paramNamespace + "Count", 0));
 	for (int i = 0; i < count; ++i)
@@ -45,12 +45,12 @@ void populateParametersBase(PM::ICPChainBase& icp)
 	initModulesFromRegistrar("readingStepDataPointsFilter", pm.REG(DataPointsFilter), icp.readingStepDataPointsFilters);
 	initModulesFromRegistrar("keyframeDataPointsFilter", pm.REG(DataPointsFilter), icp.keyframeDataPointsFilters);
 	initModulesFromRegistrar("transformation", pm.REG(Transformation), icp.transformations);
-	icp.matcher = initModuleFromRegistrar("matcher", pm.REG(Matcher));
+	icp.matcher.reset(initModuleFromRegistrar("matcher", pm.REG(Matcher)));
 	initModulesFromRegistrar("featureOutlierFilter", pm.REG(FeatureOutlierFilter), icp.featureOutlierFilters);
 	initModulesFromRegistrar("descriptorOutlierFilter", pm.REG(DescriptorOutlierFilter), icp.descriptorOutlierFilters);
-	icp.errorMinimizer = initModuleFromRegistrar("errorMinimizer", pm.REG(ErrorMinimizer));
+	icp.errorMinimizer.reset(initModuleFromRegistrar("errorMinimizer", pm.REG(ErrorMinimizer)));
 	initModulesFromRegistrar("transformationChecker", pm.REG(TransformationChecker), icp.transformationCheckers);
-	icp.inspector = initModuleFromRegistrar("inspector", pm.REG(Inspector));
+	icp.inspector.reset(initModuleFromRegistrar("inspector", pm.REG(Inspector)));
 	icp.outlierMixingWeight = getParam<double>("outlierMixingWeight", 1);
 	// FIXME: consistency check?
 }

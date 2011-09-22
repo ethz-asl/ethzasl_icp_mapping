@@ -37,7 +37,7 @@ public:
 
 CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix, const bool sendDeltaPoseMessage):
 	n(n),
-	icp(3, statFilePrefix),
+	icp(statFilePrefix),
 	sendDeltaPoseMessage(sendDeltaPoseMessage),
 	fixedFrame(getParam<string>("fixedFrame",  "/world")),
 	sensorFrame(getParam<string>("sensorFrame",  "/openni_rgb_optical_frame")),
