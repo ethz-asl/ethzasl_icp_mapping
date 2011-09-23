@@ -103,6 +103,21 @@ endif (OPENCL_LIBRARIES)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
+# look for yaml-cpp library
+find_path(yaml-cpp_INCLUDE_DIRS yaml-cpp/yaml.h
+	/usr/local/include
+	/usr/include
+)
+find_library(yaml-cpp_LIBRARIES yaml-cpp PATHS
+	/usr/local/lib
+	/usr/lib
+NO_DEFAULT_PATH)
+if (yaml-cpp_INCLUDE_DIRS AND yaml-cpp_LIBRARIES)
+	include_directories(${yaml-cpp_INCLUDE_DIRS})
+	set(EXTRA_LIBS ${EXTRA_LIBS} ${yaml-cpp_LIBRARIES})
+	add_definitions(-DHAVE_YAML_CPP)
+endif (yaml-cpp_INCLUDE_DIRS AND yaml-cpp_LIBRARIES)
+
 rosbuild_add_boost_directories()
 rosbuild_add_executable(cloud_matcher_node src/modular_cloud_matcher.cpp)
 rosbuild_add_executable(cloud_matcher_service src/modular_cloud_matcher_service.cpp)
