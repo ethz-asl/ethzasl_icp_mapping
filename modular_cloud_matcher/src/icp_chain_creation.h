@@ -41,16 +41,17 @@ void populateParametersBase(PM::ICPChainBase& icp)
 	// icp parameters
 	PM pm;
 	
-	initModulesFromRegistrar("readingDataPointsFilter", pm.REG(DataPointsFilter), icp.readingDataPointsFilters);
-	initModulesFromRegistrar("readingStepDataPointsFilter", pm.REG(DataPointsFilter), icp.readingStepDataPointsFilters);
-	initModulesFromRegistrar("keyframeDataPointsFilter", pm.REG(DataPointsFilter), icp.keyframeDataPointsFilters);
-	initModulesFromRegistrar("transformation", pm.REG(Transformation), icp.transformations);
+	initModulesFromRegistrar("readingDataPointsFilters", pm.REG(DataPointsFilter), icp.readingDataPointsFilters);
+	initModulesFromRegistrar("readingStepDataPointsFilters", pm.REG(DataPointsFilter), icp.readingStepDataPointsFilters);
+	initModulesFromRegistrar("keyframeDataPointsFilters", pm.REG(DataPointsFilter), icp.keyframeDataPointsFilters);
+	initModulesFromRegistrar("transformations", pm.REG(Transformation), icp.transformations);
 	icp.matcher.reset(initModuleFromRegistrar("matcher", pm.REG(Matcher)));
-	initModulesFromRegistrar("featureOutlierFilter", pm.REG(FeatureOutlierFilter), icp.featureOutlierFilters);
-	initModulesFromRegistrar("descriptorOutlierFilter", pm.REG(DescriptorOutlierFilter), icp.descriptorOutlierFilters);
+	initModulesFromRegistrar("featureOutlierFilters", pm.REG(FeatureOutlierFilter), icp.featureOutlierFilters);
+	initModulesFromRegistrar("descriptorOutlierFilters", pm.REG(DescriptorOutlierFilter), icp.descriptorOutlierFilters);
 	icp.errorMinimizer.reset(initModuleFromRegistrar("errorMinimizer", pm.REG(ErrorMinimizer)));
-	initModulesFromRegistrar("transformationChecker", pm.REG(TransformationChecker), icp.transformationCheckers);
+	initModulesFromRegistrar("transformationCheckers", pm.REG(TransformationChecker), icp.transformationCheckers);
 	icp.inspector.reset(initModuleFromRegistrar("inspector", pm.REG(Inspector)));
+	icp.logger.reset(initModuleFromRegistrar("logger", pm.REG(Logger)));
 	icp.outlierMixingWeight = getParam<double>("outlierMixingWeight", 1);
 	// FIXME: consistency check?
 }

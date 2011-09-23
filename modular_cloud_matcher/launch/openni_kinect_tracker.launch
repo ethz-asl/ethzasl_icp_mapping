@@ -3,33 +3,33 @@
     <param name="startupDropCount" value="0" />
     <param name="statFilePrefix" value="test.stats." />
     
-    <param name="readingDataPointsFilterCount" value="2" />
-    <param name="readingDataPointsFilter/0/name" value="ClampOnAxisThresholdDataPointsFilter" />
-    <param name="readingDataPointsFilter/0/threshold" value="2.5" />
-    <param name="readingDataPointsFilter/0/dim" value="2" />
-    <param name="readingDataPointsFilter/1/name" value="FixstepSamplingDataPointsFilter" />
-    <param name="readingDataPointsFilter/1/startStep" value="17." />
-    <param name="readingDataPointsFilter/1/endStep" value="17." />
-    <param name="readingDataPointsFilter/1/stepMult" value="1." />
+    <param name="readingDataPointsFiltersCount" value="2" />
+    <param name="readingDataPointsFilters/0/name" value="ClampOnAxisThresholdDataPointsFilter" />
+    <param name="readingDataPointsFilters/0/threshold" value="2.5" />
+    <param name="readingDataPointsFilters/0/dim" value="2" />
+    <param name="readingDataPointsFilters/1/name" value="FixstepSamplingDataPointsFilter" />
+    <param name="readingDataPointsFilters/1/startStep" value="17." />
+    <param name="readingDataPointsFilters/1/endStep" value="17." />
+    <param name="readingDataPointsFilters/1/stepMult" value="1." />
     
-    <param name="readingStepDataPointsFilterCount" value="0" />
-    <param name="readingStepDataPointsFilter/0/name" value="FixstepSamplingDataPointsFilter" />
-    <param name="readingStepDataPointsFilter/0/startStep" value="111." />
-    <param name="readingStepDataPointsFilter/0/endStep" value="17." />
-    <param name="readingStepDataPointsFilter/0/stepMult" value="0.7" />
+    <param name="readingStepDataPointsFiltersCount" value="0" />
+    <param name="readingStepDataPointsFilters/0/name" value="FixstepSamplingDataPointsFilter" />
+    <param name="readingStepDataPointsFilters/0/startStep" value="111." />
+    <param name="readingStepDataPointsFilters/0/endStep" value="17." />
+    <param name="readingStepDataPointsFilters/0/stepMult" value="0.7" />
 
-    <param name="keyframeDataPointsFilterCount" value="2" />
-    <param name="keyframeDataPointsFilter/0/name" value="ClampOnAxisThresholdDataPointsFilter" />
-    <param name="keyframeDataPointsFilter/0/threshold" value="2.5" />
-    <param name="keyframeDataPointsFilter/0/dim" value="2" />
-    <param name="keyframeDataPointsFilter/1/name" value="SamplingSurfaceNormalDataPointsFilter" />
-    <param name="keyframeDataPointsFilter/1/k" value="11" />
+    <param name="keyframeDataPointsFiltersCount" value="2" />
+    <param name="keyframeDataPointsFilters/0/name" value="ClampOnAxisThresholdDataPointsFilter" />
+    <param name="keyframeDataPointsFilters/0/threshold" value="2.5" />
+    <param name="keyframeDataPointsFilters/0/dim" value="2" />
+    <param name="keyframeDataPointsFilters/1/name" value="SamplingSurfaceNormalDataPointsFilter" />
+    <param name="keyframeDataPointsFilters/1/k" value="11" />
 
     <param name="matcher/name" value="KDTreeMatcher" />
     <param name="matcher/epsilon" value="0.0" />
     <param name="matcher/maxDist" value="0.2" />
 
-    <param name="transformationCheckerCount" value="2" />  
+    <param name="transformationCheckersCount" value="2" />  
     <param name="transformationCheckers/0/name" value="ErrorTransformationChecker" />
     <param name="transformationCheckers/0/minRotErrorDelta" value="0.001" />
     <param name="transformationCheckers/0/minTransErrorDelta" value="0.01" />
@@ -40,11 +40,14 @@
     <param name="transformationCheckers/2/maxRotationNorm" value="1" />
     <param name="transformationCheckers/2/maxTranslationNorm" value="0.5" />
 
-    <param name="featureOutlierFilterCount" value="1" />
+    <param name="featureOutlierFiltersCount" value="1" />
     <param name="featureOutlierFilters/0/name" value="MedianDistOutlierFilter" />
     <param name="featureOutlierFilters/0/factor" value="4" />
 
     <param name="inspector/name" value="Inspector" />
+    
+    <param name="logger/name" value="NullLogger" />
+    
     <param name="errorMinimizer/name" value="PointToPlaneErrorMinimizer" />
 
     <param name="sensorFrame" value="/openni_rgb_optical_frame" />
