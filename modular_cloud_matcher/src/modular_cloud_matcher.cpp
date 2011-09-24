@@ -94,7 +94,7 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 	}
 	
 	const unsigned pointCount(cloudMsg.width * cloudMsg.height);
-	ROS_INFO_STREAM("Got " << pointCount << " points (" << goodCount << " goods)");
+	//ROS_INFO_STREAM("Got " << pointCount << " points (" << goodCount << " goods)");
 	const double imageRatio = (double)goodCount / (double)pointCount;
 	
 	//TODO: put that as parameter, tricky to set...
@@ -109,7 +109,7 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 	try 
 	{
 		icp(dp);
-		ROS_INFO_STREAM("match ratio: " << icp.errorMinimizer->getWeightedPointUsedRatio() << endl);
+		//ROS_INFO_STREAM("match ratio: " << icp.errorMinimizer->getWeightedPointUsedRatio() << endl);
 	}
 	catch (PM::ConvergenceError error)
 	{
