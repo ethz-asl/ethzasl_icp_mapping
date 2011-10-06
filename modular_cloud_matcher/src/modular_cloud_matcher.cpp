@@ -1,8 +1,9 @@
 #include "ros/ros.h"
+#include "ros/console.h"
 #include "pointmatcher/PointMatcher.h"
 
+#include "aliases.h"
 #include "get_params_from_server.h"
-#include "icp_chain_creation.h"
 #include "cloud_conversion.h"
 
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
@@ -11,6 +12,44 @@
 #include "tf_conversions/tf_eigen.h"
 
 using namespace std;
+
+namespace PointMatcherSupport
+{
+	struct ROSLogger: public Logger
+	{
+		virtual bool hasInfoChannel() const{ return true; };
+		virtual std::ostream* infoStream() { return &_infoStream; }
+		virtual void finishInfoEntry(const char *file, unsigned line, const char *func);
+		virtual bool hasWarningChannel() const { return true; }
+		virtual std::ostream* warningStream() { return &_warningStream; }
+		virtual void finishWarningEntry(const char *file, unsigned line, const char *func);
+		
+	protected:
+		void writeRosLog(ros::console::Level level, const char* file, int line, const char *func, const string& text);
+		
+		std::ostringstream _infoStream;
+		std::ostringstream _warningStream;
+	};
+	
+	void ROSLogger::finishInfoEntry(const char *file, unsigned line, const char *func)
+	{
+		writeRosLog(ros::console::levels::Info, file, line, func, _infoStream.str());
+		_infoStream.str("");
+	}
+	
+	void ROSLogger::finishWarningEntry(const char *file, unsigned line, const char *func)
+	{
+		writeRosLog(ros::console::levels::Warn, file, line, func, _warningStream.str());
+		_warningStream.str("");
+	}
+	
+	void ROSLogger::writeRosLog(ros::console::Level level, const char* file, int line, const char *func, const string& text)
+	{
+		ROSCONSOLE_DEFINE_LOCATION(true, level, ROSCONSOLE_DEFAULT_NAME);
+		if (enabled)
+			ros::console::print(0, loc.logger_, loc.level_, file, line, func, "%s", text.c_str());
+	}
+};
 
 class CloudMatcher
 {
@@ -52,7 +91,29 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix
 	
 	path.header.frame_id = fixedFrame;
 	
-	populateParameters(icp);
+	// load config
+	string configFileName;
+	if (ros::param::get("~config", configFileName))
+	{
+		ifstream ifs(configFileName.c_str());
+		if (ifs.good())
+		{
+			icp.loadFromYaml(ifs);
+		}
+		else
+		{
+			ROS_ERROR_STREAM("Cannot load config from YAML file " << configFileName);
+			icp.setDefault();
+		}
+	}
+	else
+	{
+		ROS_WARN_STREAM("No config file specified, using default ICP chain.");
+		icp.setDefault();
+	}
+	
+	// replace logger
+	icp.logger.reset(new PointMatcherSupport::ROSLogger);
 	
 	if (sendDeltaPoseMessage)
 		posePub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>(getParam<string>("deltaPoseTopic", "/openni_delta_pose"), 3);
