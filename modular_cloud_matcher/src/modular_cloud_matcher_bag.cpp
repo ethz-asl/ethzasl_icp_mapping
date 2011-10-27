@@ -26,6 +26,7 @@
 #include <argtable2.h>
 #include <regex.h>      /* REG_ICASE */
 #include "pointmatcher/PointMatcher.h"
+#include "pointmatcher/Timer.h"
 
 using namespace std;
 using namespace Eigen;

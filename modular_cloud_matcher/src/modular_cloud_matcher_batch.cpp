@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <ctime>
 #include "pointmatcher/PointMatcher.h"
+#include "pointmatcher/Timer.h"
 
 using namespace std;
 using namespace Eigen;

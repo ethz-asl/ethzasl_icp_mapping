@@ -1,3 +1,5 @@
+#include <fstream>
+
 #include "ros/ros.h"
 #include "ros/console.h"
 #include "pointmatcher/PointMatcher.h"
@@ -123,7 +125,7 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix
 	}
 	
 	// replace logger
-	icp.logger.reset(new PointMatcherSupport::ROSLogger);
+	PointMatcherSupport::setLogger(new PointMatcherSupport::ROSLogger);
 	
 	if (sendDeltaPoseMessage)
 		posePub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>(getParam<string>("deltaPoseTopic", "/openni_delta_pose"), 3);

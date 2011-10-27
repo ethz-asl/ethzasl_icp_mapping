@@ -64,8 +64,8 @@ void populateParametersBase(PM::ICPChainBase& icp)
 	icp.errorMinimizer.reset(initModuleFromRegistrar("errorMinimizer", pm.REG(ErrorMinimizer)));
 	initModulesFromRegistrar("transformationCheckers", pm.REG(TransformationChecker), icp.transformationCheckers);
 	icp.inspector.reset(initModuleFromRegistrar("inspector", pm.REG(Inspector)));
-	icp.logger.reset(initModuleFromRegistrar("logger", pm.REG(Logger)));
 	icp.outlierMixingWeight = getParam<double>("outlierMixingWeight", 1);
+	PointMatcherSupport::setLogger(initModuleFromRegistrar("logger", pm.REG(Logger)));
 	// FIXME: consistency check?
 }
 
