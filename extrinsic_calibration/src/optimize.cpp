@@ -49,9 +49,9 @@ struct TrainingEntry
 {
 	double timeStamp;
 	Eigen::Vector3d odom_tr;
-	Eigen::eigen2_Quaterniond odom_rot;
+	Eigen::Quaterniond odom_rot;
 	Eigen::Vector3d icp_tr;
-	Eigen::eigen2_Quaterniond icp_rot;
+	Eigen::Quaterniond icp_rot;
 
 	TrainingEntry(){}
 	TrainingEntry(std::istream& is)
@@ -66,7 +66,7 @@ struct TrainingEntry
 		is >> q_y;
 		is >> q_z;
 		is >> q_w;
-		icp_rot = Eigen::eigen2_Quaterniond(q_w, q_x, q_y, q_z).normalized();
+		icp_rot = Eigen::Quaterniond(q_w, q_x, q_y, q_z).normalized();
 		is >> t_x;
 		is >> t_y;
 		is >> t_z;
@@ -75,7 +75,7 @@ struct TrainingEntry
 		is >> q_y;
 		is >> q_z;
 		is >> q_w;
-		odom_rot = Eigen::eigen2_Quaterniond(q_w, q_x, q_y, q_z).normalized();
+		odom_rot = Eigen::Quaterniond(q_w, q_x, q_y, q_z).normalized();
 		//odom_tr = odom_rot*odom_tr;
 		//cerr << icp_rot.x() << " " << icp_rot.y() << " " << icp_rot.z() << " " << icp_rot.w() <<endl;
 		//cerr << icp_tr.x() << " " << icp_tr.y() << " " << icp_tr.z() << endl;
@@ -113,10 +113,10 @@ TrainingSet trainingSet;
 struct Params
 {
 	Eigen::Vector3d tr;
-	Eigen::eigen2_Quaterniond rot;
+	Eigen::Quaterniond rot;
 	
 	Params():tr(0,0,0),rot(1,0,0,0) {}
-	Params(const Eigen::Vector3d& _tr, const Eigen::eigen2_Quaterniond& _rot):
+	Params(const Eigen::Vector3d& _tr, const Eigen::Quaterniond& _rot):
 		tr(_tr),
 		rot(_rot)
 		{}
@@ -127,10 +127,10 @@ struct Params
 			gaussianRand(0, transVariance)
 		),
 		rot(
-			Eigen::eigen2_Quaterniond(1,0,0,0) *
-			Eigen::eigen2_Quaterniond(Eigen::eigen2_AngleAxisd(uniformRand() * M_PI*2, Eigen::Vector3d::UnitX())) *
-			Eigen::eigen2_Quaterniond(Eigen::eigen2_AngleAxisd(uniformRand() * M_PI*2, Eigen::Vector3d::UnitY())) *
-			Eigen::eigen2_Quaterniond(Eigen::eigen2_AngleAxisd(uniformRand() * M_PI*2, Eigen::Vector3d::UnitZ()))
+			Eigen::Quaterniond(1,0,0,0) *
+			Eigen::Quaterniond(Eigen::AngleAxisd(uniformRand() * M_PI*2, Eigen::Vector3d::UnitX())) *
+			Eigen::Quaterniond(Eigen::AngleAxisd(uniformRand() * M_PI*2, Eigen::Vector3d::UnitY())) *
+			Eigen::Quaterniond(Eigen::AngleAxisd(uniformRand() * M_PI*2, Eigen::Vector3d::UnitZ()))
 		)
 		{}
 	
@@ -146,9 +146,9 @@ struct Params
 				case 0: tr.x() += gaussianRand(0, 0.1) * amount; break;
 				case 1: tr.y() += gaussianRand(0, 0.1) * amount; break;
 				case 2: tr.z() += gaussianRand(0, 0.1) * amount; break;
-				case 3: rot *= Eigen::eigen2_Quaterniond(Eigen::eigen2_AngleAxisd(gaussianRand(0, M_PI / 8) * amount, Eigen::Vector3d::UnitX())); break;
-				case 4: rot *= Eigen::eigen2_Quaterniond(Eigen::eigen2_AngleAxisd(gaussianRand(0, M_PI / 8) * amount, Eigen::Vector3d::UnitY())); break;
-				case 5: rot *= Eigen::eigen2_Quaterniond(Eigen::eigen2_AngleAxisd(gaussianRand(0, M_PI / 8) * amount, Eigen::Vector3d::UnitZ())); break;
+				case 3: rot *= Eigen::Quaterniond(Eigen::AngleAxisd(gaussianRand(0, M_PI / 8) * amount, Eigen::Vector3d::UnitX())); break;
+				case 4: rot *= Eigen::Quaterniond(Eigen::AngleAxisd(gaussianRand(0, M_PI / 8) * amount, Eigen::Vector3d::UnitY())); break;
+				case 5: rot *= Eigen::Quaterniond(Eigen::AngleAxisd(gaussianRand(0, M_PI / 8) * amount, Eigen::Vector3d::UnitZ())); break;
 				default: break;
 			};
 		}
@@ -156,9 +156,9 @@ struct Params
 		tr.x() += gaussianRand(0, 0.1) * amount;
 		tr.y() += gaussianRand(0, 0.1) * amount;
 		tr.z() += gaussianRand(0, 0.1) * amount;
-		rot *= Eigen::eigen2_Quaterniond(Eigen::AngleAxisd(gaussianRand(0, M_PI / 8) * amount, Eigen::Vector3d::UnitX()));
-		rot *= Eigen::eigen2_Quaterniond(Eigen::AngleAxisd(gaussianRand(0, M_PI / 8) * amount, Eigen::Vector3d::UnitY()));
-		rot *= Eigen::eigen2_Quaterniond(Eigen::AngleAxisd(gaussianRand(0, M_PI / 8) * amount, Eigen::Vector3d::UnitZ()));
+		rot *= Eigen::Quaterniond(Eigen::AngleAxisd(gaussianRand(0, M_PI / 8) * amount, Eigen::Vector3d::UnitX()));
+		rot *= Eigen::Quaterniond(Eigen::AngleAxisd(gaussianRand(0, M_PI / 8) * amount, Eigen::Vector3d::UnitY()));
+		rot *= Eigen::Quaterniond(Eigen::AngleAxisd(gaussianRand(0, M_PI / 8) * amount, Eigen::Vector3d::UnitZ()));
 		*/
 		return *this;
 	}
@@ -213,7 +213,7 @@ void normalizeParams(ParamsVector& params)
 void dumpParamsStats(ostream& stream, const ParamsVector& params)
 {
 	Eigen::Vector3d trMean(0,0,0);
-	Eigen::eigen2_Quaterniond::Coefficients rotMean(0,0,0,0);
+	Eigen::Quaterniond::Coefficients rotMean(0,0,0,0);
 	for (size_t i = 0; i < params.size(); ++i)
 	{
 		trMean += params[i].tr;
@@ -222,12 +222,12 @@ void dumpParamsStats(ostream& stream, const ParamsVector& params)
 	trMean /= double(params.size());
 	rotMean /= double(params.size());
 	
-	Params mean(trMean,Eigen::eigen2_Quaterniond(rotMean));
+	Params mean(trMean,Eigen::Quaterniond(rotMean));
 	mean.normalize();
 	mean.dumpCopyPaste(stream); stream << "\n";
 	
 	Eigen::Vector3d trVar(0,0,0);
-	Eigen::eigen2_Quaterniond::Coefficients rotVar(0,0,0,0);
+	Eigen::Quaterniond::Coefficients rotVar(0,0,0,0);
 	for (size_t i = 0; i < params.size(); ++i)
 	{
 		trVar += (params[i].tr - trMean).cwise() * (params[i].tr - trMean);
@@ -237,7 +237,7 @@ void dumpParamsStats(ostream& stream, const ParamsVector& params)
 	rotVar /= double(params.size());
 	
 	stream << "\nVariance:\n";
-	Params var(trVar,Eigen::eigen2_Quaterniond(rotVar));
+	Params var(trVar,Eigen::Quaterniond(rotVar));
 	var.dumpTransform(stream); stream << "\n";
 	
 	stream << "\nValues:\n";
@@ -266,19 +266,22 @@ double computeError(const Params& p, const TrainingEntry& e)
 	const Eigen::Matrix4d pred_icp = blk_i * odom * blk;
 	
 	const Eigen::Matrix3d pred_icp_rot_m = pred_icp.corner(Eigen::TopLeft,3,3);
-	const Eigen::eigen2_Quaterniond pred_icp_rot = Eigen::eigen2_Quaterniond(pred_icp_rot_m);
+	const Eigen::Quaterniond pred_icp_rot = Eigen::Quaterniond(pred_icp_rot_m);
 	const Eigen::Vector3d pred_icp_tr = pred_icp.corner(Eigen::TopRight,3,1);
 	*/
 	
 	// version with Eigen::Transform3d
-	const Eigen::eigen2_Transform3d blk = Eigen::eigen2_Translation3d(p.tr) * p.rot;
-	const Eigen::eigen2_Transform3d blk_i = Eigen::eigen2_Transform3d(blk.inverse(Eigen::Isometry));
-	const Eigen::eigen2_Transform3d odom = Eigen::eigen2_Translation3d(e.odom_tr) * e.odom_rot;
+	typedef Eigen::Transform<double, 3, Eigen::Affine> Transform3d;
+	typedef Eigen::Translation<double, 3> Translation3d;
+	
+	const Transform3d blk = Translation3d(p.tr) * p.rot;
+	const Transform3d blk_i = Transform3d(blk.inverse(Eigen::Isometry));
+	const Transform3d odom = Translation3d(e.odom_tr) * e.odom_rot;
 	//const Eigen::Transform3d pred_icp = blk * odom * blk_i;
-	const Eigen::eigen2_Transform3d pred_icp = blk_i * odom * blk;
+	const Transform3d pred_icp = blk_i * odom * blk;
 	
 	const Eigen::Matrix3d pred_icp_rot_m = pred_icp.matrix().topLeftCorner(3,3);
-	const Eigen::eigen2_Quaterniond pred_icp_rot = Eigen::eigen2_Quaterniond(pred_icp_rot_m);
+	const Eigen::Quaterniond pred_icp_rot = Eigen::Quaterniond(pred_icp_rot_m);
 	const Eigen::Vector3d pred_icp_tr = pred_icp.translation();
 	
 	
