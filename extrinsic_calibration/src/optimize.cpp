@@ -230,8 +230,8 @@ void dumpParamsStats(ostream& stream, const ParamsVector& params)
 	Eigen::Quaterniond::Coefficients rotVar(0,0,0,0);
 	for (size_t i = 0; i < params.size(); ++i)
 	{
-		trVar += (params[i].tr - trMean).cwise() * (params[i].tr - trMean);
-		rotVar += (params[i].rot.coeffs() - rotMean).cwise() * (params[i].rot.coeffs() - rotMean);
+		trVar += (params[i].tr - trMean).cwiseProduct(params[i].tr - trMean);
+		rotVar += (params[i].rot.coeffs() - rotMean).cwiseProduct(params[i].rot.coeffs() - rotMean);
 	}
 	trVar /= double(params.size());
 	rotVar /= double(params.size());
