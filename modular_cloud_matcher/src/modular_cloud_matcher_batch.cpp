@@ -266,8 +266,6 @@ int main(int argc, char **argv)
 		// run experiment
 		PM::ICPSequence icp("", false);
 		populateParameters(icp);
-		Histogram<Scalar> e_x(16, "e_x", "", false), e_y(16, "e_y", "", false), e_z(16, "e_z", "", false), e_a(16, "e_a", "", false);
-		Histogram<Scalar> e_acc_x(16, "e_acc_x", "", false), e_acc_y(16, "e_acc_y", "", false), e_acc_z(16, "e_acc_z", "", false), e_acc_a(16, "e_acc_a", "", false);
 		
 		// init icp
 		timer t;
@@ -346,11 +344,11 @@ int main(int argc, char **argv)
 			const TP T_d = T_d_gt * T_d_icp.inverse();
 			{
 				const Vector3 e_t(T_d.topRightCorner(3,1));
-				e_x.push_back(e_t(0));
-				e_y.push_back(e_t(1));
-				e_z.push_back(e_t(2));
+				icp.inspector->addStat("e_x", e_t(0));
+				icp.inspector->addStat("e_y", e_t(1));
+				icp.inspector->addStat("e_z", e_t(2));
 				const Quaternion<Scalar> quat(Matrix3(T_d.topLeftCorner(3,3)));
-				e_a.push_back(2 * acos(quat.normalized().w()));
+				icp.inspector->addStat("e_a", 2 * acos(quat.normalized().w()));
 			}
 			
 			if (i % deltaTfSteps == 0)
@@ -360,11 +358,11 @@ int main(int argc, char **argv)
 				
 				// compute errors
 				const Vector3 e_t(T_d_acc.topRightCorner(3,1));
-				e_acc_x.push_back(e_t(0));
-				e_acc_y.push_back(e_t(1));
-				e_acc_z.push_back(e_t(2));
+				icp.inspector->addStat("e_acc_x", e_t(0));
+				icp.inspector->addStat("e_acc_y", e_t(1));
+				icp.inspector->addStat("e_acc_z", e_t(2));
 				const Quaternion<Scalar> quat(Matrix3(T_d_acc.topLeftCorner(3,3)));
-				e_acc_a.push_back(2 * acos(quat.normalized().w()));
+				icp.inspector->addStat("e_acc_a", 2 * acos(quat.normalized().w()));
 				
 				// dump deltas
 				if (argc >= 13)
@@ -397,27 +395,9 @@ int main(int argc, char **argv)
 		// write back results
 		// general stats
 		ofs << data.size() - 1 << " " << failCount << " * ";
-		// error on each dt
-		e_x.dumpStats(ofs); ofs << " * ";
-		e_y.dumpStats(ofs); ofs << " * ";
-		e_z.dumpStats(ofs); ofs << " * ";
-		e_a.dumpStats(ofs); ofs << " * ";
-		// error every sect
-		e_acc_x.dumpStats(ofs); ofs << " * ";
-		e_acc_y.dumpStats(ofs); ofs << " * ";
-		e_acc_z.dumpStats(ofs); ofs << " * ";
-		e_acc_a.dumpStats(ofs); ofs << " * ";
-		// timing
 		ofs << icpTotalDuration << " * ";
-		icp.keyFrameDuration.dumpStats(ofs); ofs << " * ";
-		icp.convergenceDuration.dumpStats(ofs); ofs << " * ";
-		// algo stats
-		icp.iterationsCount.dumpStats(ofs); ofs << " * ";
-		icp.pointCountIn.dumpStats(ofs); ofs << " * ";
-		icp.pointCountReading.dumpStats(ofs); ofs << " * ";
-		icp.pointCountKeyFrame.dumpStats(ofs); ofs << " * ";
-		icp.pointCountTouched.dumpStats(ofs); ofs << " * ";
-		icp.overlapRatio.dumpStats(ofs); ofs << " # ";
+		icp.inspector->dumpStats(ofs);
+		ofs << " # ";
 		// params for info
 		for (Params::const_iterator it(params.begin()); it != params.end(); ++it)
 			ofs << it->first << "=" << it->second << " ";

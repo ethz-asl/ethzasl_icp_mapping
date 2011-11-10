@@ -308,9 +308,6 @@ int main(int argc, char **argv)
 			TP T_d_gt_acc(TP::Identity(4,4));
 			TP T_d_icp_acc(TP::Identity(4,4));
 			
-			Histogram<Scalar> e_x(16, "e_x", "", false), e_y(16, "e_y", "", false), e_z(16, "e_z", "", false), e_a(16, "e_a", "", false);
-			Histogram<Scalar> e_acc_x(16, "e_acc_x", "", false), e_acc_y(16, "e_acc_y", "", false), e_acc_z(16, "e_acc_z", "", false), e_acc_a(16, "e_acc_a", "", false);
-			
 			// open bag
 			rosbag::Bag bag(bagFile->filename[0]);
 			unsigned cloudLimit(onlyFirsts->count > 0 ? onlyFirsts->ival[0] : numeric_limits<unsigned>::max());
@@ -432,11 +429,11 @@ int main(int argc, char **argv)
 					if (useGt)
 					{
 						const Vector3 e_t(T_d.topRightCorner(3,1));
-						e_x.push_back(e_t(0));
-						e_y.push_back(e_t(1));
-						e_z.push_back(e_t(2));
+						icp.inspector->addStat("e_x", e_t(0));
+						icp.inspector->addStat("e_y", e_t(1));
+						icp.inspector->addStat("e_z", e_t(2));
 						const Quaternion<Scalar> quat(Matrix3(T_d.topLeftCorner(3,3)));
-						e_a.push_back(2 * acos(quat.normalized().w()));
+						icp.inspector->addStat("e_a", 2 * acos(quat.normalized().w()));
 					}
 					
 					if (cloudCount % deltaTfSteps == 0)
@@ -448,11 +445,11 @@ int main(int argc, char **argv)
 							
 							// compute errors
 							const Vector3 e_t(T_d_acc.topRightCorner(3,1));
-							e_acc_x.push_back(e_t(0));
-							e_acc_y.push_back(e_t(1));
-							e_acc_z.push_back(e_t(2));
+							icp.inspector->addStat("e_acc_x", e_t(0));
+							icp.inspector->addStat("e_acc_y", e_t(1));
+							icp.inspector->addStat("e_acc_z", e_t(2));
 							const Quaternion<Scalar> quat(Matrix3(T_d_acc.topLeftCorner(3,3)));
-							e_acc_a.push_back(2 * acos(quat.normalized().w()));
+							icp.inspector->addStat("e_acc_a", 2 * acos(quat.normalized().w()));
 						}
 						
 						// dump deltas
@@ -505,30 +502,9 @@ int main(int argc, char **argv)
 			if (statofs.good())
 			{
 				statofs << processedCount-1 << " " << failCount << " * ";
-				if (useGt)
-				{
-					// error on each dt
-					e_x.dumpStats(statofs); statofs << " * ";
-					e_y.dumpStats(statofs); statofs << " * ";
-					e_z.dumpStats(statofs); statofs << " * ";
-					e_a.dumpStats(statofs); statofs << " * ";
-					// error every sect
-					e_acc_x.dumpStats(statofs); statofs << " * ";
-					e_acc_y.dumpStats(statofs); statofs << " * ";
-					e_acc_z.dumpStats(statofs); statofs << " * ";
-					e_acc_a.dumpStats(statofs); statofs << " * ";
-				}
-				// timing
 				statofs << icpTotalDuration << " * ";
-				icp.keyFrameDuration.dumpStats(statofs); statofs << " * ";
-				icp.convergenceDuration.dumpStats(statofs); statofs << " * ";
-				// algo stats
-				icp.iterationsCount.dumpStats(statofs); statofs << " * ";
-				icp.pointCountIn.dumpStats(statofs); statofs << " * ";
-				icp.pointCountReading.dumpStats(statofs); statofs << " * ";
-				icp.pointCountKeyFrame.dumpStats(statofs); statofs << " * ";
-				icp.pointCountTouched.dumpStats(statofs); statofs << " * ";
-				icp.overlapRatio.dumpStats(statofs); statofs << " # ";
+				icp.inspector->dumpStats(statofs);
+				statofs << " # ";
 				// params for info
 				for (Params::const_iterator it(params.begin()); it != params.end(); ++it)
 					statofs << it->first << "=" << it->second << " ";
