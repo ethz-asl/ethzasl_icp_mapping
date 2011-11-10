@@ -69,7 +69,7 @@ else (FETCH_DEPENDENCIES)
 		/usr/local/include
 		/usr/include
 	)
-	find_library(NABO_LIBRARY libnabo
+	find_library(NABO_LIBRARY nabo
 		/usr/local/lib
 		/usr/lib
 	)
@@ -79,7 +79,7 @@ else (FETCH_DEPENDENCIES)
 		/usr/local/include
 		/usr/include
 	)
-	find_library(POINT_MATCHER_LIBRARY libpointmatcher
+	find_library(POINT_MATCHER_LIBRARY pointmatcher
 		/usr/local/lib
 		/usr/lib
 	)
