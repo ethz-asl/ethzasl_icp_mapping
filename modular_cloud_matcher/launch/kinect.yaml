@@ -1,0 +1,41 @@
+ratioToSwitchKeyframe: 0.7
+
+transformations:
+  - TransformFeatures
+
+readingDataPointsFilters:
+  - MaxDistDataPointsFilter:
+      maxDist: 3.0
+      dim: 2
+  - RandomSamplingDataPointsFilter:
+      prob: 0.2
+
+keyframeDataPointsFilters:
+  - MaxDistDataPointsFilter:
+      maxDist: 3.0
+      dim: 2
+  - SamplingSurfaceNormalDataPointsFilter:
+      k: 17
+
+matcher:
+  KDTreeMatcher:
+    maxDist: 0.2
+    epsilon: 0.0
+
+featureOutlierFilters:
+  - VarTrimmedDistOutlierFilter:
+
+errorMinimizer:
+  PointToPlaneErrorMinimizer
+
+transformationCheckers:
+  - DifferentialTransformationChecker:
+      minDiffRotErr: 0.001
+      minDiffTransErr: 0.01
+      smoothLength: 4
+  - CounterTransformationChecker:
+      maxIterationCount: 30
+      
+inspector:
+  NullInspector
+
