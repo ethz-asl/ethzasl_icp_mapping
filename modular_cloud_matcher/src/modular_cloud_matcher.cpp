@@ -69,7 +69,6 @@ class CloudMatcher
 	
 	PM::ICPSequence icp;
 	
-	const bool sendDeltaPoseMessage;
 	const string fixedFrame;
 	const string sensorFrame;
 	const unsigned startupDropCount;
@@ -82,14 +81,12 @@ class CloudMatcher
 	ros::Publisher posePub;
 	
 public:
-	CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix, const bool sendDeltaPoseMessage);
+	CloudMatcher(ros::NodeHandle& n);
 	void gotCloud(const sensor_msgs::PointCloud2& cloudMsg);
 };
 
-CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix, const bool sendDeltaPoseMessage):
+CloudMatcher::CloudMatcher(ros::NodeHandle& n):
 	n(n),
-	icp(statFilePrefix),
-	sendDeltaPoseMessage(sendDeltaPoseMessage),
 	fixedFrame(getParam<string>("fixedFrame",  "/world")),
 	sensorFrame(getParam<string>("sensorFrame",  "/openni_rgb_optical_frame")),
 	startupDropCount(getParam("startupDropCount", 0)),
@@ -127,8 +124,7 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n, const std::string &statFilePrefix
 	// replace logger
 	PointMatcherSupport::setLogger(new PointMatcherSupport::ROSLogger);
 	
-	if (sendDeltaPoseMessage)
-		posePub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>(getParam<string>("deltaPoseTopic", "/openni_delta_pose"), 3);
+	posePub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>(getParam<string>("deltaPoseTopic", "/openni_delta_pose"), 3);
 }
 
 void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
@@ -145,7 +141,7 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 	if (goodCount == 0)
 	{
 		ROS_ERROR("I found no good points in the cloud");
-		if (sendDeltaPoseMessage)
+		if (posePub.getNumSubscribers() > 0)
 		{
 			geometry_msgs::PoseWithCovarianceStamped pose;
 			geometry_msgs::Point& position(pose.pose.pose.position);
@@ -173,7 +169,7 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 	//TODO: put that as parameter, tricky to set...
 	if (imageRatio < 0.5)
 	{
-		ROS_ERROR_STREAM("Partial cloud! Missing " << 100 - imageRatio*100.0 << "% of the cloud (received " << goodCount << ")");
+		ROS_WARN_STREAM("Partial cloud! Missing " << 100 - imageRatio*100.0 << "% of the cloud (received " << goodCount << ")");
 		//return;
 	}
 	
@@ -191,7 +187,7 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 	}
 	
 	// broadcast transform
-	if (sendDeltaPoseMessage)
+	if (posePub.getNumSubscribers() > 0)
 	{
 		const TP dTransform(icp.getDeltaTransform());
 		const Eigen::eigen2_Quaternion<Scalar> dTquat(Matrix3(dTransform.block(0,0,3,3)));
@@ -251,7 +247,7 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 
 	if (icp.keyFrameCreatedAtLastCall())
 	{
-		ROS_WARN_STREAM("Keyframe created at " << icp.errorMinimizer->getWeightedPointUsedRatio());
+		ROS_INFO_STREAM("Keyframe created at " << icp.errorMinimizer->getWeightedPointUsedRatio());
 		geometry_msgs::PoseStamped pose;
 		pose.header.frame_id = sensorFrame;
 		pose.pose.position.x = tfVect.x();
@@ -272,13 +268,8 @@ int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "cloud_matcher_node");
 	ros::NodeHandle n;
-	bool sendDeltaPoseMessage(false);
 	
-	for (int i = 1; i < argc; ++i)
-		if (strcmp(argv[i], "--senddeltapose") == 0)
-			sendDeltaPoseMessage = true;
-	
-	CloudMatcher matcher(n, getParam<string>("statFilePrefix",  ""), sendDeltaPoseMessage);
+	CloudMatcher matcher(n);
 	
 	ros::spin();
 	
