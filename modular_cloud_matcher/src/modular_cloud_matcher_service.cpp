@@ -1,9 +1,12 @@
+#include <fstream>
+
 #include "ros/ros.h"
 #include "pointmatcher/PointMatcher.h"
 
+#include "aliases.h"
 #include "get_params_from_server.h"
-#include "icp_chain_creation.h"
 #include "cloud_conversion.h"
+#include "ros_logger.h"
 
 #include "modular_cloud_matcher/MatchClouds.h"
 
@@ -26,7 +29,30 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n):
 	n(n),
 	service(n.advertiseService(getParam<string>("serviceName","matchClouds"), &CloudMatcher::match, this))
 {
-	populateParametersBase(icp);
+	// load config
+	string configFileName;
+	if (ros::param::get("~config", configFileName))
+	{
+		ifstream ifs(configFileName.c_str());
+		if (ifs.good())
+		{
+			icp.loadFromYaml(ifs);
+		}
+		else
+		{
+			ROS_ERROR_STREAM("Cannot load config from YAML file " << configFileName);
+			icp.setDefault();
+		}
+	}
+	else
+	{
+		ROS_WARN_STREAM("No config file specified, using default ICP chain.");
+		icp.setDefault();
+	}
+	
+	// replace logger
+	if (getParam<bool>("useROSLogger", false))
+		PointMatcherSupport::setLogger(new PointMatcherSupport::ROSLogger);
 }
 
 bool CloudMatcher::match(modular_cloud_matcher::MatchClouds::Request& req, modular_cloud_matcher::MatchClouds::Response& res)

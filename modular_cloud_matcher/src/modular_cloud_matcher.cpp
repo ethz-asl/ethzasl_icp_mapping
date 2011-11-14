@@ -7,6 +7,7 @@
 #include "aliases.h"
 #include "get_params_from_server.h"
 #include "cloud_conversion.h"
+#include "ros_logger.h"
 
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "nav_msgs/Path.h"
@@ -14,54 +15,6 @@
 #include "tf_conversions/tf_eigen.h"
 
 using namespace std;
-
-namespace PointMatcherSupport
-{
-	struct ROSLogger: public Logger
-	{
-		virtual bool hasInfoChannel() const{ return true; };
-		virtual void beginInfoEntry(const char *file, unsigned line, const char *func);
-		virtual std::ostream* infoStream() { return &_infoStream; }
-		virtual void finishInfoEntry(const char *file, unsigned line, const char *func);
-		virtual bool hasWarningChannel() const { return true; }
-		virtual void beginWarningEntry(const char *file, unsigned line, const char *func);
-		virtual std::ostream* warningStream() { return &_warningStream; }
-		virtual void finishWarningEntry(const char *file, unsigned line, const char *func);
-		
-	protected:
-		void writeRosLog(ros::console::Level level, const char* file, int line, const char *func, const string& text);
-		
-		std::ostringstream _infoStream;
-		std::ostringstream _warningStream;
-	};
-	
-	void ROSLogger::beginInfoEntry(const char *file, unsigned line, const char *func)
-	{
-		_infoStream.str("");
-	}
-	
-	void ROSLogger::finishInfoEntry(const char *file, unsigned line, const char *func)
-	{
-		writeRosLog(ros::console::levels::Info, file, line, func, _infoStream.str());
-	}
-	
-	void ROSLogger::beginWarningEntry(const char *file, unsigned line, const char *func)
-	{
-		_warningStream.str("");
-	}
-	
-	void ROSLogger::finishWarningEntry(const char *file, unsigned line, const char *func)
-	{
-		writeRosLog(ros::console::levels::Warn, file, line, func, _warningStream.str());
-	}
-	
-	void ROSLogger::writeRosLog(ros::console::Level level, const char* file, int line, const char *func, const string& text)
-	{
-		ROSCONSOLE_DEFINE_LOCATION(true, level, ROSCONSOLE_DEFAULT_NAME);
-		if (enabled)
-			ros::console::print(0, loc.logger_, loc.level_, file, line, func, "%s", text.c_str());
-	}
-};
 
 class CloudMatcher
 {
@@ -122,8 +75,10 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n):
 	}
 	
 	// replace logger
-	//PointMatcherSupport::setLogger(new PointMatcherSupport::ROSLogger);
+	if (getParam<bool>("useROSLogger", false))
+		PointMatcherSupport::setLogger(new PointMatcherSupport::ROSLogger);
 	
+	// TODO: send odometry messages instead
 	posePub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>(getParam<string>("deltaPoseTopic", "/openni_delta_pose"), 3);
 }
 
@@ -261,6 +216,7 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 	
 	br.sendTransform(tf::StampedTransform(transform, cloudMsg.header.stamp, fixedFrame, sensorFrame));
 }
+
 
 int main(int argc, char **argv)
 {
