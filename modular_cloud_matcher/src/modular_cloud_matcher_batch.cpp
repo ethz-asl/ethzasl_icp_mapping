@@ -264,7 +264,7 @@ int main(int argc, char **argv)
 		++expCount;
 		
 		// run experiment
-		PM::ICPSequence icp("", false);
+		PM::ICPSequence icp;
 		populateParameters(icp);
 		
 		// init icp

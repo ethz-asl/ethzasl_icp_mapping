@@ -295,7 +295,7 @@ int main(int argc, char **argv)
 			++expCount;
 			
 			// run experiment
-			PM::ICPSequence icp("", false);
+			PM::ICPSequence icp;
 			populateParameters(icp);
 			cout << endl;
 			unsigned failCount(0);
