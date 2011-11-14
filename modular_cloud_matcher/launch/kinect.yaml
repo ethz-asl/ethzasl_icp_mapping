@@ -1,4 +1,4 @@
-ratioToSwitchKeyframe: 0.7
+ratioToSwitchKeyframe: 0.80
 
 transformations:
   - TransformFeatures
@@ -8,7 +8,7 @@ readingDataPointsFilters:
       maxDist: 3.0
       dim: 2
   - RandomSamplingDataPointsFilter:
-      prob: 0.2
+      prob: 0.20
 
 keyframeDataPointsFilters:
   - MaxDistDataPointsFilter:
@@ -19,11 +19,12 @@ keyframeDataPointsFilters:
 
 matcher:
   KDTreeMatcher:
-    maxDist: 0.2
+    maxDist: 0.05
     epsilon: 0.0
 
 featureOutlierFilters:
-  - VarTrimmedDistOutlierFilter:
+  - TrimmedDistOutlierFilter:
+      ratio: 0.85
 
 errorMinimizer:
   PointToPlaneErrorMinimizer

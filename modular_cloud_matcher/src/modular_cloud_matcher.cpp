@@ -99,7 +99,7 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n):
 	pathPub = n.advertise<nav_msgs::Path>(pathTopic, 1);
 	
 	path.header.frame_id = fixedFrame;
-	
+
 	// load config
 	string configFileName;
 	if (ros::param::get("~config", configFileName))
@@ -122,7 +122,7 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n):
 	}
 	
 	// replace logger
-	PointMatcherSupport::setLogger(new PointMatcherSupport::ROSLogger);
+	//PointMatcherSupport::setLogger(new PointMatcherSupport::ROSLogger);
 	
 	posePub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>(getParam<string>("deltaPoseTopic", "/openni_delta_pose"), 3);
 }
