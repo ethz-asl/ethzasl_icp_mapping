@@ -226,8 +226,6 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 		posePub.publish(pose);
 	}
 	
-	// FIXME: should we continue publishing absolute pose as tf in sendDeltaPoseMessage mode?
-	
 	const TP globalTransform(icp.getTransform());
 	tf::Quaternion tfQuat;
 #if ROS_VERSION_MINIMUM(1, 6, 0)
