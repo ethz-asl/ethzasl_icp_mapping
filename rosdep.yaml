@@ -1,10 +1,6 @@
 libargtable2:
   ubuntu: libargtable2-dev
 yaml-cpp:
-  ubuntu:
-    apt:
-      packages: [ yaml-cpp0.2.6-dev ]
+  ubuntu: yaml-cpp0.2.6-dev
 libpointmatcher:
-  ubuntu:
-    apt:
-	  packages: [ libpointmatcher-dev ]  
+  ubuntu: libpointmatcher-dev
