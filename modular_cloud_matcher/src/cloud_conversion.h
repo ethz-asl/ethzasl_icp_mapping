@@ -20,7 +20,16 @@ DP rosMsgToPointMatcherCloud(const sensor_msgs::PointCloud2& rosMsg, size_t& goo
 	
 	// create data points
 	pcl::PointCloud<pcl::PointXYZ> cloud;
-	pcl::fromROSMsg (rosMsg, cloud);
+	try
+	{
+		pcl::fromROSMsg (rosMsg, cloud);
+	}
+	catch(pcl::InvalidConversionException)
+	{
+		ROS_ERROR("PCL could not convert the point cloud message.");
+		return DP();
+	}
+
 	
 	// scan points for goods
 	for (size_t i = 0; i < cloud.points.size(); ++i)
@@ -74,25 +83,5 @@ sensor_msgs::PointCloud2 pointMatcherCloudToRosMsg(const DP pmCloud, std::string
 	return rosCloud;
 
 }
-
-DP concatenatClouds(const DP pmCloud1, const DP pmCloud2)
-{
-	
-	const int nbPoints1 = pmCloud1.features.cols();
-	const int nbPoints2 = pmCloud2.features.cols();
-	const int nbPointsTotal = nbPoints1 + nbPoints2;
-
-	const int dim = pmCloud1.features.rows();
-	
-	PM::DataPoints::Features combinedFeat(dim, nbPointsTotal);
-	combinedFeat.leftCols(nbPoints1) = pmCloud1.features;
-	combinedFeat.rightCols(nbPoints2) = pmCloud2.features;
-
-
-	// We explicitly remove descriptors
-	return DP(combinedFeat, pmCloud1.featureLabels);
-}
-
-
 
 #endif

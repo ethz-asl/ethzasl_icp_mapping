@@ -102,4 +102,7 @@ target_link_libraries(cloud_matcher_bag ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY}
 rosbuild_add_executable(mapper src/mapper.cpp)
 target_link_libraries(mapper ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY} ${EXTRA_LIBS} argtable2 rt)
 
+rosbuild_add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
+target_link_libraries(pointCloudToVtk ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY} ${EXTRA_LIBS} argtable2 rt)
+
 

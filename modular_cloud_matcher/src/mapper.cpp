@@ -30,14 +30,20 @@ class Mapper
 	PM::DataPoints mapPointCloud;
 	PM::ICP icp;
 	PM pm;
-	int totalPointCount;
+	//setLogger(pm.LoggerRegistrar.create("FileLogger"));
+	int maxMapPointCount;
+	int minReadingPointCount;
+	double minOverlap;
 	string mapFrame;
 
 	tf::TransformListener tf_listener;
 
 public:
 	Mapper(ros::NodeHandle& n);
+	~Mapper();
 	void gotCloud(const sensor_msgs::PointCloud2& cloudMsg);
+private:
+	PM::DataPoints filterScannerPtsCloud(const PM::DataPoints pointCloud);
 };
 
 Mapper::Mapper(ros::NodeHandle& n):
@@ -45,7 +51,7 @@ Mapper::Mapper(ros::NodeHandle& n):
 {
 
 	// ROS initialization
-	const string cloudTopic(getParam<string>("cloudTopic", "/nifti_point_cloud"));
+	const string cloudTopic(getParam<string>("cloudTopic", "/static_point_cloud"));
 	cloudSub = n.subscribe(cloudTopic, 1, &Mapper::gotCloud, this);
 	
 	const string mapTopic(getParam<string>("mapTopic", "/map3D"));
@@ -71,14 +77,18 @@ Mapper::Mapper(ros::NodeHandle& n):
 	}
 
 	// Parameters for 3D map
-	totalPointCount = getParam<int>("totalPointCount", 100000);
+	maxMapPointCount = getParam<int>("maxMapPointCount", 300000);
+	minReadingPointCount = getParam<int>("minReadingPointCount", 5000);
+	minOverlap = getParam<double>("minOverlap", 0.5);
 	mapFrame= getParam<string>("mapFrameId", "/map");
 }
 
 
 void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 {
-
+	PM::Parameters params;
+	PM::TransformationParameters T = PM::TransformationParameters::Identity(4,4);
+	
 	sensor_msgs::PointCloud2 cloudMsg;
 
 	pcl_ros::transformPointCloud(mapFrame, cloudMsgIn, cloudMsg, tf_listener);
@@ -91,50 +101,72 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 		ROS_ERROR("I found no good points in the cloud");
 		return;
 	}
+	else
+	{
+		ROS_INFO("Processing new point cloud");
+	}
 		
-	PM::TransformationParameters T = PM::TransformationParameters::Identity(4,4);
 	bool icpWasSuccess = true;
 	
+	newPointCloud = filterScannerPtsCloud(newPointCloud);
+	
+	// Ensure a minimum amount of point after filtering
+	const int ptsCount = newPointCloud.features.cols();
+	if(ptsCount < minReadingPointCount)
+	{
+		ROS_ERROR_STREAM("Not enough points in newPointCloud: " << ptsCount << "pts.");
+		return;
+	}
+
 	// Keep the map in memory
 	if(mapPointCloud.features.rows() == 0)
 	{
 		// Initialize the map
 		mapPointCloud = newPointCloud;
+		return;
 	}
 	
 	// Apply ICP
 	try 
 	{
 		T = icp(newPointCloud, mapPointCloud);
-		cout << T.inverse() << endl;
 		mapPointCloud.features = T.inverse() * mapPointCloud.features;
-	
+
+		// Ensure minimum overlap between scans
 		const double estimatedOverlap = icp.errorMinimizer->getWeightedPointUsedRatio();
-		//if (estimatedOverlap < 0.85)
+		if (estimatedOverlap < minOverlap)
 		{
-			ROS_INFO_STREAM("Adding new points to the map with " << estimatedOverlap << " overlap");
-	
-			// Create point cloud filters
-			PM::DataPointsFilter* uniformSubsample;
-			const PM::Parameters params({{"aggressivity", toParam(0.5)}});
-			uniformSubsample = pm.DataPointsFilterRegistrar.create("UniformizeDensityDataPointsFilter", params);
-			
-					
-			// Controle the size of the point cloud
-			mapPointCloud = concatenatClouds(mapPointCloud, newPointCloud);
-			mapPointCloud = uniformSubsample->filter(mapPointCloud);
-
-			const double probToKeep = totalPointCount/mapPointCloud.features.cols();
-			if(probToKeep < 1)
-			{
-				PM::DataPointsFilter* randSubsample;
-				const PM::Parameters params({{"prob", toParam(probToKeep)}});
-				randSubsample = pm.DataPointsFilterRegistrar.create("RandomSamplingDataPointsFilter", params);
-				mapPointCloud = randSubsample->filter(mapPointCloud);
-			}
-
-			mapPub.publish(pointMatcherCloudToRosMsg(mapPointCloud, mapFrame));
+			ROS_ERROR("Estimated overlap too small, move back");	
+			return;
 		}
+
+		ROS_INFO_STREAM("**** Adding new points to the map with " << estimatedOverlap << " overlap");
+
+		// Create point cloud filters
+		PM::DataPointsFilter* uniformSubsample;
+		params = PM::Parameters({{"aggressivity", toParam(0.5)}});
+		uniformSubsample = pm.DataPointsFilterRegistrar.create("UniformizeDensityDataPointsFilter", params);
+		
+		// Merge point clouds to map			
+		mapPointCloud.concatenate(newPointCloud);
+		mapPointCloud = uniformSubsample->filter(mapPointCloud);
+
+		// Controle the size of the point cloud
+		const double probToKeep = maxMapPointCount/(double)mapPointCloud.features.cols();
+		if(probToKeep < 1.0)
+		{
+			PM::DataPointsFilter* randSubsample;
+			params = PM::Parameters({{"prob", toParam(probToKeep)}});
+			randSubsample = pm.DataPointsFilterRegistrar.create("RandomSamplingDataPointsFilter", params);
+			mapPointCloud = randSubsample->filter(mapPointCloud);
+		}
+
+		//Publish map point cloud
+		stringstream nameStream;
+		nameStream << "nifti_map_" << cloudMsg.header.seq;
+		PM::saveVTK(mapPointCloud, nameStream.str());
+		mapPub.publish(pointMatcherCloudToRosMsg(mapPointCloud, mapFrame));
+		
 	}
 	catch (PM::ConvergenceError error)
 	{
@@ -142,58 +174,51 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 		ROS_WARN_STREAM("ICP failed to converge: " << error.what());
 	}
 
-	if(icpWasSuccess)
-	{
-		tf::Quaternion tfQuat;
-#if ROS_VERSION_MINIMUM(1, 6, 0)
-		// electric and later
-		const Eigen::Quaternion<Scalar> quat(Matrix3(T.block(0,0,3,3)));
-		tf::RotationEigenToTF(quat.cast<double>(), tfQuat);
-#else // ROS_VERSION_MINIMUM(1, 6, 0)
-		// diamondback and before
-		const Eigen::eigen2_Quaternion<Scalar> quat(Matrix3(T.block(0,0,3,3)));
-		tf::RotationEigenToTF(quat.cast<double>(), tfQuat);
-#endif // ROS_VERSION_MINIMUM(1, 6, 0)
-		tf::Vector3 tfVect;
-		tf::VectorEigenToTF(T.block(0,3,3,1).cast<double>(), tfVect);
-
-		
-		nav_msgs::Odometry odom;
-		odom.header.frame_id = mapFrame;
-		//TODO: should it be point cloud time?
-		odom.header.stamp = ros::Time::now(); 
-		
-		geometry_msgs::PoseWithCovariance pose;
-		
-		pose.pose.position.x = tfVect.x();
-		pose.pose.position.y = tfVect.y();
-		pose.pose.position.z = tfVect.z();
-		pose.pose.orientation.x = tfQuat.x();
-		pose.pose.orientation.y = tfQuat.y();
-		pose.pose.orientation.z = tfQuat.z();
-		pose.pose.orientation.w = tfQuat.w();
-
-		boost::array<double, 36> cov = {{1, 0, 0, 0, 0, 0,
-												0, 1, 0, 0, 0, 0,
-												0, 0, 1, 0, 0, 0,
-												0, 0, 0, 1, 0, 0,
-												0, 0, 0, 0, 1, 0,
-												0, 0, 0, 0, 0, 1}};
-		
-		pose.covariance.swap(cov);
 	
-		odom.pose = pose;
-		odomPub.publish(odom);
-	}
 }
 
+//Warning! need to have pointCloud in laser frame or very close
+PM::DataPoints Mapper::filterScannerPtsCloud(const PM::DataPoints pointCloud)
+{
+	// Build filter to remove shadow points and down sample
+	PM::DataPointsFilter* normalFilter;
+	normalFilter = pm.DataPointsFilterRegistrar.create(
+		"SamplingSurfaceNormalDataPointsFilter", PM::Parameters({
+			{"binSize", "20"},
+			{"epsilon", "5"}, 
+			{"ratio", "0.25"}, 
+			{"keepNormals", "1"}, 
+			{"keepDensities", "1"}
+			}));
+
+	PM::DataPointsFilter* orienteNormalFilter;
+	orienteNormalFilter= pm.DataPointsFilterRegistrar.create(
+		"OrientNormalsDataPointsFilter");
+
+	PM::DataPointsFilter* shadowFilter;
+	shadowFilter = pm.DataPointsFilterRegistrar.create(
+		"ShadowDataPointsFilter");
+	
+	// Apply filter in laser coordinates 
+	PM::DataPoints newPointCloud = pointCloud;
+	newPointCloud = normalFilter->filter(newPointCloud);
+	newPointCloud = orienteNormalFilter->filter(newPointCloud);
+	newPointCloud = shadowFilter->filter(newPointCloud);
+
+	return newPointCloud;
+}
+
+Mapper::~Mapper()
+{
+	PM::saveVTK(mapPointCloud, "uniformMap");	
+}
+
+// Main function supporting the Mapper class
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "mapper_node");
 	ros::NodeHandle n;
-	
 	Mapper mapper(n);
-	
 	ros::spin();
 	
 	return 0;
