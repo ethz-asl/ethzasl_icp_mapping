@@ -21,6 +21,8 @@
   <depend package="eigen"/>
   <depend package="pcl"/>
   <depend package="pcl_ros"/>
+  <depend package="libnabo"/>
+  <depend package="libpointmatcher"/>
   <rosdep name="libargtable2"/>
   <rosdep name="yaml-cpp"/>
   <rosdep name="libpointmatcher"/>
