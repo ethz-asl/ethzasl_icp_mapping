@@ -2,7 +2,7 @@ all: libnabo
 
 libnabo:
 	mkdir -p build
-	cd build && cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=.. ../src 
+	cd build && cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=.. -DPYTHON_CUSTOM_TARGET=src ../upstream_src
 	cd build && make
 	cd build && make install
 	touch libnabo

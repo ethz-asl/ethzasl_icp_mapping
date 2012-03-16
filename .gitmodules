@@ -1,0 +1,3 @@
+[submodule "libnabo/upstream_src"]
+	path = libnabo/upstream_src
+	url = git://github.com/ethz-asl/libnabo.git
