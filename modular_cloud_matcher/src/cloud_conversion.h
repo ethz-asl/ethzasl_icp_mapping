@@ -1,6 +1,7 @@
 #ifndef __CLOUD_CONVERSION_H
 #define __CLOUD_CONVERSION_H
 
+#include "ros/ros.h"
 #include "sensor_msgs/PointCloud2.h"
 #include "pcl/point_types.h"
 #include "pcl/point_cloud.h" 
@@ -19,7 +20,16 @@ DP rosMsgToPointMatcherCloud(const sensor_msgs::PointCloud2& rosMsg, size_t& goo
 	
 	// create data points
 	pcl::PointCloud<pcl::PointXYZ> cloud;
-	pcl::fromROSMsg (rosMsg, cloud);
+	try
+	{
+		pcl::fromROSMsg (rosMsg, cloud);
+	}
+	catch(pcl::InvalidConversionException)
+	{
+		ROS_ERROR("PCL could not convert the point cloud message.");
+		return DP();
+	}
+
 	
 	// scan points for goods
 	for (size_t i = 0; i < cloud.points.size(); ++i)
@@ -46,6 +56,32 @@ DP rosMsgToPointMatcherCloud(const sensor_msgs::PointCloud2& rosMsg, size_t& goo
 		}
 	}
 	return dp;
+}
+
+
+sensor_msgs::PointCloud2 pointMatcherCloudToRosMsg(const DP pmCloud, std::string frame_id)
+{
+	pcl::PointCloud<pcl::PointXYZ> pclCloud;
+	pclCloud.points.reserve(pmCloud.features.cols());
+	pcl::PointXYZ point;
+
+	for (int i = 0; i < pmCloud.features.cols(); ++i)
+	{
+		point.x = pmCloud.features(0,i);
+		point.y = pmCloud.features(1,i);
+		point.z = pmCloud.features(2,i);
+
+		pclCloud.points.push_back(point);
+	}
+
+	sensor_msgs::PointCloud2 rosCloud;
+	pcl::toROSMsg(pclCloud, rosCloud);
+
+	rosCloud.header.frame_id = frame_id;
+	rosCloud.header.stamp = ros::Time::now();
+
+	return rosCloud;
+
 }
 
 #endif
