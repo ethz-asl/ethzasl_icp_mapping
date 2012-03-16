@@ -5,7 +5,7 @@ Compilation
 -----------
 
 Get the [ethzasl_mapping] stack:
-	git clone git://github.com/ethz-asl/ros-mapping.git ethzasl_mapping
+	git clone --recursive git://github.com/ethz-asl/ros-mapping.git ethzasl_mapping
 
 Make sure that it is included in your `ROS_PACKAGE_PATH`:
 	export ROS_PACKAGE_PATH=$ROS_PACKAGE_PATH:`pwd`/ethzasl_mapping
