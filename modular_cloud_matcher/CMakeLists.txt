@@ -65,9 +65,11 @@ target_link_libraries(cloud_matcher_batch ${EXTRA_LIBS} pointmatcher nabo rt)
 target_link_libraries(cloud_matcher_bag  ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
 
 rosbuild_add_executable(mapper src/mapper.cpp)
+rosbuild_link_boost(mapper filesystem system)
 target_link_libraries(mapper ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
 
 rosbuild_add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
+rosbuild_link_boost(pointCloudToVtk filesystem system)
 target_link_libraries(pointCloudToVtk ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
 
 
