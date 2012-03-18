@@ -35,40 +35,6 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 # - N2672: Initializer lists (gcc)
 # - N1984: auto-typed variables (gcc, clang)
 
-find_path(NABO_INCLUDE_DIR nabo/nabo.h
-	/usr/local/include
-	/usr/include
-)
-find_library(NABO_LIBRARY nabo
-	/usr/local/lib
-	/usr/lib
-)
-include_directories(${NABO_INCLUDE_DIR})
-
-find_path(POINT_MATCHER_INCLUDE_DIR pointmatcher/PointMatcher.h
-	/usr/local/include
-	/usr/include
-)
-find_library(POINT_MATCHER_LIBRARY pointmatcher
-	/usr/local/lib
-	/usr/lib
-)
-include_directories(${POINT_MATCHER_INCLUDE_DIR})
-
-# look for OpenCL library
-if (WIN32)
-	find_library(OPENCL_LIBRARIES opencl64)
-	if (!OPENCL_LIBRARIES)
-		find_library(OPENCL_LIBRARIES opencl32)
-	endif (!OPENCL_LIBRARIES)
-else (WIN32)
-	find_library(OPENCL_LIBRARIES OpenCL ENV LD_LIBRARY_PATH)
-endif (WIN32)
-# if found, add
-if (OPENCL_LIBRARIES)
-	set(EXTRA_LIBS ${OPENCL_LIBRARIES})
-endif (OPENCL_LIBRARIES)
-
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
@@ -93,15 +59,15 @@ rosbuild_add_executable(cloud_matcher_service src/modular_cloud_matcher_service.
 rosbuild_add_executable(cloud_matcher_batch src/modular_cloud_matcher_batch.cpp)
 rosbuild_add_executable(cloud_matcher_bag src/modular_cloud_matcher_bag.cpp)
 
-target_link_libraries(cloud_matcher_node ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY} ${EXTRA_LIBS} rt)
-target_link_libraries(cloud_matcher_service ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY}  ${EXTRA_LIBS} rt)
-target_link_libraries(cloud_matcher_batch ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY} ${EXTRA_LIBS} rt)
-target_link_libraries(cloud_matcher_bag ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY} ${EXTRA_LIBS} argtable2 rt)
+target_link_libraries(cloud_matcher_node ${EXTRA_LIBS} pointmatcher nabo rt)
+target_link_libraries(cloud_matcher_service ${EXTRA_LIBS} pointmatcher nabo rt)
+target_link_libraries(cloud_matcher_batch ${EXTRA_LIBS} pointmatcher nabo rt)
+target_link_libraries(cloud_matcher_bag  ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
 
 rosbuild_add_executable(mapper src/mapper.cpp)
-target_link_libraries(mapper ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY} ${EXTRA_LIBS} argtable2 rt)
+target_link_libraries(mapper ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
 
 rosbuild_add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
-target_link_libraries(pointCloudToVtk ${POINT_MATCHER_LIBRARY} ${NABO_LIBRARY} ${EXTRA_LIBS} argtable2 rt)
+target_link_libraries(pointCloudToVtk ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
 
 
