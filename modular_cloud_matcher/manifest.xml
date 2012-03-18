@@ -25,7 +25,6 @@
   <depend package="libpointmatcher"/>
   <rosdep name="libargtable2"/>
   <rosdep name="yaml-cpp"/>
-  <rosdep name="libpointmatcher"/>
 
 </package>
 
