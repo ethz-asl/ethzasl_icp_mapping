@@ -1,74 +1,61 @@
-#include "libpointmatcher_ros/transforms.h"
+#include "pointmatcher_ros/transform.h"
+#include "tf/transform_listener.h"
+#include "tf_conversions/tf_eigen.h"
+#include "eigen_conversions/eigen_msg.h"
+#include "ros/ros.h"
+#include "Eigen/Core"
 
-PM::TransformationParameters PointMatcher_ros::transformListenerToEigenMatrix(const tf::TransformListener &listener, const std::string child, const std::string parent, ros::Time stamp)
+namespace PointMatcher_ros
 {
-	PM::TransformationParameters T = PM::TransformationParameters::Identity(4,4);
-
-	tf::StampedTransform transform;
-	
-	try
+	template<typename T>
+	typename PointMatcher<T>::TransformationParameters transformListenerToEigenMatrix(const tf::TransformListener &listener, const std::string& child, const std::string& parent, const ros::Time& stamp)
 	{
-		listener.lookupTransform(parent, child, stamp, transform);
-		//TODO: is there a better way to get a matrix?
-		T(0,3) = transform.getOrigin().x();
-		T(1,3) = transform.getOrigin().y();
-		T(2,3) = transform.getOrigin().z();
-		btMatrix3x3 bt = transform.getBasis();
-		for(int i=0; i < 3; i++)
-			for(int j=0; j < 3; j++)
-				T(i,j) = bt[i][j];
+		typedef typename PointMatcher<T>::TransformationParameters TransformationParameters;
+		
+		tf::StampedTransform stampedTr;
+		try
+		{
+			listener.lookupTransform(parent, child, stamp, stampedTr);
+		}
+		catch(tf::TransformException ex)
+		{
+			ROS_ERROR("%s",ex.what());
+			return TransformationParameters::Identity(4,4);
+		}
+		
+		Eigen::Affine3d eigenTr;
+		tf::TransformTFToEigen(stampedTr, eigenTr);
+		return eigenTr.matrix().cast<T>();
 	}
-	catch(tf::TransformException ex)
+
+	template<typename T>
+	nav_msgs::Odometry eigenMatrixToOdomMsg(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& frame_id, const ros::Time& stamp)
 	{
-		ROS_ERROR("%s",ex.what());
+		nav_msgs::Odometry odom;
+		odom.header.stamp = stamp;
+		odom.header.frame_id = frame_id;
+		
+		// Fill pose
+		const Eigen::Affine3d eigenTr(inTr.template cast<double>());
+		tf::poseEigenToMsg(eigenTr, odom.pose.pose);
+
+		// Fill velocity, TODO: find proper computation from delta poses to twist
+		//odom.child_frame_id = cloudMsgIn.header.frame_id;
+		odom.twist.covariance[0+0*6] = -1;
+		odom.twist.covariance[1+1*6] = -1;
+		odom.twist.covariance[2+2*6] = -1;
+		odom.twist.covariance[3+3*6] = -1;
+		odom.twist.covariance[4+4*6] = -1;
+		odom.twist.covariance[5+5*6] = -1;
+
+		return odom;
 	}
 
-	return T;
-}
-
-nav_msgs::Odometry PointMatcher_ros::eigenMatrixToOdomMsg(const PM::TransformationParameters T, const std::string frame_id, ros::Time stamp)
-{
-	nav_msgs::Odometry odom;
-	odom.header.stamp = stamp;
-	odom.header.frame_id = frame_id;
-
-	tf::Transform t;
-	t.setOrigin(tf::Vector3(T(0,3), T(1,3), T(2,3)));
-	t.setBasis(btMatrix3x3(
-		T(0,0), T(0,1),T(0,2),
-		T(1,0), T(1,1),T(1,2),
-		T(2,0), T(2,1),T(2,2))
-	);
-
-	// Fill pose
-	tf::poseTFToMsg(t, odom.pose.pose);
-
-	// Fill velocity, TODO: find proper computation from delta poses to twist
-	//odom.child_frame_id = cloudMsgIn.header.frame_id;
-	odom.twist.covariance[0+0*6] = -1;
-	odom.twist.covariance[1+1*6] = -1;
-	odom.twist.covariance[2+2*6] = -1;
-	odom.twist.covariance[3+3*6] = -1;
-	odom.twist.covariance[4+4*6] = -1;
-	odom.twist.covariance[5+5*6] = -1;
-
-	return odom;
-}
-
-PM::TransformationParameters PointMatcher_ros::odomMsgToEigenMatrix(const nav_msgs::Odometry odom)
-{
-	PM::TransformationParameters T = PM::TransformationParameters::Identity(4,4);
-	tf::Transform t;
-	
-	tf::poseMsgToTF(odom.pose.pose, t);
-
-	T(0,3) = t.getOrigin().x();
-	T(1,3) = t.getOrigin().y();
-	T(2,3) = t.getOrigin().z();
-	btMatrix3x3 bt = t.getBasis();
-	for(int i=0; i < 3; i++)
-		for(int j=0; j < 3; j++)
-			T(i,j) = bt[i][j];
-
-	return T;
-}
+	template<typename T>
+	typename PointMatcher<T>::TransformationParameters odomMsgToEigenMatrix(const nav_msgs::Odometry& odom)
+	{
+		Eigen::Affine3d eigenTr;
+		tf::poseMsgToEigen(odom.pose.pose, eigenTr);
+		return eigenTr.matrix().cast<T>();
+	}
+}; // PointMatcher_ros

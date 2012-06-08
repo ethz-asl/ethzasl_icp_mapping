@@ -10,6 +10,10 @@
   <url>http://ros.org/wiki/libpointmatcher_ros</url>
   <depend package="roscpp"/>
   <depend package="sensor_msgs"/>
+  <depend package="nav_msgs"/>
+  <depend package="tf"/>
+  <depend package="tf_conversions"/>
+  <depend package="eigen_conversions"/>
   <depend package="libpointmatcher"/>
   <depend package="libnabo"/>
   <rosdep name="Eigen"/>

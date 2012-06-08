@@ -1,8 +1,9 @@
-#include "libpointmatcher_ros/point_cloud.h"
+#include "pointmatcher_ros/point_cloud.h"
 //#include "pointmatcher/DataPointsFiltersImpl.h"
 #include "ros/ros.h"
 #include "boost/detail/endian.hpp"
 #include <vector>
+#include <memory>
 
 namespace PointMatcher_ros
 {
@@ -12,7 +13,8 @@ namespace PointMatcher_ros
 	template<typename T>
 	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::PointCloud2& rosMsg)
 	{
-		typedef typename PointMatcher<T>::DataPoints DataPoints;
+		typedef PointMatcher<T> PM;
+		typedef typename PM::DataPoints DataPoints;
 		typedef typename DataPoints::Label Label;
 		typedef typename DataPoints::Labels Labels;
 		typedef typename DataPoints::View View;
@@ -83,9 +85,8 @@ namespace PointMatcher_ros
 			}
 		}
 		
-		//TODO: find a clean and fast way to access this filter
-		//return RemoveNaNDataPointsFilter().filter(cloud);
-		return cloud;
+		shared_ptr<typename PM::DataPointsFilter> filter(PM::get().DataPointsFilterRegistrar.create("RemoveNaNDataPointsFilter"));
+		return filter->filter(cloud);
 	}
 
 

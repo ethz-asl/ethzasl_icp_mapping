@@ -3,8 +3,6 @@
 
 #include "pointmatcher/PointMatcher.h"
 #include "sensor_msgs/PointCloud2.h"
-//#include "tf/transform_listener.h"
-//#include "nav_msgs/Odometry.h"
 
 namespace ros
 {
