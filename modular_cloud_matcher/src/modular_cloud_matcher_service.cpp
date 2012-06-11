@@ -2,10 +2,10 @@
 
 #include "ros/ros.h"
 #include "pointmatcher/PointMatcher.h"
+#include "pointmatcher_ros/point_cloud.h"
 
 #include "aliases.h"
 #include "get_params_from_server.h"
-#include "cloud_conversion.h"
 #include "ros_logger.h"
 
 #include "modular_cloud_matcher/MatchClouds.h"
@@ -58,8 +58,8 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n):
 bool CloudMatcher::match(modular_cloud_matcher::MatchClouds::Request& req, modular_cloud_matcher::MatchClouds::Response& res)
 {
 	// get and check reference
-	size_t referenceGoodCount;
-	DP referenceCloud(rosMsgToPointMatcherCloud(req.reference, referenceGoodCount));
+	const DP referenceCloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(req.reference));
+	const unsigned referenceGoodCount(referenceCloud.features.cols());
 	const unsigned referencePointCount(req.reference.width * req.reference.height);
 	const double referenceGoodRatio(double(referenceGoodCount) / double(referencePointCount));
 	
@@ -74,8 +74,8 @@ bool CloudMatcher::match(modular_cloud_matcher::MatchClouds::Request& req, modul
 	}
 	
 	// get and check reading
-	size_t readingGoodCount;
-	DP readingCloud(rosMsgToPointMatcherCloud(req.readings, readingGoodCount));
+	const DP readingCloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(req.readings));
+	const unsigned readingGoodCount(referenceCloud.features.cols());
 	const unsigned readingPointCount(req.readings.width * req.readings.height);
 	const double readingGoodRatio(double(readingGoodCount) / double(readingPointCount));
 	

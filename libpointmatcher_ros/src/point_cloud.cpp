@@ -1,5 +1,4 @@
 #include "pointmatcher_ros/point_cloud.h"
-//#include "pointmatcher/DataPointsFiltersImpl.h"
 #include "ros/ros.h"
 #include "boost/detail/endian.hpp"
 #include <vector>
@@ -77,6 +76,7 @@ namespace PointMatcher_ros
 							case PF::UINT32: view(dim, ptId) = T(*reinterpret_cast<const uint32_t*>(fPtr)); fPtr += 4; break;
 							case PF::FLOAT32: view(dim, ptId) = T(*reinterpret_cast<const float*>(fPtr)); fPtr += 4; break;
 							case PF::FLOAT64: view(dim, ptId) = T(*reinterpret_cast<const double*>(fPtr)); fPtr += 8; break;
+							default: abort();
 						}
 					}
 					dataPtr += rosMsg.point_step;

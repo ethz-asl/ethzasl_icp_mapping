@@ -19,14 +19,12 @@
 #include "rosbag/bag.h"
 #include "rosbag/query.h"
 #include "rosbag/view.h"
-#include "pcl/point_types.h"
-#include "pcl/point_cloud.h" 
-#include "pcl/ros/conversions.h"
 #include "sensor_msgs/CameraInfo.h"
 #include <argtable2.h>
 #include <regex.h>      /* REG_ICASE */
 #include "pointmatcher/PointMatcher.h"
 #include "pointmatcher/Timer.h"
+#include "pointmatcher_ros/point_cloud.h"
 
 using namespace std;
 using namespace Eigen;
@@ -348,27 +346,8 @@ int main(int argc, char **argv)
 				
 				// create cloud
 				++processedCount;
-				pcl::PointCloud<pcl::PointXYZ> cloud;
-				pcl::fromROSMsg(*cloudMsg, cloud);
-				const size_t pointCount(cloud.points.size());
-				PM::Matrix tempCloud(4, pointCount);
-				int dIndex(0);
-				for (size_t i = 0; i < pointCount; ++i)
-				{
-					if (!isnan(cloud.points[i].x) && 
-						!isnan(cloud.points[i].y) &&
-						!isnan(cloud.points[i].z)
-					)
-					{
-						tempCloud(0, dIndex) = cloud.points[i].x;
-						tempCloud(1, dIndex) = cloud.points[i].y;
-						tempCloud(2, dIndex) = cloud.points[i].z;
-						tempCloud(3, dIndex) = 1;
-						++dIndex;
-					}
-				}
-				cout << "  Using " << dIndex << " good points on " << pointCount << "\n";
-				DP d(tempCloud.leftCols(dIndex), labels);
+				DP d(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(*cloudMsg));
+				cout << "  Using " << d.features.cols() << " good points on " << cloudMsg->width * cloudMsg->height << "\n";;
 				
 				// apply icp
 				bool mustInitICP(!icp.hasKeyFrame());

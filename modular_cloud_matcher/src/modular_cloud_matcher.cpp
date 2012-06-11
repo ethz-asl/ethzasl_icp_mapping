@@ -2,11 +2,12 @@
 
 #include "ros/ros.h"
 #include "ros/console.h"
+
 #include "pointmatcher/PointMatcher.h"
+#include "pointmatcher_ros/point_cloud.h"
 
 #include "aliases.h"
 #include "get_params_from_server.h"
-#include "cloud_conversion.h"
 #include "ros_logger.h"
 
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
@@ -90,8 +91,8 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 		return;
 	}
 	
-	size_t goodCount(0);
-	DP dp(rosMsgToPointMatcherCloud(cloudMsg, goodCount));
+	DP dp(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloudMsg));
+	const int goodCount(dp.features.cols());
 	
 	if (goodCount == 0)
 	{
@@ -183,15 +184,8 @@ void CloudMatcher::gotCloud(const sensor_msgs::PointCloud2& cloudMsg)
 	
 	const TP globalTransform(icp.getTransform());
 	tf::Quaternion tfQuat;
-#if ROS_VERSION_MINIMUM(1, 6, 0)
-	// electric and later
 	const Eigen::Quaternion<Scalar> quat(Matrix3(globalTransform.block(0,0,3,3)));
 	tf::RotationEigenToTF(quat.cast<double>(), tfQuat);
-#else // ROS_VERSION_MINIMUM(1, 6, 0)
-	// diamondback and before
-	const Eigen::eigen2_Quaternion<Scalar> quat(Matrix3(globalTransform.block(0,0,3,3)));
-	tf::RotationEigenToTF(quat.cast<double>(), tfQuat);
-#endif // ROS_VERSION_MINIMUM(1, 6, 0)
 	tf::Vector3 tfVect;
 	tf::VectorEigenToTF(globalTransform.block(0,3,3,1).cast<double>(), tfVect);
 	tf::Transform transform;

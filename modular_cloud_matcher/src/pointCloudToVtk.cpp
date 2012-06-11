@@ -1,12 +1,14 @@
 #include <fstream>
+#include <memory>
 
 #include "ros/ros.h"
 #include "ros/console.h"
 #include "pointmatcher/PointMatcher.h"
+#include "pointmatcher_ros/point_cloud.h"
+#include "pointmatcher_ros/transform.h"
 
 #include "aliases.h"
 #include "get_params_from_server.h"
-#include "cloud_conversion.h"
 #include "ros_logger.h"
 
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
@@ -14,7 +16,6 @@
 #include "tf/transform_broadcaster.h"
 #include "tf_conversions/tf_eigen.h"
 #include "tf/transform_listener.h"
-#include <pcl_ros/transforms.h>
 
 using namespace std;
 using namespace PointMatcherSupport;
@@ -28,6 +29,7 @@ class ExportVtk
 	string mapFrame;
 
 	tf::TransformListener tf_listener;
+	std::shared_ptr<PM::Transformation> transformation;
 
 public:
 	ExportVtk(ros::NodeHandle& n);
@@ -35,7 +37,8 @@ public:
 };
 
 ExportVtk::ExportVtk(ros::NodeHandle& n):
-	n(n)
+	n(n),
+	transformation(PM::get().TransformationRegistrar.create("RigidTransformation"))
 {
 	// ROS initialization
 	cloudTopic = getParam<string>("cloudTopic", "/static_point_cloud");
@@ -48,14 +51,13 @@ ExportVtk::ExportVtk(ros::NodeHandle& n):
 
 void ExportVtk::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 {
-	sensor_msgs::PointCloud2 cloudMsg;
-
-	pcl_ros::transformPointCloud(mapFrame, cloudMsgIn, cloudMsg, tf_listener);
-
-	size_t goodCount(0);
-	DP newPointCloud(rosMsgToPointMatcherCloud(cloudMsg, goodCount));
+	const DP inCloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloudMsgIn));
 	
-	if (goodCount == 0)
+	const PM::TransformationParameters tr(PointMatcher_ros::transformListenerToEigenMatrix<float>(tf_listener, cloudMsgIn.header.frame_id, mapFrame, cloudMsgIn.header.stamp));
+	
+	const DP outCloud(transformation->compute(inCloud, tr));
+	
+	if (outCloud.features.cols() == 0)
 	{
 		ROS_ERROR("I found no good points in the cloud");
 		return;
@@ -66,9 +68,8 @@ void ExportVtk::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 	}
 	
 	stringstream nameStream;
-	nameStream << "." << cloudTopic << "_" << cloudMsg.header.seq;
-	PM::saveVTK(newPointCloud, nameStream.str());
-
+	nameStream << "." << cloudTopic << "_" << cloudMsgIn.header.seq;
+	PM::saveVTK(outCloud, nameStream.str());
 }
 
 // Main function supporting the ExportVtk class

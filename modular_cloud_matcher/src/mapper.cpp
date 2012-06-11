@@ -17,8 +17,6 @@
 #include "tf/transform_broadcaster.h"
 #include "tf_conversions/tf_eigen.h"
 #include "tf/transform_listener.h"
-#include <pcl_ros/transforms.h>
-#include "Eigen/Geometry"
 
 using namespace std;
 using namespace PointMatcherSupport;
