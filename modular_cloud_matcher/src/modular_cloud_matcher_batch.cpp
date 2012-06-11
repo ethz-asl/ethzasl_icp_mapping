@@ -156,7 +156,7 @@ int main(int argc, char **argv)
 			// point count
 			size_t pointCount;
 			ifs >> pointCount;
-			DP::Features tempCloud(4, pointCount);
+			PM::Matrix tempCloud(4, pointCount);
 			int dIndex(0);
 			for (size_t j = 0; j < pointCount; ++j)
 			{

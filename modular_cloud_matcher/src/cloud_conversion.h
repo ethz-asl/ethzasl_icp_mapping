@@ -42,7 +42,7 @@ DP rosMsgToPointMatcherCloud(const sensor_msgs::PointCloud2& rosMsg, size_t& goo
 	if (goodCount == 0)
 		return DP();
 	
-	DP dp(DP::Features(4, goodCount), labels);
+	DP dp(PM::Matrix(4, goodCount), labels);
 	int dIndex(0);
 	for (size_t i = 0; i < cloud.points.size(); ++i)
 	{

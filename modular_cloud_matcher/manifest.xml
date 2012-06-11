@@ -18,13 +18,14 @@
   <depend package="tf"/>
   <depend package="tf2"/>
   <depend package="tf_conversions"/>
-  <depend package="eigen"/>
   <depend package="pcl"/>
   <depend package="pcl_ros"/>
   <depend package="libnabo"/>
   <depend package="libpointmatcher"/>
+  <depend package="libpointmatcher_ros"/>
   <rosdep name="libargtable2"/>
   <rosdep name="yaml-cpp"/>
+  <rosdep name="eigen"/>
 
 </package>
 

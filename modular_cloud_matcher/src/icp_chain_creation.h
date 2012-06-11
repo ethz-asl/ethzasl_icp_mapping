@@ -59,12 +59,10 @@ void populateParametersBase(PM::ICPChainBase& icp)
 	initModulesFromRegistrar("keyframeDataPointsFilters", pm.REG(DataPointsFilter), icp.keyframeDataPointsFilters);
 	initModulesFromRegistrar("transformations", pm.REG(Transformation), icp.transformations);
 	icp.matcher.reset(initModuleFromRegistrar("matcher", pm.REG(Matcher)));
-	initModulesFromRegistrar("featureOutlierFilters", pm.REG(FeatureOutlierFilter), icp.featureOutlierFilters);
-	initModulesFromRegistrar("descriptorOutlierFilters", pm.REG(DescriptorOutlierFilter), icp.descriptorOutlierFilters);
+	initModulesFromRegistrar("outlierFilters", pm.REG(OutlierFilter), icp.outlierFilters);
 	icp.errorMinimizer.reset(initModuleFromRegistrar("errorMinimizer", pm.REG(ErrorMinimizer)));
 	initModulesFromRegistrar("transformationCheckers", pm.REG(TransformationChecker), icp.transformationCheckers);
 	icp.inspector.reset(initModuleFromRegistrar("inspector", pm.REG(Inspector)));
-	icp.outlierMixingWeight = getParam<double>("outlierMixingWeight", 1);
 	PointMatcherSupport::setLogger(initModuleFromRegistrar("logger", pm.REG(Logger)));
 	// FIXME: consistency check?
 }

@@ -114,7 +114,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 
 	// Fetch initial guess for transformation
 	const PM::TransformationParameters Tinit(
-		PointMatcher_ros::transformListenerToEigenMatrix(
+		PointMatcher_ros::transformListenerToEigenMatrix<float>(
 			tf_listener, 
 			cloudMsgIn.header.frame_id, 
 			mapFrame,
@@ -122,8 +122,8 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 		)
 	);
 
-	size_t goodCount(0);
-	DP newPointCloud(PointMatcher_ros::rosMsgToPointMatcherCloud(cloudMsgIn, goodCount));
+	DP newPointCloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloudMsgIn));
+	const size_t goodCount(newPointCloud.features.cols());
 	
 	if (goodCount == 0)
 	{
@@ -135,7 +135,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 		ROS_INFO("Processing new point cloud");
 	}
 		
-	bool icpWasSuccess = true;
+	//bool icpWasSuccess = true;
 	
 	newPointCloud = filterScannerPtsCloud(newPointCloud);
 	
@@ -174,7 +174,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 		}
 
 		// Publish odometry message
-		odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg(T, mapFrame, cloudMsgIn.header.stamp));
+		odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(T, mapFrame, cloudMsgIn.header.stamp));
 		
 		ROS_INFO_STREAM("**** Adding new points to the map with " << estimatedOverlap << " overlap");
 
@@ -188,7 +188,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 		ROS_INFO_STREAM("Mapping total time (ICP+maintenance): " << t.elapsed() << " sec");
 
 		//Publish map point cloud
-		mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg(mapPointCloud, mapFrame, cloudMsgIn.header.stamp));
+		mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(mapPointCloud, mapFrame, cloudMsgIn.header.stamp));
 
 		if(dumpVTKGlobalMap)
 		{
@@ -200,7 +200,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 	}
 	catch (PM::ConvergenceError error)
 	{
-		icpWasSuccess = false;
+		//icpWasSuccess = false;
 		ROS_WARN_STREAM("ICP failed to converge: " << error.what());
 	}
 

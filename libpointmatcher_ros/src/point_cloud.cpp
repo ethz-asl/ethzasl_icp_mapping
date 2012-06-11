@@ -61,22 +61,22 @@ namespace PointMatcher_ros
 			int ptId(0);
 			for (size_t y(0); y < rosMsg.height; ++y)
 			{
-				uint8_t* dataPtr(&rosMsg.data[0] + rosMsg.row_step*y);
+				const uint8_t* dataPtr(&rosMsg.data[0] + rosMsg.row_step*y);
 				for (size_t x(0); x < rosMsg.width; ++x)
 				{
-					uint8_t* fPtr(dataPtr + it->offset);
-					for (int dim(0); dim < it->count; ++dim)
+					const uint8_t* fPtr(dataPtr + it->offset);
+					for (unsigned dim(0); dim < it->count; ++dim)
 					{
 						switch (it->datatype)
 						{
-							case PF::INT8: view(dim, ptId) = T(*reinterpret_cast<int8_t*>(fPtr)); fPtr += 1; break;
-							case PF::UINT8: view(dim, ptId) = T(*reinterpret_cast<uint8_t*>(fPtr)); fPtr += 1; break;
-							case PF::INT16: view(dim, ptId) = T(*reinterpret_cast<int16_t*>(fPtr)); fPtr += 2; break;
-							case PF::UINT16: view(dim, ptId) = T(*reinterpret_cast<uint16_t*>(fPtr)); fPtr += 2; break;
-							case PF::INT32: view(dim, ptId) = T(*reinterpret_cast<int32_t*>(fPtr)); fPtr += 4; break;
-							case PF::UINT32: view(dim, ptId) = T(*reinterpret_cast<uint32_t*>(fPtr)); fPtr += 4; break;
-							case PF::FLOAT32: view(dim, ptId) = T(*reinterpret_cast<float*>(fPtr)); fPtr += 4; break;
-							case PF::FLOAT64: view(dim, ptId) = T(*reinterpret_cast<double*>(fPtr)); fPtr += 8; break;
+							case PF::INT8: view(dim, ptId) = T(*reinterpret_cast<const int8_t*>(fPtr)); fPtr += 1; break;
+							case PF::UINT8: view(dim, ptId) = T(*reinterpret_cast<const uint8_t*>(fPtr)); fPtr += 1; break;
+							case PF::INT16: view(dim, ptId) = T(*reinterpret_cast<const int16_t*>(fPtr)); fPtr += 2; break;
+							case PF::UINT16: view(dim, ptId) = T(*reinterpret_cast<const uint16_t*>(fPtr)); fPtr += 2; break;
+							case PF::INT32: view(dim, ptId) = T(*reinterpret_cast<const int32_t*>(fPtr)); fPtr += 4; break;
+							case PF::UINT32: view(dim, ptId) = T(*reinterpret_cast<const uint32_t*>(fPtr)); fPtr += 4; break;
+							case PF::FLOAT32: view(dim, ptId) = T(*reinterpret_cast<const float*>(fPtr)); fPtr += 4; break;
+							case PF::FLOAT64: view(dim, ptId) = T(*reinterpret_cast<const double*>(fPtr)); fPtr += 8; break;
 						}
 					}
 					dataPtr += rosMsg.point_step;
@@ -88,6 +88,11 @@ namespace PointMatcher_ros
 		shared_ptr<typename PM::DataPointsFilter> filter(PM::get().DataPointsFilterRegistrar.create("RemoveNaNDataPointsFilter"));
 		return filter->filter(cloud);
 	}
+	
+	template
+	typename PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::PointCloud2& rosMsg);
+	template
+	typename PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::PointCloud2& rosMsg);
 
 
 	template<typename T>
@@ -119,7 +124,7 @@ namespace PointMatcher_ros
 		for(auto it(pmCloud.featureLabels.begin()); it != pmCloud.featureLabels.end(); ++it)
 		{
 			// last label is padding
-			if ((it + 1) == pmCloud.end())
+			if ((it + 1) == pmCloud.featureLabels.end())
 				break;
 			PF pointField;
 			pointField.name = it->text;
@@ -159,8 +164,8 @@ namespace PointMatcher_ros
 		for (unsigned pt(0); pt < rosCloud.width; ++pt)
 		{
 			uint8_t *fPtr(&rosCloud.data[pt * offset]);
-			memcpy(fPtr, reinterpret_cast<uint8_t*>(&pmCloud.features(0, pt)), scalarSize * featureDim);
-			memcpy(fPtr, reinterpret_cast<uint8_t*>(&pmCloud.descriptors(0, pt)), scalarSize * descriptorDim);
+			memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.features(0, pt)), scalarSize * featureDim);
+			memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(0, pt)), scalarSize * descriptorDim);
 		}
 
 		// fill remaining information
@@ -169,5 +174,10 @@ namespace PointMatcher_ros
 		
 		return rosCloud;
 	}
+	
+	template
+	sensor_msgs::PointCloud2 pointMatcherCloudToRosMsg<float>(const typename PointMatcher<float>::DataPoints& pmCloud, const std::string& frame_id, const ros::Time& stamp);
+	template
+	sensor_msgs::PointCloud2 pointMatcherCloudToRosMsg<double>(const typename PointMatcher<double>::DataPoints& pmCloud, const std::string& frame_id, const ros::Time& stamp);
 
 } // PointMatcher_ros

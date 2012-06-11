@@ -351,7 +351,7 @@ int main(int argc, char **argv)
 				pcl::PointCloud<pcl::PointXYZ> cloud;
 				pcl::fromROSMsg(*cloudMsg, cloud);
 				const size_t pointCount(cloud.points.size());
-				DP::Features tempCloud(4, pointCount);
+				PM::Matrix tempCloud(4, pointCount);
 				int dIndex(0);
 				for (size_t i = 0; i < pointCount; ++i)
 				{

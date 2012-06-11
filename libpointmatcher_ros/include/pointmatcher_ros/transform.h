@@ -1,8 +1,9 @@
-#ifndef __POINTMATCHER_ROS_POINT_CLOUD_H
-#define __POINTMATCHER_ROS_POINT_CLOUD_H
+#ifndef __POINTMATCHER_ROS_TRANSFORM_H
+#define __POINTMATCHER_ROS_TRANSFORM_H
 
 #include "pointmatcher/PointMatcher.h"
 #include "nav_msgs/Odometry.h"
+#include "Eigen/Eigen"
 
 namespace ros
 {
@@ -25,4 +26,4 @@ namespace PointMatcher_ros
 	typename PointMatcher<T>::TransformationParameters odomMsgToEigenMatrix(const nav_msgs::Odometry& odom);
 }; // PointMatcher_ros
 
-#endif //__POINTMATCHER_ROS_POINT_CLOUD_H
+#endif //__POINTMATCHER_ROS_TRANSFORM_H
