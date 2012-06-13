@@ -7,6 +7,6 @@
 <!-- ROS topic parameters -->
     <param name="sensorFrame" value="/openni_rgb_optical_frame" />
     <param name="fixedFrame" value="/rotated_world" />
-    <param name="cloudTopic" value="/camera/rgb/points" />
+    <param name="cloudTopic" value="/depth_registered/points" />
   </node>
 </launch>

@@ -3,8 +3,14 @@
     <param name="image_mode" value="8" />
     <param name="depth_mode" value="8" />
     <param name="debayering" value="0" />
-    <param name="depth_registration" value="1" />
-    <rosparam command="load" file="$(find openni_camera)/info/openni_params.yaml" />
+    <param name="depth_registration" value="True" />
   </node>
+  <node pkg="nodelet" type="nodelet" name="points_xyzrgb"
+	args="load depth_image_proc/point_cloud_xyzrgb points_xyzrgb_nodelet_manager">
+	<remap from="rgb/image_rect_color" to="/rgb/image_raw" />
+	<remap from="rgb/camera_info" to="/rgb/camera_info" />
+	<remap from="depth_registered/image_rect" to="/depth_registered/image_raw" />
+	<remap from="depth_registered/points" to="/depth_registered/points" />
+  </node> 
 </launch>
 

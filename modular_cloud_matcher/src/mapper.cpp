@@ -29,18 +29,18 @@ class Mapper
 	ros::Publisher mapPub;
 	ros::Publisher odomPub;
 
-	PM pm;
+	PM::DataPointsFilters inputFilters;
+	PM::DataPointsFilters mapFilters;
+	shared_ptr<PM::Transformation> transformation;
 	PM::DataPoints mapPointCloud;
 	PM::ICP icp;
-	PM::Transformations transformations; 
 
 	// Parameters
-	int maxMapPointCount;
 	int minReadingPointCount;
-	int maxReadingPointCount;
 	double minOverlap;
 	string mapFrame;
-	bool dumpVTKGlobalMap;
+	string vtkGlobalMapPrefix; //!< if empty, no vtk dump at every scan
+	string vtkFinalMapName; //!< name of the final vtk map
 
 	tf::TransformListener tf_listener;
 
@@ -48,27 +48,32 @@ public:
 	Mapper(ros::NodeHandle& n);
 	~Mapper();
 	void gotCloud(const sensor_msgs::PointCloud2& cloudMsg);
+
 private:
-	PM::DataPoints filterScannerPtsCloud(const PM::DataPoints pointCloud);
 	void globalMapMaintenance();
 };
 
 Mapper::Mapper(ros::NodeHandle& n):
-	n(n)
+	n(n),
+	transformation(PM::get().REG(Transformation).create("RigidTransformation")),
+	minReadingPointCount(getParam<int>("minReadingPointCount", 2000)),
+	minOverlap(getParam<double>("minOverlap", 0.5)),
+	mapFrame(getParam<string>("mapFrameId", "/map")),
+	vtkGlobalMapPrefix(getParam<string>("vtkGlobalMapPrefix", "")),
+	vtkFinalMapName(getParam<string>("vtkFinalMapName", "uniformMap"))
 {
-
 	// ROS initialization
 	const string cloudTopic(getParam<string>("cloudTopic", "/static_point_cloud"));
 	cloudSub = n.subscribe(cloudTopic, 2, &Mapper::gotCloud, this);
 	
 	const string mapTopic(getParam<string>("mapTopic", "/map3D"));
 	mapPub = n.advertise<sensor_msgs::PointCloud2>(mapTopic, 1);
-		
+	
 	odomPub = n.advertise<nav_msgs::Odometry>(getParam<string>("odomTopic", "/icp_odom"), 50);
 
-	// load config
+	// load configs
 	string configFileName;
-	if (ros::param::get("~config", configFileName))
+	if (ros::param::get("~icpConfig", configFileName))
 	{
 		ifstream ifs(configFileName.c_str());
 		if (ifs.good())
@@ -77,30 +82,36 @@ Mapper::Mapper(ros::NodeHandle& n):
 		}
 		else
 		{
-			ROS_ERROR_STREAM("Cannot load config from YAML file " << configFileName);
+			ROS_ERROR_STREAM("Cannot load ICP config from YAML file " << configFileName);
 			icp.setDefault();
+		}
+	}
+	if (ros::param::get("~inputFiltersConfig", configFileName))
+	{
+		ifstream ifs(configFileName.c_str());
+		if (ifs.good())
+		{
+			inputFilters = PM::DataPointsFilters(ifs);
+		}
+		else
+		{
+			ROS_ERROR_STREAM("Cannot load input filters config from YAML file " << configFileName);
+		}
+	}
+	if (ros::param::get("~mapFiltersConfig", configFileName))
+	{
+		ifstream ifs(configFileName.c_str());
+		if (ifs.good())
+		{
+			mapFilters = PM::DataPointsFilters(ifs);
+		}
+		else
+		{
+			ROS_ERROR_STREAM("Cannot load map filters config from YAML file " << configFileName);
 		}
 	}
 
 	//setLogger(pm.LoggerRegistrar.create("FileLogger"));
-	
-	// Prepare transformation chain for maps
-	PM::Transformation* transformPoints;
-	transformPoints = pm.TransformationRegistrar.create("TransformFeatures");
-	PM::Transformation* transformNormals;
-	transformNormals = pm.TransformationRegistrar.create("TransformNormals");
-	
-	transformations.push_back(transformPoints);
-	transformations.push_back(transformNormals);
-
-
-	// Parameters for 3D map
-	maxMapPointCount = getParam<int>("maxMapPointCount", 300000);
-	minReadingPointCount = getParam<int>("minReadingPointCount", 2000);
-	maxReadingPointCount = getParam<int>("maxReadingPointCount", 10000);
-	minOverlap = getParam<double>("minOverlap", 0.5);
-	mapFrame = getParam<string>("mapFrameId", "/map");
-	dumpVTKGlobalMap = getParam<bool>("dumpVTKGlobalMap", false);
 }
 
 
@@ -108,21 +119,10 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 {
 	// IMPORTANT:  We need to receive the point clouds in local coordinates (scanner or robot)
 	timer t;
-	t.restart();
-
-	// Fetch initial guess for transformation
-	const PM::TransformationParameters Tinit(
-		PointMatcher_ros::transformListenerToEigenMatrix<float>(
-			tf_listener, 
-			cloudMsgIn.header.frame_id, 
-			mapFrame,
-			cloudMsgIn.header.stamp 
-		)
-	);
-
+	
+	// Convert point cloud
 	DP newPointCloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloudMsgIn));
 	const size_t goodCount(newPointCloud.features.cols());
-	
 	if (goodCount == 0)
 	{
 		ROS_ERROR("I found no good points in the cloud");
@@ -132,13 +132,20 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 	{
 		ROS_INFO("Processing new point cloud");
 	}
-		
-	//bool icpWasSuccess = true;
 	
-	newPointCloud = filterScannerPtsCloud(newPointCloud);
+	// Apply filters to incoming cloud
+	inputFilters.apply(newPointCloud);
 	
-	// Transform point with initial guess
-	transformations.apply(newPointCloud, Tinit);
+	// Fetch initial guess and transform cloud with it
+	const PM::TransformationParameters Tinit(
+		PointMatcher_ros::transformListenerToEigenMatrix<float>(
+			tf_listener, 
+			cloudMsgIn.header.frame_id, 
+			mapFrame,
+			cloudMsgIn.header.stamp 
+		)
+	);
+	newPointCloud = transformation->compute(newPointCloud, Tinit);
 
 	// Ensure a minimum amount of point after filtering
 	const int ptsCount = newPointCloud.features.cols();
@@ -148,10 +155,9 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 		return;
 	}
 
-	// Keep the map in memory
+	// Initialize the map if empty
 	if(mapPointCloud.features.rows() == 0)
 	{
-		// Initialize the map
 		mapPointCloud = newPointCloud;
 		return;
 	}
@@ -159,10 +165,11 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 	// Apply ICP
 	try 
 	{
-		PM::TransformationParameters T = icp(newPointCloud, mapPointCloud);
+		const PM::TransformationParameters T = icp(newPointCloud, mapPointCloud);
 		
-		transformations.apply(mapPointCloud, T.inverse());
-
+		// FIXME: why this direction, why moving the map always?
+		transformation->compute(mapPointCloud, T.inverse());
+		
 		// Ensure minimum overlap between scans
 		const double estimatedOverlap = icp.errorMinimizer->getOverlap();
 		if (estimatedOverlap < minOverlap)
@@ -170,112 +177,38 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 			ROS_ERROR_STREAM("Estimated overlap too small (" << estimatedOverlap << "), move back");	
 			return;
 		}
-
+		
 		// Publish odometry message
 		odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(T, mapFrame, cloudMsgIn.header.stamp));
-		
 		ROS_INFO_STREAM("**** Adding new points to the map with " << estimatedOverlap << " overlap");
-
-	
-		// Merge point clouds to map			
-		mapPointCloud.concatenate(newPointCloud);
-	
-		// Map maintenance
-		globalMapMaintenance();
-
-		ROS_INFO_STREAM("Mapping total time (ICP+maintenance): " << t.elapsed() << " sec");
-
-		//Publish map point cloud
-		mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(mapPointCloud, mapFrame, cloudMsgIn.header.stamp));
-
-		if(dumpVTKGlobalMap)
-		{
-			stringstream nameStream;
-			nameStream << "nifti_map_" << cloudMsgIn.header.seq;
-			PM::saveVTK(mapPointCloud, nameStream.str());
-		}
-		
+		// FIXME: why not TF
 	}
 	catch (PM::ConvergenceError error)
 	{
-		//icpWasSuccess = false;
 		ROS_WARN_STREAM("ICP failed to converge: " << error.what());
 	}
 
-	
-}
+	// Merge point clouds to map
+	mapPointCloud.concatenate(newPointCloud);
 
-//Warning! need to have pointCloud in laser frame or very close
-PM::DataPoints Mapper::filterScannerPtsCloud(const PM::DataPoints pointCloud)
-{
-	// Create a copy of the points
-	PM::DataPoints newPointCloud = pointCloud;
+	// Map maintenance
+	mapFilters.apply(mapPointCloud);
+	ROS_INFO_STREAM("Mapping total time (ICP+maintenance): " << t.elapsed() << " sec");
 
-	// Construct sensor noise
-	PM::DataPointsFilter* sensorNoiseFilter;
-	sensorNoiseFilter= pm.DataPointsFilterRegistrar.create(
-		"SimpleSensorNoiseDataPointsFilter");
-	newPointCloud = sensorNoiseFilter->filter(newPointCloud);
+	// Publish map point cloud
+	mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(mapPointCloud, mapFrame, cloudMsgIn.header.stamp));
 
-	// Build filter to compute normals and down sample
-	const double probToKeep = maxReadingPointCount/(double)pointCloud.features.cols();
-	if(probToKeep < 1.0)
+	if(!vtkGlobalMapPrefix.empty())
 	{
-		PM::DataPointsFilter* normalFilter;
-		normalFilter = pm.DataPointsFilterRegistrar.create(
-			"SamplingSurfaceNormalDataPointsFilter", PM::Parameters({
-				{"binSize", "20"},
-				{"epsilon", "5"}, 
-				{"ratio", toParam(probToKeep)}, 
-				{"keepNormals", "1"}, 
-				{"keepDensities", "1"}
-				}));
-
-		newPointCloud = normalFilter->filter(newPointCloud);
-	}
-
-	// Point normal vector toward laser
-	PM::DataPointsFilter* orienteNormalFilter;
-	orienteNormalFilter= pm.DataPointsFilterRegistrar.create(
-		"OrientNormalsDataPointsFilter");
-	newPointCloud = orienteNormalFilter->filter(newPointCloud);
-
-	// Remove shadow points (mixed pixel)
-	PM::DataPointsFilter* shadowFilter;
-	shadowFilter = pm.DataPointsFilterRegistrar.create(
-		"ShadowDataPointsFilter");
-	//newPointCloud = shadowFilter->filter(newPointCloud);
-	
-
-	return newPointCloud;
-}
-
-void Mapper::globalMapMaintenance()
-{
-	// Generic holder for parameters
-	PM::Parameters params;
-
-	// Uniformize density
-	PM::DataPointsFilter* uniformSubsample;
-	params = PM::Parameters({{"aggressivity", toParam(0.65)}});
-	uniformSubsample = pm.DataPointsFilterRegistrar.create("UniformizeDensityDataPointsFilter", params);
-	
-	mapPointCloud = uniformSubsample->filter(mapPointCloud);
-
-	// Controle the size of the point cloud
-	const double probToKeep = maxMapPointCount/(double)mapPointCloud.features.cols();
-	if(probToKeep < 1.0)
-	{
-		PM::DataPointsFilter* randSubsample;
-		params = PM::Parameters({{"prob", toParam(probToKeep)}});
-		randSubsample = pm.DataPointsFilterRegistrar.create("RandomSamplingDataPointsFilter", params);
-		mapPointCloud = randSubsample->filter(mapPointCloud);
+		stringstream nameStream;
+		nameStream << vtkGlobalMapPrefix << cloudMsgIn.header.seq;
+		PM::saveVTK(mapPointCloud, nameStream.str());
 	}
 }
 
 Mapper::~Mapper()
 {
-	PM::saveVTK(mapPointCloud, "uniformMap");	
+	PM::saveVTK(mapPointCloud, vtkFinalMapName);
 }
 
 // Main function supporting the Mapper class

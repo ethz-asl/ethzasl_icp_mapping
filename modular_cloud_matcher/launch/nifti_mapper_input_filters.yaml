@@ -1,0 +1,10 @@
+- SimpleSensorNoiseDataPointsFilter
+- SamplingSurfaceNormalDataPointsFilter:
+    binSize: 20
+    epsilon: 5
+    ratio: 0.5
+    keepNormals: 1
+    keepDensities: 1
+- ObservationDirectionDataPointsFilter
+- OrientNormalsDataPointsFilter 
+- ShadowDataPointsFilter

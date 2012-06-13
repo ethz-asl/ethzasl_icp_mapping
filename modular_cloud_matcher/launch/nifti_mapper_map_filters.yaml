@@ -1,0 +1,4 @@
+- UniformizeDensityDataPointsFilter:
+    aggressivity: 0.65
+- RandomSamplingDataPointsFilter:
+    prob: 0.5
