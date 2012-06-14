@@ -62,14 +62,16 @@ Mapper::Mapper(ros::NodeHandle& n):
 	vtkGlobalMapPrefix(getParam<string>("vtkGlobalMapPrefix", "")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "uniformMap"))
 {
-	// ROS initialization
-	const string cloudTopic(getParam<string>("cloudTopic", "/static_point_cloud"));
-	cloudSub = n.subscribe(cloudTopic, 2, &Mapper::gotCloud, this);
-	
-	const string mapTopic(getParam<string>("mapTopic", "/map3D"));
-	mapPub = n.advertise<sensor_msgs::PointCloud2>(mapTopic, 1);
-	
-	odomPub = n.advertise<nav_msgs::Odometry>(getParam<string>("odomTopic", "/icp_odom"), 50);
+	// topics initialization
+	cloudSub = n.subscribe(
+		getParam<string>("cloudTopic", "/static_point_cloud"), 2, &Mapper::gotCloud, this
+	);
+	mapPub = n.advertise<sensor_msgs::PointCloud2>(
+		getParam<string>("mapTopic", "/map3D"), 1
+	);
+	odomPub = n.advertise<nav_msgs::Odometry>(
+		getParam<string>("odomTopic", "/icp_odom"), 50
+	);
 
 	// load configs
 	string configFileName;
@@ -151,7 +153,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 	const int ptsCount = newPointCloud.features.cols();
 	if(ptsCount < minReadingPointCount)
 	{
-		ROS_ERROR_STREAM("Not enough points in newPointCloud: " << ptsCount << "pts.");
+		ROS_ERROR_STREAM("Not enough points in newPointCloud: only " << ptsCount << " pts.");
 		return;
 	}
 
