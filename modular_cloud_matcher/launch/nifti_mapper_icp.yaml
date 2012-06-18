@@ -1,0 +1,41 @@
+transformations:
+  - TransformFeatures
+
+readingDataPointsFilters:
+  - MaxDensityDataPointsFilter
+
+keyframeDataPointsFilters:
+  - RandomSamplingDataPointsFilter:
+      prob: 0.50
+
+matcher:
+  KDTreeMatcher:
+    maxDist: 0.50
+    epsilon: 1.0
+
+featureOutlierFilters:
+  - TrimmedDistOutlierFilter:
+     ratio: 0.95
+  - SurfaceNormalOutlierFilter:
+     maxAngle: 1.57
+
+errorMinimizer:
+  PointToPlaneErrorMinimizer
+
+transformationCheckers:
+  - DifferentialTransformationChecker:
+      minDiffRotErr: 0.001
+      minDiffTransErr: 0.01
+      smoothLength: 4
+  - CounterTransformationChecker:
+      maxIterationCount: 40
+  - BoundTransformationChecker:
+      maxRotationNorm: 0.80
+      maxTranslationNorm: 4.00
+
+inspector:
+#  VTKFileInspector
+  NullInspector
+
+logger:
+  FileLogger

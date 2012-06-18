@@ -29,14 +29,15 @@ namespace PointMatcher_ros
 		for(auto it(rosMsg.fields.begin()); it != rosMsg.fields.end(); ++it, ++fieldId)
 		{
 			const string name(it->name);
+			const size_t count(std::max<size_t>(it->count, 1));
 			if (name == "x" || name == "y" || name == "z")
 			{
-				featLabels.push_back(Label(name, it->count));
+				featLabels.push_back(Label(name, count));
 				isFeature[fieldId] = true;
 			}
 			else
 			{
-				descLabels.push_back(Label(name, it->count));
+				descLabels.push_back(Label(name, count));
 				isFeature[fieldId] = false;
 			}
 		}
@@ -58,13 +59,14 @@ namespace PointMatcher_ros
 				cloud.getDescriptorViewByName(it->name)
 			);
 			int ptId(0);
+			const size_t count(std::max<size_t>(it->count, 1));
 			for (size_t y(0); y < rosMsg.height; ++y)
 			{
 				const uint8_t* dataPtr(&rosMsg.data[0] + rosMsg.row_step*y);
 				for (size_t x(0); x < rosMsg.width; ++x)
 				{
 					const uint8_t* fPtr(dataPtr + it->offset);
-					for (unsigned dim(0); dim < it->count; ++dim)
+					for (unsigned dim(0); dim < count; ++dim)
 					{
 						switch (it->datatype)
 						{
