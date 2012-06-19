@@ -1,5 +1,5 @@
 <launch>
-	<node name="mapper" type="mapper" pkg="modular_cloud_matcher" output="screen" launch-prefix="gdb -ex run --args">
+	<node name="mapper" type="mapper" pkg="modular_cloud_matcher" output="screen" >
 		<param name="icpConfig" value="$(find modular_cloud_matcher)/launch/nifti_mapper_icp.yaml" />
 		<param name="inputFiltersConfig" value="$(find modular_cloud_matcher)/launch/nifti_mapper_input_filters.yaml" />
 		<param name="mapFiltersConfig" value="$(find modular_cloud_matcher)/launch/nifti_mapper_map_filters.yaml" />

@@ -46,6 +46,7 @@ namespace PointMatcher_ros
 		// create cloud
 		const unsigned pointCount(rosMsg.width * rosMsg.height);
 		DataPoints cloud(featLabels, descLabels, pointCount);
+		cloud.getFeatureViewByName("pad").setConstant(1);
 		
 		// fill cloud
 		// TODO: support big endian, pass through endian-swapping method just after the *reinterpret_cast
@@ -101,6 +102,7 @@ namespace PointMatcher_ros
 	sensor_msgs::PointCloud2 pointMatcherCloudToRosMsg(const typename PointMatcher<T>::DataPoints& pmCloud, const std::string& frame_id, const ros::Time& stamp)
 	{
 		sensor_msgs::PointCloud2 rosCloud;
+		typedef sensor_msgs::PointField PF;
 		
 		// check type and get sizes
 		BOOST_STATIC_ASSERT(is_floating_point<T>::value);
@@ -109,17 +111,16 @@ namespace PointMatcher_ros
 		size_t scalarSize;
 		if (typeid(T) == typeid(float))
 		{
-			dataType = 7;
+			dataType = PF::FLOAT32;
 			scalarSize = 4;
 		}
 		else
 		{
-			dataType = 8;
+			dataType = PF::FLOAT64;
 			scalarSize = 8;
 		}
 		
 		// build labels
-		typedef sensor_msgs::PointField PF;
 		unsigned offset(0);
 		assert(!pmCloud.featureLabels.empty());
 		assert(pmCloud.featureLabels[pmCloud.featureLabels.size()-1].text == "pad");
@@ -167,6 +168,7 @@ namespace PointMatcher_ros
 		{
 			uint8_t *fPtr(&rosCloud.data[pt * offset]);
 			memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.features(0, pt)), scalarSize * featureDim);
+			fPtr += scalarSize * featureDim;
 			memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(0, pt)), scalarSize * descriptorDim);
 		}
 

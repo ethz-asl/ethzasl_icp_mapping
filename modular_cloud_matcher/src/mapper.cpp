@@ -148,6 +148,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 		)
 	);
 	newPointCloud = transformation->compute(newPointCloud, Tinit);
+	cerr << "Tinit: " << Tinit << endl;
 
 	// Ensure a minimum amount of point after filtering
 	const int ptsCount = newPointCloud.features.cols();
@@ -168,6 +169,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 	try 
 	{
 		const PM::TransformationParameters T = icp(newPointCloud, mapPointCloud);
+		cerr << "Ticp: " << T << endl;
 		
 		// FIXME: why this direction, why moving the map always?
 		transformation->compute(mapPointCloud, T.inverse());
