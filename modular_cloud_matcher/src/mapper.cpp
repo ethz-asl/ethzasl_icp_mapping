@@ -63,7 +63,7 @@ Mapper::Mapper(ros::NodeHandle& n):
 	transformation(PM::get().REG(Transformation).create("RigidTransformation")),
 	minReadingPointCount(getParam<int>("minReadingPointCount", 2000)),
 	minOverlap(getParam<double>("minOverlap", 0.5)),
-	baseFrame(getParam<string>("map_frame", "/base_link")),
+	baseFrame(getParam<string>("base_frame", "/base_link")),
 	mapFrame(getParam<string>("map_frame", "/map")),
 	vtkGlobalMapPrefix(getParam<string>("vtkGlobalMapPrefix", "")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "uniformMap"))
