@@ -150,9 +150,10 @@ namespace PointMatcher_ros
 					const ros::Time cur_time(rosMsg.header.stamp + ros::Duration(i * rosMsg.time_increment));
 					// wait for transform
 					listener->waitForTransform(
-						rosMsg.header.frame_id, init_time, 
-						rosMsg.header.frame_id, cur_time, 
-						fixed_frame, ros::Duration(1.0)
+						fixed_frame, 
+						rosMsg.header.frame_id,
+						cur_time, 
+						ros::Duration(1.0)
 					);
 					// transform data
 					geometry_msgs::Vector3Stamped pin, pout;
@@ -162,8 +163,9 @@ namespace PointMatcher_ros
 					pin.vector.y = ys(0,j);
 					pin.vector.z = 0;
 					listener->transformVector(
-						rosMsg.header.frame_id, init_time,
-						pin, fixed_frame, pout
+						fixed_frame,
+						pin,
+						pout
 					);
 					// write back
 					xs(0,j) = pout.vector.x;

@@ -39,6 +39,7 @@ class Mapper
 	// Parameters
 	int minReadingPointCount;
 	double minOverlap;
+	string baseFrame;
 	string mapFrame;
 	string vtkGlobalMapPrefix; //!< if empty, no vtk dump at every scan
 	string vtkFinalMapName; //!< name of the final vtk map
@@ -62,7 +63,8 @@ Mapper::Mapper(ros::NodeHandle& n):
 	transformation(PM::get().REG(Transformation).create("RigidTransformation")),
 	minReadingPointCount(getParam<int>("minReadingPointCount", 2000)),
 	minOverlap(getParam<double>("minOverlap", 0.5)),
-	mapFrame(getParam<string>("mapFrameId", "/map")),
+	baseFrame(getParam<string>("map_frame", "/base_link")),
+	mapFrame(getParam<string>("map_frame", "/map")),
 	vtkGlobalMapPrefix(getParam<string>("vtkGlobalMapPrefix", "")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "uniformMap"))
 {
@@ -131,8 +133,7 @@ Mapper::Mapper(ros::NodeHandle& n):
 
 void Mapper::gotScan(const sensor_msgs::LaserScan& scanMsgIn)
 {
-	// TODO: check which fixed_frame to use
-	DP cloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(scanMsgIn, &tf_listener, "/icp_odom"));
+	DP cloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(scanMsgIn, &tf_listener, baseFrame));
 	processCloud(cloud, scanMsgIn.header);
 }
 
@@ -145,6 +146,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 void Mapper::processCloud(DP& newPointCloud, const std_msgs::Header& header)
 {
 	// IMPORTANT:  We need to receive the point clouds in local coordinates (scanner or robot)
+	// FIXME: isn't there a bug here? cloud should be in base_link?
 	timer t;
 	
 	// Convert point cloud
