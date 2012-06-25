@@ -1,6 +1,7 @@
 #include "pointmatcher_ros/point_cloud.h"
 #include "ros/ros.h"
 #include "boost/detail/endian.hpp"
+#include "tf/transform_listener.h"
 #include <vector>
 #include <memory>
 
@@ -96,6 +97,108 @@ namespace PointMatcher_ros
 	typename PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::PointCloud2& rosMsg);
 	template
 	typename PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::PointCloud2& rosMsg);
+	
+	
+	template<typename T>
+	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixed_frame)
+	{
+		typedef PointMatcher<T> PM;
+		typedef typename PM::DataPoints DataPoints;
+		typedef typename DataPoints::Label Label;
+		typedef typename DataPoints::Labels Labels;
+		typedef typename DataPoints::View View;
+		
+		Labels featLabels;
+		featLabels.push_back(Label("x", 1));
+		featLabels.push_back(Label("y", 1));
+		featLabels.push_back(Label("pad", 1));
+		
+		Labels descLabels;
+		if (!rosMsg.intensities.empty())
+		{
+			descLabels.push_back(Label("intensity", 1));
+			assert(rosMsg.intensities.size() == rosMsg.ranges.size());
+		}
+		
+		// create cloud
+		size_t goodCount(0);
+		for (size_t i = 0; i < rosMsg.ranges.size(); ++i)
+		{
+			const float range(rosMsg.ranges[i]);
+			if (range >= rosMsg.range_min && range <= rosMsg.range_max)
+				++goodCount;
+		}
+		DataPoints cloud(featLabels, descLabels, goodCount);
+		cloud.getFeatureViewByName("pad").setConstant(1);
+		
+		// fill features
+		const ros::Time& init_time(rosMsg.header.stamp);
+		auto xs(cloud.getFeatureViewByName("x"));
+		auto ys(cloud.getFeatureViewByName("y"));
+		float angle(rosMsg.angle_min);
+		int j(0);
+		for (size_t i = 0; i < rosMsg.ranges.size(); ++i)
+		{
+			const float range(rosMsg.ranges[i]);
+			if (range >= rosMsg.range_min && range <= rosMsg.range_max)
+			{
+				xs(0,j) = cos(angle) * range;
+				ys(0,j) = sin(angle) * range;
+				
+				if (listener)
+				{
+					const ros::Time cur_time(rosMsg.header.stamp + ros::Duration(i * rosMsg.time_increment));
+					// wait for transform
+					listener->waitForTransform(
+						rosMsg.header.frame_id, init_time, 
+						rosMsg.header.frame_id, cur_time, 
+						fixed_frame, ros::Duration(1.0)
+					);
+					// transform data
+					geometry_msgs::Vector3Stamped pin, pout;
+					pin.header.stamp = cur_time;
+					pin.header.frame_id = rosMsg.header.frame_id;
+					pin.vector.x = xs(0,j);
+					pin.vector.y = ys(0,j);
+					pin.vector.z = 0;
+					listener->transformVector(
+						rosMsg.header.frame_id, init_time,
+						pin, fixed_frame, pout
+					);
+					// write back
+					xs(0,j) = pout.vector.x;
+					ys(0,j) = pout.vector.y;
+				}
+				
+				angle += rosMsg.angle_increment;
+				++j;
+			}
+		}
+		
+		// fill descriptors
+		if (!rosMsg.intensities.empty())
+		{
+			assert(rosMsg.intensities.size() == rosMsg.ranges.size());
+			auto is(cloud.getDescriptorViewByName("intensity"));
+			j = 0;
+			for (size_t i = 0; i < rosMsg.intensities.size(); ++i)
+			{
+				const float range(rosMsg.ranges[i]);
+				if (range >= rosMsg.range_min && range <= rosMsg.range_max)
+				{
+					is(0,j) = rosMsg.intensities[i];
+					++j;
+				}
+			}
+		}
+		
+		return cloud;
+	}
+	
+	template
+	typename PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixed_frame);
+	template
+	typename PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixed_frame);
 
 
 	template<typename T>
