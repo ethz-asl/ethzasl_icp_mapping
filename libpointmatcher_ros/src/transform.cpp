@@ -56,7 +56,13 @@ namespace PointMatcher_ros
 		odom.header.frame_id = frame_id;
 		
 		// Fill pose
-		const Eigen::Affine3d eigenTr(Eigen::Matrix4d(inTr.template cast<double>()));
+		const Eigen::Affine3d eigenTr(
+			Eigen::Matrix4d(
+				eigenMatrixToDim<double>(
+					inTr.template cast<double>(), 4
+				)
+			)
+		);
 		tf::poseEigenToMsg(eigenTr, odom.pose.pose);
 
 		// Fill velocity, TODO: find proper computation from delta poses to twist
@@ -81,7 +87,13 @@ namespace PointMatcher_ros
 	tf::StampedTransform eigenMatrixToStampedTransform(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& child, const std::string& parent, const ros::Time& stamp)
 	{
 		tf::Transform tfTr;
-		const Eigen::Affine3d eigenTr(Eigen::Matrix4d(inTr.template cast<double>()));
+		const Eigen::Affine3d eigenTr(
+			Eigen::Matrix4d(
+				eigenMatrixToDim<double>(
+					inTr.template cast<double>(), 4
+				)
+			)
+		);
 		tf::TransformEigenToTF(eigenTr, tfTr);
 		return tf::StampedTransform(tfTr, stamp, parent, child);
 	}
@@ -90,4 +102,26 @@ namespace PointMatcher_ros
 	tf::StampedTransform eigenMatrixToStampedTransform<float>(const typename PointMatcher<float>::TransformationParameters& inTr, const std::string& child, const std::string& parent, const ros::Time& stamp);
 	template
 	tf::StampedTransform eigenMatrixToStampedTransform<double>(const typename PointMatcher<double>::TransformationParameters& inTr, const std::string& child, const std::string& parent, const ros::Time& stamp);
+	
+	template<typename T>
+	typename PointMatcher<T>::TransformationParameters eigenMatrixToDim(const typename PointMatcher<T>::TransformationParameters& matrix, int dimp1)
+	{
+		typedef typename PointMatcher<T>::TransformationParameters M;
+		assert(matrix.rows() == matrix.cols());
+		assert((matrix.rows() == 3) || (matrix.rows() == 4));
+		assert((dimp1 == 3) || (dimp1 == 4));
+		
+		if (matrix.rows() == dimp1)
+			return matrix;
+		
+		M out(M::Identity(dimp1,dimp1));
+		out.topLeftCorner(2,2) = matrix.topLeftCorner(2,2);
+		out.topRightCorner(2,1) = matrix.topRightCorner(2,1);
+		return out;
+	}
+	
+	template
+	typename PointMatcher<float>::TransformationParameters eigenMatrixToDim<float>(const typename PointMatcher<float>::TransformationParameters& matrix, int dimp1);
+	template
+	typename PointMatcher<double>::TransformationParameters eigenMatrixToDim<double>(const typename PointMatcher<double>::TransformationParameters& matrix, int dimp1);
 }; // PointMatcher_ros

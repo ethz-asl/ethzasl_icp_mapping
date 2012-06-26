@@ -33,6 +33,11 @@ namespace PointMatcher_ros
 	template<typename T>
 	tf::StampedTransform eigenMatrixToStampedTransform(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& child, const std::string& parent, const ros::Time& stamp);
 	
+	// 2D / 3D transform
+	
+	template<typename T>
+	typename PointMatcher<T>::TransformationParameters eigenMatrixToDim(const typename PointMatcher<T>::TransformationParameters& matrix, int dimp1);
+	
 }; // PointMatcher_ros
 
 #endif //__POINTMATCHER_ROS_TRANSFORM_H

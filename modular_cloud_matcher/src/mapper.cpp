@@ -1,5 +1,7 @@
 #include <fstream>
 
+#include <boost/thread.hpp>
+
 #include "ros/ros.h"
 #include "ros/console.h"
 #include "pointmatcher/PointMatcher.h"
@@ -18,6 +20,7 @@
 #include "tf_conversions/tf_eigen.h"
 #include "tf/transform_listener.h"
 #include "tf/transform_broadcaster.h"
+
 
 using namespace std;
 using namespace PointMatcherSupport;
@@ -40,24 +43,31 @@ class Mapper
 	// Parameters
 	int minReadingPointCount;
 	double minOverlap;
+	double tfPublishPeriod;
 	string odomFrame;
 	string mapFrame;
 	string vtkGlobalMapPrefix; //!< if empty, no vtk dump at every scan
 	string vtkFinalMapName; //!< name of the final vtk map
 
+	PM::TransformationParameters Ticp;
+	boost::thread* publishThread;
+	boost::mutex publishLock;
+	
 	tf::TransformListener tfListener;
 	tf::TransformBroadcaster tfBroadcaster;
-
+	
 public:
 	Mapper(ros::NodeHandle& n);
 	~Mapper();
 	
+protected:
 	void gotScan(const sensor_msgs::LaserScan& scanMsgIn);
 	void gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn);
 	void processCloud(DP& cloud, const std::string& scannerFrame, const ros::Time& stamp, uint32_t seq);
 
-private:
 	void globalMapMaintenance();
+	void publishLoop(double publishPeriod);
+	void publishTransform();
 };
 
 Mapper::Mapper(ros::NodeHandle& n):
@@ -65,10 +75,13 @@ Mapper::Mapper(ros::NodeHandle& n):
 	transformation(PM::get().REG(Transformation).create("RigidTransformation")),
 	minReadingPointCount(getParam<int>("minReadingPointCount", 2000)),
 	minOverlap(getParam<double>("minOverlap", 0.5)),
+	tfPublishPeriod(getParam<double>("tfPublishPeriod", 0.1)),
 	odomFrame(getParam<string>("odom_frame", "odom")),
 	mapFrame(getParam<string>("map_frame", "map")),
 	vtkGlobalMapPrefix(getParam<string>("vtkGlobalMapPrefix", "")),
-	vtkFinalMapName(getParam<string>("vtkFinalMapName", "uniformMap"))
+	vtkFinalMapName(getParam<string>("vtkFinalMapName", "uniformMap")),
+	Ticp(PM::TransformationParameters::Identity(4,4)),
+	publishThread(0)
 {
 	// topics initialization
 	if (hasParam("scanTopic"))
@@ -131,6 +144,18 @@ Mapper::Mapper(ros::NodeHandle& n):
 	}
 
 	//setLogger(pm.LoggerRegistrar.create("FileLogger"));
+	
+	publishThread = new boost::thread(boost::bind(&Mapper::publishLoop, this, tfPublishPeriod));
+}
+
+Mapper::~Mapper()
+{
+	PM::saveVTK(mapPointCloud, vtkFinalMapName);
+	if (publishThread)
+	{
+		publishThread->join();
+		delete publishThread;
+	}
 }
 
 void Mapper::gotScan(const sensor_msgs::LaserScan& scanMsgIn)
@@ -165,27 +190,33 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 	
 	// Apply filters to incoming cloud
 	inputFilters.apply(newPointCloud);
+	const int dimp1(newPointCloud.features.rows());
 	
 	// Fetch initial guess and transform cloud with it
 	const PM::TransformationParameters TscannerToOdom(
-		PointMatcher_ros::transformListenerToEigenMatrix<float>(
-			tfListener, 
-			scannerFrame, 
-			odomFrame,
-			stamp 
+		PointMatcher_ros::eigenMatrixToDim<float>(
+			PointMatcher_ros::transformListenerToEigenMatrix<float>(
+				tfListener, 
+				scannerFrame, 
+				odomFrame,
+				stamp 
+			), dimp1
 		)
 	);
 	newPointCloud = transformation->compute(newPointCloud, TscannerToOdom);
 	cerr << "TscannerToOdom: " << TscannerToOdom << endl;
 	
-	const PM::TransformationParameters Tinit(
-		PointMatcher_ros::transformListenerToEigenMatrix<float>(
+	PM::TransformationParameters Tinit(PM::TransformationParameters::Identity(dimp1,dimp1));
+	if (tfListener.canTransform(odomFrame,mapFrame,stamp))
+	{
+		Tinit = PointMatcher_ros::eigenMatrixToDim<float>(
+			PointMatcher_ros::transformListenerToEigenMatrix<float>(
 			tfListener, 
 			odomFrame,
 			mapFrame,
-			stamp 
-		)
-	);
+			stamp
+		), dimp1);
+	}
 	cerr << "Tinit: " << Tinit << endl;
 
 	// Ensure a minimum amount of point after filtering
@@ -208,6 +239,10 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 	{
 		const PM::TransformationParameters T = icp(newPointCloud, mapPointCloud, Tinit);
 		cerr << "Ticp: " << T << endl;
+		
+		publishLock.lock();
+		Ticp = T;
+		publishLock.unlock();
 		
 		//transformation->compute(mapPointCloud, T.inverse());
 		
@@ -247,10 +282,25 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 	}
 }
 
-Mapper::~Mapper()
+void Mapper::publishLoop(double publishPeriod)
 {
-	PM::saveVTK(mapPointCloud, vtkFinalMapName);
+	if(publishPeriod == 0)
+		return;
+	ros::Rate r(1.0 / publishPeriod);
+	while(ros::ok())
+	{
+		publishTransform();
+		r.sleep();
+	}
 }
+
+void Mapper::publishTransform()
+{
+	publishLock.lock();
+	tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(Ticp, odomFrame, mapFrame, ros::Time::now()));
+	publishLock.unlock();
+}
+
 
 // Main function supporting the Mapper class
 int main(int argc, char **argv)
