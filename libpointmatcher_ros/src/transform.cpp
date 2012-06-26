@@ -8,14 +8,14 @@
 namespace PointMatcher_ros
 {
 	template<typename T>
-	typename PointMatcher<T>::TransformationParameters transformListenerToEigenMatrix(const tf::TransformListener &listener, const std::string& child, const std::string& parent, const ros::Time& stamp)
+	typename PointMatcher<T>::TransformationParameters transformListenerToEigenMatrix(const tf::TransformListener &listener, const std::string& target, const std::string& source, const ros::Time& stamp)
 	{
 		typedef typename PointMatcher<T>::TransformationParameters TransformationParameters;
 		
 		tf::StampedTransform stampedTr;
 		try
 		{
-			listener.lookupTransform(parent, child, stamp, stampedTr);
+			listener.lookupTransform(target, source, stamp, stampedTr);
 		}
 		catch(tf::TransformException ex)
 		{
@@ -29,9 +29,9 @@ namespace PointMatcher_ros
 	}
 	
 	template
-	PointMatcher<float>::TransformationParameters transformListenerToEigenMatrix<float>(const tf::TransformListener &listener, const std::string& child, const std::string& parent, const ros::Time& stamp);
+	PointMatcher<float>::TransformationParameters transformListenerToEigenMatrix<float>(const tf::TransformListener &listener, const std::string& target, const std::string& source, const ros::Time& stamp);
 	template
-	PointMatcher<double>::TransformationParameters transformListenerToEigenMatrix<double>(const tf::TransformListener &listener, const std::string& child, const std::string& parent, const ros::Time& stamp);
+	PointMatcher<double>::TransformationParameters transformListenerToEigenMatrix<double>(const tf::TransformListener &listener, const std::string& target, const std::string& source, const ros::Time& stamp);
 
 	
 	template<typename T>
@@ -84,7 +84,7 @@ namespace PointMatcher_ros
 	
 
 	template<typename T>
-	tf::StampedTransform eigenMatrixToStampedTransform(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& child, const std::string& parent, const ros::Time& stamp)
+	tf::StampedTransform eigenMatrixToStampedTransform(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp)
 	{
 		tf::Transform tfTr;
 		const Eigen::Affine3d eigenTr(
@@ -95,13 +95,13 @@ namespace PointMatcher_ros
 			)
 		);
 		tf::TransformEigenToTF(eigenTr, tfTr);
-		return tf::StampedTransform(tfTr, stamp, parent, child);
+		return tf::StampedTransform(tfTr, stamp, target, source);
 	}
 	
 	template
-	tf::StampedTransform eigenMatrixToStampedTransform<float>(const typename PointMatcher<float>::TransformationParameters& inTr, const std::string& child, const std::string& parent, const ros::Time& stamp);
+	tf::StampedTransform eigenMatrixToStampedTransform<float>(const typename PointMatcher<float>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp);
 	template
-	tf::StampedTransform eigenMatrixToStampedTransform<double>(const typename PointMatcher<double>::TransformationParameters& inTr, const std::string& child, const std::string& parent, const ros::Time& stamp);
+	tf::StampedTransform eigenMatrixToStampedTransform<double>(const typename PointMatcher<double>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp);
 	
 	template<typename T>
 	typename PointMatcher<T>::TransformationParameters eigenMatrixToDim(const typename PointMatcher<T>::TransformationParameters& matrix, int dimp1)

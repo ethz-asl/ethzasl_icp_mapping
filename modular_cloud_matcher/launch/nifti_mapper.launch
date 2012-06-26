@@ -7,5 +7,6 @@
 		<param name="map_frame" value="/map" />
 		<param name="cloudTopic" value="/dynamic_point_cloud" />
 		<param name="maxMapPointCount" value="600000" />
+		<param name="useROSLogger" value="true" />
 	</node>
 </launch>
