@@ -1,5 +1,6 @@
 #include "pointmatcher_ros/transform.h"
 #include "tf/transform_listener.h"
+#include "tf/transform_datatypes.h"
 #include "tf_conversions/tf_eigen.h"
 #include "eigen_conversions/eigen_msg.h"
 #include "ros/ros.h"
@@ -34,6 +35,20 @@ namespace PointMatcher_ros
 
 	
 	template<typename T>
+	typename PointMatcher<T>::TransformationParameters odomMsgToEigenMatrix(const nav_msgs::Odometry& odom)
+	{
+		Eigen::Affine3d eigenTr;
+		tf::poseMsgToEigen(odom.pose.pose, eigenTr);
+		return eigenTr.matrix().cast<T>();
+	}
+	
+	template
+	PointMatcher<float>::TransformationParameters odomMsgToEigenMatrix<float>(const nav_msgs::Odometry& odom);
+	template
+	PointMatcher<double>::TransformationParameters odomMsgToEigenMatrix<double>(const nav_msgs::Odometry& odom);
+	
+	
+	template<typename T>
 	nav_msgs::Odometry eigenMatrixToOdomMsg(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& frame_id, const ros::Time& stamp)
 	{
 		nav_msgs::Odometry odom;
@@ -63,15 +78,16 @@ namespace PointMatcher_ros
 	
 
 	template<typename T>
-	typename PointMatcher<T>::TransformationParameters odomMsgToEigenMatrix(const nav_msgs::Odometry& odom)
+	tf::StampedTransform eigenMatrixToStampedTransform(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& child, const std::string& parent, const ros::Time& stamp)
 	{
-		Eigen::Affine3d eigenTr;
-		tf::poseMsgToEigen(odom.pose.pose, eigenTr);
-		return eigenTr.matrix().cast<T>();
+		tf::Transform tfTr;
+		const Eigen::Affine3d eigenTr(Eigen::Matrix4d(inTr.template cast<double>()));
+		tf::TransformEigenToTF(eigenTr, tfTr);
+		return tf::StampedTransform(tfTr, stamp, parent, child);
 	}
 	
 	template
-	PointMatcher<float>::TransformationParameters odomMsgToEigenMatrix<float>(const nav_msgs::Odometry& odom);
+	tf::StampedTransform eigenMatrixToStampedTransform<float>(const typename PointMatcher<float>::TransformationParameters& inTr, const std::string& child, const std::string& parent, const ros::Time& stamp);
 	template
-	PointMatcher<double>::TransformationParameters odomMsgToEigenMatrix<double>(const nav_msgs::Odometry& odom);
+	tf::StampedTransform eigenMatrixToStampedTransform<double>(const typename PointMatcher<double>::TransformationParameters& inTr, const std::string& child, const std::string& parent, const ros::Time& stamp);
 }; // PointMatcher_ros

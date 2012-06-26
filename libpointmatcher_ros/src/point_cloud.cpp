@@ -100,7 +100,7 @@ namespace PointMatcher_ros
 	
 	
 	template<typename T>
-	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixed_frame)
+	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame)
 	{
 		typedef PointMatcher<T> PM;
 		typedef typename PM::DataPoints DataPoints;
@@ -128,11 +128,14 @@ namespace PointMatcher_ros
 			if (range >= rosMsg.range_min && range <= rosMsg.range_max)
 				++goodCount;
 		}
+		if (goodCount == 0)
+			return DataPoints();
 		DataPoints cloud(featLabels, descLabels, goodCount);
 		cloud.getFeatureViewByName("pad").setConstant(1);
 		
 		// fill features
-		const ros::Time& init_time(rosMsg.header.stamp);
+		const ros::Time& startTime(rosMsg.header.stamp);
+		const ros::Time endTime(startTime + ros::Duration(rosMsg.time_increment * (rosMsg.ranges.size() - 1)));
 		auto xs(cloud.getFeatureViewByName("x"));
 		auto ys(cloud.getFeatureViewByName("y"));
 		float angle(rosMsg.angle_min);
@@ -147,24 +150,35 @@ namespace PointMatcher_ros
 				
 				if (listener)
 				{
-					const ros::Time cur_time(rosMsg.header.stamp + ros::Duration(i * rosMsg.time_increment));
+					/* Note:
+						We do an approximation, as some filters like
+						ObservationDirectionDataPointsFilter should be applied per 
+						point *before* correcting them using the tf transform, but
+						as we expect the scan to be fast with respect to the speed 
+						of the robot, we consider this approximation as being ok.
+					*/
+					const ros::Time curTime(rosMsg.header.stamp + ros::Duration(i * rosMsg.time_increment));
 					// wait for transform
 					listener->waitForTransform(
-						fixed_frame, 
 						rosMsg.header.frame_id,
-						cur_time, 
+						endTime,
+						rosMsg.header.frame_id,
+						curTime,
+						fixedFrame,
 						ros::Duration(1.0)
 					);
 					// transform data
 					geometry_msgs::Vector3Stamped pin, pout;
-					pin.header.stamp = cur_time;
+					pin.header.stamp = curTime;
 					pin.header.frame_id = rosMsg.header.frame_id;
 					pin.vector.x = xs(0,j);
 					pin.vector.y = ys(0,j);
 					pin.vector.z = 0;
 					listener->transformVector(
-						fixed_frame,
+						rosMsg.header.frame_id,
+						endTime,
 						pin,
+						fixedFrame,
 						pout
 					);
 					// write back
@@ -198,9 +212,9 @@ namespace PointMatcher_ros
 	}
 	
 	template
-	typename PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixed_frame);
+	typename PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame);
 	template
-	typename PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixed_frame);
+	typename PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame);
 
 
 	template<typename T>
