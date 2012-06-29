@@ -174,21 +174,28 @@ namespace PointMatcher_ros
 					pin.vector.x = xs(0,j);
 					pin.vector.y = ys(0,j);
 					pin.vector.z = 0;
-					listener->transformVector(
-						rosMsg.header.frame_id,
-						endTime,
-						pin,
-						fixedFrame,
-						pout
-					);
+					try
+					{
+						listener->transformVector(
+							rosMsg.header.frame_id,
+							endTime,
+							pin,
+							fixedFrame,
+							pout
+						);
+					}
+					catch (const tf::ExtrapolationException& e)
+					{
+						return DataPoints();
+					}
 					// write back
 					xs(0,j) = pout.vector.x;
 					ys(0,j) = pout.vector.y;
 				}
 				
-				angle += rosMsg.angle_increment;
 				++j;
 			}
+			angle += rosMsg.angle_increment;
 		}
 		
 		// fill descriptors
@@ -208,6 +215,7 @@ namespace PointMatcher_ros
 			}
 		}
 		
+		//cerr << "point cloud:\n" << cloud.features.leftCols(10) << endl;
 		return cloud;
 	}
 	
@@ -256,6 +264,18 @@ namespace PointMatcher_ros
 			rosCloud.fields.push_back(pointField);
 			offset += it->span * scalarSize;
 		}
+		bool addZ(false);
+		if (!pmCloud.featureLabels.contains("z"))
+		{
+			PF pointField;
+			pointField.name = "z";
+			pointField.offset = offset;
+			pointField.datatype= dataType;
+			pointField.count = 1;
+			rosCloud.fields.push_back(pointField);
+			offset += scalarSize;
+			addZ = true;
+		}
 		for(auto it(pmCloud.descriptorLabels.begin()); it != pmCloud.descriptorLabels.end(); ++it)
 		{
 			PF pointField;
@@ -288,6 +308,11 @@ namespace PointMatcher_ros
 			uint8_t *fPtr(&rosCloud.data[pt * offset]);
 			memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.features(0, pt)), scalarSize * featureDim);
 			fPtr += scalarSize * featureDim;
+			if (addZ)
+			{
+				memset(fPtr, 0, scalarSize);
+				fPtr += scalarSize;
+			}
 			memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(0, pt)), scalarSize * descriptorDim);
 		}
 

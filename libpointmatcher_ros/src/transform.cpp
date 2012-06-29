@@ -13,15 +13,8 @@ namespace PointMatcher_ros
 		typedef typename PointMatcher<T>::TransformationParameters TransformationParameters;
 		
 		tf::StampedTransform stampedTr;
-		try
-		{
-			listener.lookupTransform(target, source, stamp, stampedTr);
-		}
-		catch(tf::TransformException ex)
-		{
-			ROS_ERROR("%s",ex.what());
-			return TransformationParameters::Identity(4,4);
-		}
+		listener.waitForTransform(target, source, stamp, ros::Duration(1));
+		listener.lookupTransform(target, source, stamp, stampedTr);
 		
 		Eigen::Affine3d eigenTr;
 		tf::TransformTFToEigen(stampedTr, eigenTr);
