@@ -1,3 +1,4 @@
 - MaxDensityDataPointsFilter
-- RandomSamplingDataPointsFilter:
+- MaxPointCountDataPointsFilter:
+    maxCount: 600000
     prob: 0.5
