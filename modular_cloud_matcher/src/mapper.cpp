@@ -42,7 +42,9 @@ class Mapper
 
 	// Parameters
 	int minReadingPointCount;
+	int minMapPointCount;
 	double minOverlap;
+	double maxOverlapToMerge;
 	double tfPublishPeriod;
 	string odomFrame;
 	string mapFrame;
@@ -74,7 +76,9 @@ Mapper::Mapper(ros::NodeHandle& n):
 	n(n),
 	transformation(PM::get().REG(Transformation).create("RigidTransformation")),
 	minReadingPointCount(getParam<int>("minReadingPointCount", 2000)),
+	minMapPointCount(getParam<int>("minMapPointCount", 500)),
 	minOverlap(getParam<double>("minOverlap", 0.5)),
+	maxOverlapToMerge(getParam<double>("maxOverlapToMerge", 0.9)),
 	tfPublishPeriod(getParam<double>("tfPublishPeriod", 0.1)),
 	odomFrame(getParam<string>("odom_frame", "odom")),
 	mapFrame(getParam<string>("map_frame", "map")),
@@ -219,7 +223,7 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 		return;
 	}
 	
-	PM::TransformationParameters Tinit(PM::TransformationParameters::Identity(dimp1,dimp1));
+	PM::TransformationParameters Tinit(PointMatcher_ros::eigenMatrixToDim<float>(Ticp, dimp1));
 	if (tfListener.canTransform(odomFrame,mapFrame,stamp))
 	{
 		Tinit = PointMatcher_ros::eigenMatrixToDim<float>(
@@ -230,6 +234,8 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 			stamp
 		), dimp1);
 	}
+	else
+		ROS_WARN("Cannot lookup Tinit, using last Ticp");
 	ROS_INFO_STREAM("Tinit:\n" << Tinit);
 	
 	// Ensure a minimum amount of point after filtering
@@ -245,52 +251,65 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 	{
 		mapPointCloud = newPointCloud;
 		//cerr << "map point cloud:\n" << mapPointCloud.features.leftCols(10) << endl;
-		mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(mapPointCloud, mapFrame, stamp));
+		if (mapPub.getNumSubscribers())
+			mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(mapPointCloud, mapFrame, stamp));
 		return;
 	}
 	
 	// Apply ICP
 	try 
 	{
+		// TODO: have a way to pass store matcher's kdtree accross calls, prevent call of matcher::init()
 		PM::TransformationParameters T = icp(newPointCloud, mapPointCloud, Tinit);
 		//T = PM::TransformationParameters::Identity(newPointCloud.features.rows(), newPointCloud.features.rows());
 		ROS_INFO_STREAM("Ticp:\n" << T);
+
+		//transformation->compute(mapPointCloud, T.inverse());
+		
+		// Ensure minimum overlap between scans
+		const double estimatedOverlap = icp.errorMinimizer->getOverlap();
+		ROS_INFO_STREAM("Overlap: " << estimatedOverlap);
+		if (estimatedOverlap < minOverlap)
+		{
+			publishLock.lock();
+			Ticp = Tinit;
+			publishLock.unlock();
+			ROS_ERROR_STREAM("Estimated overlap too small, move back!");
+			return;
+		}
 		
 		publishLock.lock();
 		Ticp = T;
 		publishLock.unlock();
 		
-		//transformation->compute(mapPointCloud, T.inverse());
-		
-		// Ensure minimum overlap between scans
-		const double estimatedOverlap = icp.errorMinimizer->getOverlap();
-		if (estimatedOverlap < minOverlap)
-		{
-			ROS_ERROR_STREAM("Estimated overlap too small (" << estimatedOverlap << "), move back");
-			return;
-		}
-		
 		// Publish odometry message
 		//odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(T, mapFrame, stamp));
 		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T, mapFrame, odomFrame, stamp));
-		ROS_INFO_STREAM("Adding new points to the map with " << estimatedOverlap << " overlap");
+		
+		// check if news points should be added to the map
+		if ((estimatedOverlap < maxOverlapToMerge) || (mapPointCloud.features.cols() < minMapPointCount))
+		{
+			ROS_INFO("Adding new points to the map");
+			
+			// Merge point clouds to map
+			newPointCloud = transformation->compute(newPointCloud, Ticp); 
+			mapPointCloud.concatenate(newPointCloud);
+
+			// Map maintenance
+			mapFilters.apply(mapPointCloud);
+			
+			// Publish map point cloud
+			if (mapPub.getNumSubscribers())
+				mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(mapPointCloud, mapFrame, stamp));
+		}
 	}
 	catch (PM::ConvergenceError error)
 	{
 		ROS_ERROR_STREAM("ICP failed to converge: " << error.what());
 		return;
 	}
-
-	// Merge point clouds to map
-	newPointCloud = transformation->compute(newPointCloud, Ticp); 
-	mapPointCloud.concatenate(newPointCloud);
-
-	// Map maintenance
-	mapFilters.apply(mapPointCloud);
+	
 	ROS_INFO_STREAM("Mapping total time (ICP+maintenance): " << t.elapsed() << " sec");
-
-	// Publish map point cloud
-	mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(mapPointCloud, mapFrame, stamp));
 
 	if(!vtkGlobalMapPrefix.empty())
 	{
