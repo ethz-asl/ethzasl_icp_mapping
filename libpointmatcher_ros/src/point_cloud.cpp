@@ -276,6 +276,7 @@ namespace PointMatcher_ros
 			offset += scalarSize;
 			addZ = true;
 		}
+		const bool isDescriptior(!pmCloud.descriptorLabels.empty());
 		for(auto it(pmCloud.descriptorLabels.begin()); it != pmCloud.descriptorLabels.end(); ++it)
 		{
 			PF pointField;
@@ -313,7 +314,10 @@ namespace PointMatcher_ros
 				memset(fPtr, 0, scalarSize);
 				fPtr += scalarSize;
 			}
-			memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(0, pt)), scalarSize * descriptorDim);
+			if (isDescriptior)
+			{
+				memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(0, pt)), scalarSize * descriptorDim);
+			}
 		}
 
 		// fill remaining information

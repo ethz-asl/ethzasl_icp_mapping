@@ -72,4 +72,8 @@ rosbuild_add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
 rosbuild_link_boost(pointCloudToVtk filesystem system)
 target_link_libraries(pointCloudToVtk ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
 
+rosbuild_add_executable(vtkToPointCloud src/vtkToPointCloud.cpp)
+rosbuild_link_boost(vtkToPointCloud filesystem system)
+target_link_libraries(vtkToPointCloud ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
+
 
