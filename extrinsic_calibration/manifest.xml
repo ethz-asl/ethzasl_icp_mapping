@@ -12,7 +12,7 @@
   <depend package="rospy"/> 
   <depend package="roscpp"/>
   <depend package="tf"/> 
-  <depend package="eigen"/> 
+  <rosdep name="eigen"/> 
 
 </package>
 
