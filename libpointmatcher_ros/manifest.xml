@@ -16,7 +16,7 @@
   <depend package="eigen_conversions"/>
   <depend package="libpointmatcher"/>
   <depend package="libnabo"/>
-  <rosdep name="Eigen"/>
+  <rosdep name="eigen"/>
   <export>
     <cpp cflags="-I${prefix}/include" lflags="-L${prefix}/lib -Wl,-rpath,${prefix}/lib -lpointmatcher_ros" />
   </export>

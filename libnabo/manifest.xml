@@ -8,6 +8,7 @@
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/libnabo</url>
+  <rosdep name="doxygen"/>
   <rosdep name="boost"/>
   <rosdep name="eigen"/>
   <export>
