@@ -1,0 +1,12 @@
+1- remove kinect_exp_logger
+2- remove cloud_matcher_experiments.py
+3- update cloud_matcher_control.py
+4- add services for reset/save/load
+5- remove point_cloud.py
+6- renamed and clean-up republishBag.py
+7- remove yaml2txt.py
+8- clean-up launches by applications
+9- strip keyframe creation logic out of ICPSequence, do not recreat map kdtree in mapper, so use ICPSequence there
+10- once 9 done, remove modular_cloud_matcher, modular_cloud_matcher_batch
+11- move modular_cloud_matcher_bag to experimental package, cleanup
+12- move point-cloud/vtk to tools/utils package
