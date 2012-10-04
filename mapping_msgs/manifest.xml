@@ -1,0 +1,15 @@
+<package>
+  <description brief="mapping_msgs">
+
+     This package defines messages commonly used in mapping packages.
+
+  </description>
+  <author>Stéphane Magnenat</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/mapping_msgs</url>
+  <depend package="sensor_msgs"/>  
+
+</package>
+
+
