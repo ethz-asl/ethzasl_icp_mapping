@@ -21,7 +21,10 @@
 #include "tf/transform_listener.h"
 #include "tf/transform_broadcaster.h"
 
+#include "std_msgs/String.h"
+#include "std_srvs/Empty.h"
 #include "mapping_msgs/GetPointMap.h"
+#include "mapping_msgs/SaveMap.h"
 
 using namespace std;
 using namespace PointMatcherSupport;
@@ -29,12 +32,15 @@ using namespace PointMatcherSupport;
 class Mapper
 {
 	ros::NodeHandle& n;
+	ros::NodeHandle& pn;
 	
 	ros::Subscriber scanSub;
 	ros::Subscriber cloudSub;
 	ros::Publisher mapPub;
 	ros::Publisher odomPub;
 	ros::ServiceServer getPointMapSrv;
+	ros::ServiceServer saveMapSrv;
+	ros::ServiceServer resetSrv;
 
 	PM::DataPointsFilters inputFilters;
 	PM::DataPointsFilters mapFilters;
@@ -62,7 +68,7 @@ class Mapper
 	tf::TransformBroadcaster tfBroadcaster;
 	
 public:
-	Mapper(ros::NodeHandle& n);
+	Mapper(ros::NodeHandle& n, ros::NodeHandle& pn);
 	~Mapper();
 	
 protected:
@@ -75,10 +81,13 @@ protected:
 	void publishTransform();
 	
 	bool getPointMap(mapping_msgs::GetPointMap::Request &req, mapping_msgs::GetPointMap::Response &res);
+	bool saveMap(mapping_msgs::SaveMap::Request &req, mapping_msgs::SaveMap::Response &res);
+	bool reset(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 };
 
-Mapper::Mapper(ros::NodeHandle& n):
+Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	n(n),
+	pn(pn),
 	transformation(PM::get().REG(Transformation).create("RigidTransformation")),
 	minReadingPointCount(getParam<int>("minReadingPointCount", 2000)),
 	minMapPointCount(getParam<int>("minMapPointCount", 500)),
@@ -95,28 +104,6 @@ Mapper::Mapper(ros::NodeHandle& n):
 	// set logger
 	if (getParam<bool>("useROSLogger", false))
 		PointMatcherSupport::setLogger(new PointMatcherSupport::ROSLogger);
-	
-	// topics initialization
-	if (hasParam("scanTopic"))
-	{
-		scanSub = n.subscribe(
-			getParam<string>("scanTopic", "/laser_scan"), 2, &Mapper::gotScan, this
-		);
-	}
-	if (hasParam("cloudTopic"))
-	{
-		cloudSub = n.subscribe(
-			getParam<string>("cloudTopic", "/point_cloud"), 2, &Mapper::gotCloud, this
-		);
-	}
-	mapPub = n.advertise<sensor_msgs::PointCloud2>(
-		getParam<string>("pointMapTopic", "/point_map"), 1
-	);
-	odomPub = n.advertise<nav_msgs::Odometry>(
-		getParam<string>("odomTopic", "/icp_odom"), 50
-	);
-	getPointMapSrv = n.advertiseService("dynamic_point_map", &Mapper::getPointMap, this);
-		
 
 	// load configs
 	string configFileName;
@@ -159,7 +146,17 @@ Mapper::Mapper(ros::NodeHandle& n):
 			ROS_ERROR_STREAM("Cannot load map filters config from YAML file " << configFileName);
 		}
 	}
+	
+	// topics and services initialization
+	scanSub = n.subscribe("scan", 2, &Mapper::gotScan, this);
+	cloudSub = n.subscribe("point_cloud", 2, &Mapper::gotCloud, this);
+	mapPub = n.advertise<sensor_msgs::PointCloud2>("point_map", 2);
+	odomPub = n.advertise<nav_msgs::Odometry>("icp_odom", 50);
+	getPointMapSrv = n.advertiseService("dynamic_point_map", &Mapper::getPointMap, this);
+	saveMapSrv = pn.advertiseService("save_map", &Mapper::saveMap, this);
+	resetSrv = pn.advertiseService("reset", &Mapper::reset, this);
 
+	// initial transform
 	publishTransform();
 	publishThread = new boost::thread(boost::bind(&Mapper::publishLoop, this, tfPublishPeriod));
 }
@@ -298,7 +295,8 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 		publishLock.unlock();
 		
 		// Publish odometry message
-		//odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(T, mapFrame, stamp));
+		if (odomPub.getNumSubscribers())
+			odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(T, mapFrame, stamp));
 		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T, mapFrame, odomFrame, stamp));
 		
 		// check if news points should be added to the map
@@ -361,12 +359,35 @@ bool Mapper::getPointMap(mapping_msgs::GetPointMap::Request &req, mapping_msgs::
 	return true;
 }
 
+bool Mapper::saveMap(mapping_msgs::SaveMap::Request &req, mapping_msgs::SaveMap::Response &res)
+{
+	try
+	{
+		PM::saveAnyFormat(mapPointCloud, req.filename.data);
+	}
+	catch (const std::runtime_error& e)
+	{
+		return false;
+	}
+	
+	return true;
+}
+
+bool Mapper::reset(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+{
+	// note: no need for locking as we do ros::spin(), to update if we go for multi-threading
+	Ticp = PM::TransformationParameters::Identity(4,4);
+	mapPointCloud = DP();
+	return true;
+}
+
 // Main function supporting the Mapper class
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "mapper");
 	ros::NodeHandle n;
-	Mapper mapper(n);
+	ros::NodeHandle pn("~");
+	Mapper mapper(n, pn);
 	ros::spin();
 	
 	return 0;
