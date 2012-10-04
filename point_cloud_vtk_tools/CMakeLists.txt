@@ -11,9 +11,6 @@ set(ROS_BUILD_TYPE RelWithDebInfo)
 
 rosbuild_init()
 
-rosbuild_genmsg()
-rosbuild_gensrv()
-
 # c++ 0x
 #if("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang") 
 #	set(CMAKE_COMPILER_IS_CLANGXX)
@@ -54,16 +51,13 @@ if (yaml-cpp_INCLUDE_DIRS AND yaml-cpp_LIBRARIES)
 endif (yaml-cpp_INCLUDE_DIRS AND yaml-cpp_LIBRARIES)
 
 rosbuild_add_boost_directories()
-rosbuild_add_executable(cloud_matcher_node src/modular_cloud_matcher.cpp)
-rosbuild_add_executable(cloud_matcher_service src/modular_cloud_matcher_service.cpp)
-#rosbuild_add_executable(cloud_matcher_batch src/modular_cloud_matcher_batch.cpp)
-#rosbuild_add_executable(cloud_matcher_bag src/modular_cloud_matcher_bag.cpp)
 
-target_link_libraries(cloud_matcher_node ${EXTRA_LIBS} pointmatcher nabo rt)
-target_link_libraries(cloud_matcher_service ${EXTRA_LIBS} pointmatcher nabo rt)
-#target_link_libraries(cloud_matcher_batch ${EXTRA_LIBS} pointmatcher nabo rt)
-#target_link_libraries(cloud_matcher_bag  ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
+rosbuild_add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
+rosbuild_link_boost(pointCloudToVtk filesystem system)
+target_link_libraries(pointCloudToVtk ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
 
-rosbuild_add_executable(mapper src/mapper.cpp)
-rosbuild_link_boost(mapper filesystem system)
-target_link_libraries(mapper ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
+rosbuild_add_executable(vtkToPointCloud src/vtkToPointCloud.cpp)
+rosbuild_link_boost(vtkToPointCloud filesystem system)
+target_link_libraries(vtkToPointCloud ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
+
+

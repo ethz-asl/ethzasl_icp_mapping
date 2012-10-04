@@ -4,11 +4,11 @@
 #include "ros/console.h"
 
 #include "pointmatcher/PointMatcher.h"
-#include "pointmatcher_ros/point_cloud.h"
 
-#include "aliases.h"
-#include "get_params_from_server.h"
-#include "ros_logger.h"
+#include "pointmatcher_ros/point_cloud.h"
+#include "pointmatcher_ros/get_params_from_server.h"
+#include "pointmatcher_ros/aliases.h"
+#include "pointmatcher_ros/ros_logger.h"
 
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "nav_msgs/Path.h"

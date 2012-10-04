@@ -1,17 +1,18 @@
 #include <fstream>
 
 #include "ros/ros.h"
+
 #include "pointmatcher/PointMatcher.h"
+
 #include "pointmatcher_ros/point_cloud.h"
 #include "pointmatcher_ros/transform.h"
-
-#include "tf/tf.h"
-
-#include "aliases.h"
-#include "get_params_from_server.h"
-#include "ros_logger.h"
+#include "pointmatcher_ros/get_params_from_server.h"
+#include "pointmatcher_ros/aliases.h"
+#include "pointmatcher_ros/ros_logger.h"
 
 #include "modular_cloud_matcher/MatchClouds.h"
+
+#include "tf/tf.h"
 
 using namespace std;
 
