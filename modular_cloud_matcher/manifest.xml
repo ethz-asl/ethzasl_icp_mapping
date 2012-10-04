@@ -18,6 +18,7 @@
   <depend package="tf"/>
   <depend package="tf2"/>
   <depend package="tf_conversions"/>
+  <depend package="mapping_msgs"/>
   <depend package="libnabo"/>
   <depend package="libpointmatcher"/>
   <depend package="libpointmatcher_ros"/>

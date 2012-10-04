@@ -21,6 +21,7 @@
 #include "tf/transform_listener.h"
 #include "tf/transform_broadcaster.h"
 
+#include "mapping_msgs/GetPointMap.h"
 
 using namespace std;
 using namespace PointMatcherSupport;
@@ -33,11 +34,13 @@ class Mapper
 	ros::Subscriber cloudSub;
 	ros::Publisher mapPub;
 	ros::Publisher odomPub;
+	ros::ServiceServer getPointMapSrv;
 
 	PM::DataPointsFilters inputFilters;
 	PM::DataPointsFilters mapFilters;
 	shared_ptr<PM::Transformation> transformation;
 	PM::DataPoints mapPointCloud;
+	sensor_msgs::PointCloud2 mapMsg;
 	PM::ICP icp;
 
 	// Parameters
@@ -70,6 +73,8 @@ protected:
 	void globalMapMaintenance();
 	void publishLoop(double publishPeriod);
 	void publishTransform();
+	
+	bool getPointMap(mapping_msgs::GetPointMap::Request &req, mapping_msgs::GetPointMap::Response &res);
 };
 
 Mapper::Mapper(ros::NodeHandle& n):
@@ -110,6 +115,8 @@ Mapper::Mapper(ros::NodeHandle& n):
 	odomPub = n.advertise<nav_msgs::Odometry>(
 		getParam<string>("odomTopic", "/icp_odom"), 50
 	);
+	getPointMapSrv = n.advertiseService("dynamic_point_map", &Mapper::getPointMap, this);
+		
 
 	// load configs
 	string configFileName;
@@ -251,8 +258,9 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 	{
 		mapPointCloud = newPointCloud;
 		//cerr << "map point cloud:\n" << mapPointCloud.features.leftCols(10) << endl;
+		mapMsg = PointMatcher_ros::pointMatcherCloudToRosMsg<float>(mapPointCloud, mapFrame, stamp);
 		if (mapPub.getNumSubscribers())
-			mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(mapPointCloud, mapFrame, stamp));
+			mapPub.publish(mapMsg);
 		return;
 	}
 	
@@ -299,8 +307,9 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 			mapFilters.apply(mapPointCloud);
 			
 			// Publish map point cloud
+			mapMsg = PointMatcher_ros::pointMatcherCloudToRosMsg<float>(mapPointCloud, mapFrame, stamp);
 			if (mapPub.getNumSubscribers())
-				mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(mapPointCloud, mapFrame, stamp));
+				mapPub.publish(mapMsg);
 		}
 	}
 	catch (PM::ConvergenceError error)
@@ -338,6 +347,12 @@ void Mapper::publishTransform()
 	publishLock.unlock();
 }
 
+bool Mapper::getPointMap(mapping_msgs::GetPointMap::Request &req, mapping_msgs::GetPointMap::Response &res)
+{
+	// note: no need for locking as we do ros::spin(), to update if we go for multi-threading
+	res.map = mapMsg;
+	return true;
+}
 
 // Main function supporting the Mapper class
 int main(int argc, char **argv)
