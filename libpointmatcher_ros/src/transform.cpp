@@ -75,9 +75,9 @@ namespace PointMatcher_ros
 	template
 	nav_msgs::Odometry eigenMatrixToOdomMsg<double>(const typename PointMatcher<double>::TransformationParameters& inTr, const std::string& frame_id, const ros::Time& stamp);
 	
-
+	
 	template<typename T>
-	tf::StampedTransform eigenMatrixToStampedTransform(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp)
+	tf::Transform eigenMatrixToTransform(const typename PointMatcher<T>::TransformationParameters& inTr)
 	{
 		tf::Transform tfTr;
 		const Eigen::Affine3d eigenTr(
@@ -88,13 +88,26 @@ namespace PointMatcher_ros
 			)
 		);
 		tf::TransformEigenToTF(eigenTr, tfTr);
-		return tf::StampedTransform(tfTr, stamp, target, source);
+		return tfTr;
+	}
+	
+	template
+	tf::Transform eigenMatrixToTransform<float>(const typename PointMatcher<float>::TransformationParameters& inTr);
+	template
+	tf::Transform eigenMatrixToTransform<double>(const typename PointMatcher<double>::TransformationParameters& inTr);
+	
+	
+	template<typename T>
+	tf::StampedTransform eigenMatrixToStampedTransform(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp)
+	{
+		return tf::StampedTransform(eigenMatrixToTransform<T>(inTr), stamp, target, source);
 	}
 	
 	template
 	tf::StampedTransform eigenMatrixToStampedTransform<float>(const typename PointMatcher<float>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp);
 	template
 	tf::StampedTransform eigenMatrixToStampedTransform<double>(const typename PointMatcher<double>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp);
+	
 	
 	template<typename T>
 	typename PointMatcher<T>::TransformationParameters eigenMatrixToDim(const typename PointMatcher<T>::TransformationParameters& matrix, int dimp1)

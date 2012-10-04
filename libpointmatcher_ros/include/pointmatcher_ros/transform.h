@@ -11,6 +11,7 @@ namespace ros
 };
 namespace tf
 {
+	struct Transform;
 	struct TransformListener;
 	struct StampedTransform;
 };
@@ -29,6 +30,9 @@ namespace PointMatcher_ros
 	
 	template<typename T>
 	nav_msgs::Odometry eigenMatrixToOdomMsg(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& frame_id, const ros::Time& stamp);
+	
+	template<typename T>
+	tf::Transform eigenMatrixToTransform(const typename PointMatcher<T>::TransformationParameters& inTr);
 	
 	template<typename T>
 	tf::StampedTransform eigenMatrixToStampedTransform(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp);

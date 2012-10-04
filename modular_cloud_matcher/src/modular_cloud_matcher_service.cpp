@@ -3,6 +3,9 @@
 #include "ros/ros.h"
 #include "pointmatcher/PointMatcher.h"
 #include "pointmatcher_ros/point_cloud.h"
+#include "pointmatcher_ros/transform.h"
+
+#include "tf/tf.h"
 
 #include "aliases.h"
 #include "get_params_from_server.h"
@@ -27,7 +30,7 @@ public:
 
 CloudMatcher::CloudMatcher(ros::NodeHandle& n):
 	n(n),
-	service(n.advertiseService(getParam<string>("serviceName","matchClouds"), &CloudMatcher::match, this))
+	service(n.advertiseService("match_clouds", &CloudMatcher::match, this))
 {
 	// load config
 	string configFileName;
@@ -89,11 +92,18 @@ bool CloudMatcher::match(modular_cloud_matcher::MatchClouds::Request& req, modul
 		ROS_WARN_STREAM("Partial reference cloud! Missing " << 100 - readingGoodRatio*100.0 << "% of the cloud (received " << readingGoodCount << ")");
 	}
 	
-	// call icp
-	TP transform;
+	// check dimensions
+	if (referenceCloud.features.rows() != readingCloud.features.rows())
+	{
+		ROS_ERROR_STREAM("Dimensionality missmatch: reference cloud is " << referenceCloud.features.rows()-1 << " while reading cloud is " << readingCloud.features.rows()-1);
+		return false;
+	}
+	
+	// call ICP
 	try 
 	{
-		transform = icp(readingCloud, referenceCloud);
+		const PM::TransformationParameters transform(icp(readingCloud, referenceCloud));
+		tf::transformTFToMsg(PointMatcher_ros::eigenMatrixToTransform<Scalar>(transform), res.transform);
 		ROS_INFO_STREAM("match ratio: " << icp.errorMinimizer->getWeightedPointUsedRatio() << endl);
 	}
 	catch (PM::ConvergenceError error)
@@ -101,16 +111,6 @@ bool CloudMatcher::match(modular_cloud_matcher::MatchClouds::Request& req, modul
 		ROS_ERROR_STREAM("ICP failed to converge: " << error.what());
 		return false;
 	}
-	
-	// fill return value
-	res.transform.translation.x = transform.coeff(0,3);
-	res.transform.translation.y = transform.coeff(1,3);
-	res.transform.translation.z = transform.coeff(2,3);
-	const Eigen::Quaternion<Scalar> quat(Matrix3(transform.block(0,0,3,3)));
-	res.transform.rotation.x = quat.x();
-	res.transform.rotation.y = quat.y();
-	res.transform.rotation.z = quat.z();
-	res.transform.rotation.w = quat.w();
 	
 	return true;
 }

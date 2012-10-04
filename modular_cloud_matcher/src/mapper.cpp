@@ -149,7 +149,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	
 	// topics and services initialization
 	scanSub = n.subscribe("scan", 2, &Mapper::gotScan, this);
-	cloudSub = n.subscribe("point_cloud", 2, &Mapper::gotCloud, this);
+	cloudSub = n.subscribe("cloud_in", 2, &Mapper::gotCloud, this);
 	mapPub = n.advertise<sensor_msgs::PointCloud2>("point_map", 2);
 	odomPub = n.advertise<nav_msgs::Odometry>("icp_odom", 50);
 	getPointMapSrv = n.advertiseService("dynamic_point_map", &Mapper::getPointMap, this);

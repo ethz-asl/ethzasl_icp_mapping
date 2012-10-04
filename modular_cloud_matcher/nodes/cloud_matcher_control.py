@@ -1,15 +1,18 @@
 #!/usr/bin/env python
+
+# This utility allows to test /cloud_matcher_service with two CSV files.
+# This python only works with 3D files, while /cloud_matcher_service
+# supports both 2D and 3D
+
 import sys
 import re
 import roslib; roslib.load_manifest('modular_cloud_matcher')
 import rospy
 import point_cloud
-from roslib.msg import *
-from std_msgs.msg import String
+from std_msgs.msg import String, Header
 from sensor_msgs.msg import PointCloud
 from geometry_msgs.msg import *
 from modular_cloud_matcher.srv import *
-
 
 def createCloud(fileName):
 	points = []
@@ -19,10 +22,10 @@ def createCloud(fileName):
 		while len(coord) < 3:
 			coord.append(0)
 		points.append(coord)
-	return point_cloud.create_cloud_xyz32(roslib.msg.Header(),points)
+	return point_cloud.create_cloud_xyz32(Header(),points)
 
 def icpcontrol(referenceFileName, readingsFileName):
-	serviceName = '/matchClouds'
+	serviceName = '/match_clouds'
 	rospy.init_node('cloud_matcher_control')
 	rospy.wait_for_service(serviceName)
 	# read reference

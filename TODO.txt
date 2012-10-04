@@ -1,7 +1,4 @@
-1- remove kinect_exp_logger
-2- remove cloud_matcher_experiments.py
-3- update cloud_matcher_control.py
-4- add services for reset/save/load
+4- add services for load (do we need it?)
 5- remove point_cloud.py
 6- renamed and clean-up republishBag.py
 7- remove yaml2txt.py
