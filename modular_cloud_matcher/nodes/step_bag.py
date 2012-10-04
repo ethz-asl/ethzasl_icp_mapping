@@ -42,9 +42,9 @@ for topic, msg, t in bag.read_messages(topics=[topicName, "/tf"]):
 	else:
 
 		if str(i) in blackList:
-			print "Scan " + str(i) + " is black listed. Not using it\n"
+			print "Scan " + str(i) + " is black-listed. Skipping it\n"
 
-		elif(i >= jumpScan):
+		elif (i >= jumpScan):
 			print "----------------\nPoint cloud " + str(i)
 			pointCloud = msg
 			pub.publish(pointCloud)
