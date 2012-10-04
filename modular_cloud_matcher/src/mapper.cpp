@@ -264,6 +264,13 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 		return;
 	}
 	
+	// check dimension
+	if (newPointCloud.features.rows() != mapPointCloud.features.rows())
+	{
+		ROS_ERROR_STREAM("Dimensionality missmatch: incoming cloud is " << newPointCloud.features.rows()-1 << " while map is " << mapPointCloud.features.rows()-1);
+		return;
+	}
+	
 	// Apply ICP
 	try 
 	{
