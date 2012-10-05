@@ -37,7 +37,6 @@ class Mapper
 	ros::Publisher mapPub;
 	ros::Publisher odomPub;
 	ros::ServiceServer getPointMapSrv;
-	ros::ServiceServer republishMapSrv;
 	ros::ServiceServer saveMapSrv;
 	ros::ServiceServer resetSrv;
 
@@ -80,7 +79,6 @@ protected:
 	void publishTransform();
 	
 	bool getPointMap(mapping_msgs::GetPointMap::Request &req, mapping_msgs::GetPointMap::Response &res);
-	bool republishMap(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 	bool saveMap(mapping_msgs::SaveMap::Request &req, mapping_msgs::SaveMap::Response &res);
 	bool reset(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 };
@@ -150,10 +148,9 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	// topics and services initialization
 	scanSub = n.subscribe("scan", 2, &Mapper::gotScan, this);
 	cloudSub = n.subscribe("cloud_in", 2, &Mapper::gotCloud, this);
-	mapPub = n.advertise<sensor_msgs::PointCloud2>("point_map", 2);
-	odomPub = n.advertise<nav_msgs::Odometry>("icp_odom", 50);
+	mapPub = n.advertise<sensor_msgs::PointCloud2>("point_map", 2, true);
+	odomPub = n.advertise<nav_msgs::Odometry>("icp_odom", 50, true);
 	getPointMapSrv = n.advertiseService("dynamic_point_map", &Mapper::getPointMap, this);
-	republishMapSrv = pn.advertiseService("republish_map", &Mapper::republishMap, this);
 	saveMapSrv = pn.advertiseService("save_map", &Mapper::saveMap, this);
 	resetSrv = pn.advertiseService("reset", &Mapper::reset, this);
 
@@ -371,13 +368,6 @@ bool Mapper::saveMap(mapping_msgs::SaveMap::Request &req, mapping_msgs::SaveMap:
 		return false;
 	}
 	
-	return true;
-}
-
-bool Mapper::republishMap(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
-{
-	if (mapPub.getNumSubscribers())
-		mapPub.publish(mapMsg);
 	return true;
 }
 
