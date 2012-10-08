@@ -1,12 +1,13 @@
 <launch>
 	<node name="mapper" type="mapper" pkg="modular_cloud_matcher" output="screen" >
+		<remap from="cloud_in" to="/dynamic_point_cloud" />
+		<param name="subscribe_scan" value="false"/>
 		<param name="icpConfig" value="$(find modular_cloud_matcher)/launch/nifti_mapper_icp.yaml" />
 		<param name="inputFiltersConfig" value="$(find modular_cloud_matcher)/launch/nifti_mapper_input_filters.yaml" />
 		<param name="mapFiltersConfig" value="$(find modular_cloud_matcher)/launch/nifti_mapper_map_filters.yaml" />
 		<param name="odom_frame" value="/odom" />
 		<param name="map_frame" value="/map" />
-		<param name="cloudTopic" value="/dynamic_point_cloud" />
 		<param name="useROSLogger" value="true" />
-		<param name="minMapPointCount" value="600000" /> <!-- quick fix to have map published each time />
+		<param name="minMapPointCount" value="600000" /> <!-- quick fix to have map published each time -->
 	</node>
 </launch>
