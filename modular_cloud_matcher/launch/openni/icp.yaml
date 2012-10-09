@@ -1,21 +1,6 @@
-ratioToSwitchKeyframe: 0.80
-
-transformations:
-  - TransformFeatures
-
 readingDataPointsFilters:
-  - MaxDistDataPointsFilter:
-      maxDist: 7.0
-      dim: 2
   - RandomSamplingDataPointsFilter:
       prob: 0.20
-
-keyframeDataPointsFilters:
-  - MaxDistDataPointsFilter:
-      maxDist: 7.0
-      dim: 2
-  - SamplingSurfaceNormalDataPointsFilter:
-      k: 17
 
 matcher:
   KDTreeMatcher:

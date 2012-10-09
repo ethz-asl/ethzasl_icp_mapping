@@ -41,7 +41,8 @@ class Mapper
 	ros::ServiceServer resetSrv;
 
 	PM::DataPointsFilters inputFilters;
-	PM::DataPointsFilters mapFilters;
+	PM::DataPointsFilters mapPreFilters;
+	PM::DataPointsFilters mapPostFilters;
 	shared_ptr<PM::Transformation> transformation;
 	PM::DataPoints mapPointCloud;
 	PM::ICPSequence icp;
@@ -131,16 +132,28 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 			ROS_ERROR_STREAM("Cannot load input filters config from YAML file " << configFileName);
 		}
 	}
-	if (ros::param::get("~mapFiltersConfig", configFileName))
+	if (ros::param::get("~mapPreFiltersConfig", configFileName))
 	{
 		ifstream ifs(configFileName.c_str());
 		if (ifs.good())
 		{
-			mapFilters = PM::DataPointsFilters(ifs);
+			mapPreFilters = PM::DataPointsFilters(ifs);
 		}
 		else
 		{
-			ROS_ERROR_STREAM("Cannot load map filters config from YAML file " << configFileName);
+			ROS_ERROR_STREAM("Cannot load map pre-filters config from YAML file " << configFileName);
+		}
+	}
+	if (ros::param::get("~mapPostFiltersConfig", configFileName))
+	{
+		ifstream ifs(configFileName.c_str());
+		if (ifs.good())
+		{
+			mapPostFilters = PM::DataPointsFilters(ifs);
+		}
+		else
+		{
+			ROS_ERROR_STREAM("Cannot load map post-filters config from YAML file " << configFileName);
 		}
 	}
 	
@@ -195,14 +208,17 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 		ROS_ERROR("I found no good points in the cloud");
 		return;
 	}
-	else
-	{
-		ROS_INFO("Processing new point cloud");
-	}
 	
-	// Apply filters to incoming cloud, in scanner coordinates
-	inputFilters.apply(newPointCloud);
 	const int dimp1(newPointCloud.features.rows());
+	ROS_INFO("Processing new point cloud");
+	{
+		timer t; // Print how long take the algo
+		
+		// Apply filters to incoming cloud, in scanner coordinates
+		inputFilters.apply(newPointCloud);
+		
+		ROS_INFO_STREAM("Input filters took " << t.elapsed() << " [s]");
+	}
 	
 	// Fetch initial guess and transform cloud with it
 	if (!tfListener.canTransform(mapFrame,scannerFrame,stamp))
@@ -220,7 +236,7 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 			), dimp1
 		)
 	);
-	ROS_INFO_STREAM("TscannerToMap:\n" << TscannerToMap);
+	ROS_INFO_STREAM("TscannerToMap (" << scannerFrame << " to " << mapFrame << "):\n" << TscannerToMap);
 	newPointCloud = transformation->compute(newPointCloud, TscannerToMap);
 	
 	// Fetch transformation from scanner to odom
@@ -238,7 +254,7 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 			stamp
 		), dimp1)
 	);
-	ROS_INFO_STREAM("TOdomToScanner:\n" << TOdomToScanner);
+	ROS_INFO_STREAM("TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << TOdomToScanner);
 	
 	// Ensure a minimum amount of point after filtering
 	const int ptsCount = newPointCloud.features.cols();
@@ -252,10 +268,19 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
  	if(!icp.hasMap())
  	{
 		ROS_INFO_STREAM("ICP has no map, using cloud as initial map");
+		timer t; // Print how long take the algo
+		
+		// Preparation of cloud for inclusion in map
+		mapPreFilters.apply(newPointCloud);
+		
+		// Map maintenance
+		mapPostFilters.apply(newPointCloud);
 		
 		// Set map in ICP
 		icp.setMap(newPointCloud);
 		mapPointCloud = newPointCloud;
+		
+		ROS_INFO_STREAM("Creating map took " << t.elapsed() << " [s]");
 		
 		// Publish map
 		if (mapPub.getNumSubscribers())
@@ -304,19 +329,25 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 		if ((estimatedOverlap < maxOverlapToMerge) || (icp.getInternalMap().features.cols() < minMapPointCount))
 		{
 			ROS_INFO("Adding new points to the map");
+			timer t; // Print how long take the algo
 			
 			// Correct new points using ICP result
 			newPointCloud = transformation->compute(newPointCloud, Ticp); 
+			
+			// Preparation of cloud for inclusion in map
+			mapPreFilters.apply(newPointCloud);
 			
 			// Merge point clouds to map
 			newPointCloud.concatenate(mapPointCloud);
 
 			// Map maintenance
-			mapFilters.apply(newPointCloud);
+			mapPostFilters.apply(newPointCloud);
 			
 			// Set map in ICP
 			icp.setMap(newPointCloud);
 			mapPointCloud = newPointCloud;
+			
+			ROS_INFO_STREAM("Updating map took " << t.elapsed() << " [s]");
 			
 			// Publish map point cloud
 			if (mapPub.getNumSubscribers())

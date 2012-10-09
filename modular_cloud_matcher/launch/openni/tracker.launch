@@ -1,0 +1,17 @@
+<launch>
+  <node pkg="tf" type="static_transform_publisher" name="fake_odom_broadcaster" args="0 0 0 0 0 0 /odom /camera_link 20" />
+  <node name="mapper" type="mapper" pkg="modular_cloud_matcher" output="screen"> 
+	<remap from="cloud_in" to="/camera/depth_registered/points" />
+	<param name="subscribe_scan" value="false"/>
+	<param name="icpConfig" value="$(find modular_cloud_matcher)/launch/openni/icp.yaml" />
+	<param name="inputFiltersConfig" value="$(find modular_cloud_matcher)/launch/openni/input_filters.yaml" />
+	<param name="mapPreFiltersConfig" value="$(find modular_cloud_matcher)/launch/openni/map_pre_filters.yaml" />
+	<param name="mapPostFiltersConfig" value="$(find modular_cloud_matcher)/launch/openni/map_post_filters.yaml" />
+	<param name="odom_frame" value="/odom" />
+    <param name="map_frame" value="/world" />
+    <param name="maxOverlapToMerge" value="0.8" />
+    <param name="minMapPointCount" value="5000" />
+    <param name="useROSLogger" value="true" />
+    <param name="startupDropCount" value="5" />
+  </node>
+</launch>

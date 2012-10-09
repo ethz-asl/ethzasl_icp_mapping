@@ -1,0 +1,3 @@
+- MaxPointCountDataPointsFilter:
+    maxCount: 10000
+    prob: 0.5

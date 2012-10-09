@@ -1,0 +1,6 @@
+- RandomSamplingDataPointsFilter:
+      prob: 0.1
+- MaxDistDataPointsFilter:
+      maxDist: 7.0
+      dim: 2
+- ObservationDirectionDataPointsFilter
