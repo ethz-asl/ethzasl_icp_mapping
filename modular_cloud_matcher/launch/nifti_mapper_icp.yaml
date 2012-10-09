@@ -1,7 +1,4 @@
 readingDataPointsFilters:
-  - MaxDensityDataPointsFilter
-
-keyframeDataPointsFilters:
   - RandomSamplingDataPointsFilter:
       prob: 0.50
 

@@ -1,6 +1,5 @@
 4- add services for load (do we need it?)
-8- clean-up launches by applications
-9- strip keyframe creation logic out of ICPSequence, do not recreat map kdtree in mapper, so use ICPSequence there
+8- make Kinect work again
 10- once 9 done, remove modular_cloud_matcher, modular_cloud_matcher_batch
 11- move modular_cloud_matcher_bag to experimental package, cleanup
 
