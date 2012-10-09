@@ -1,3 +1,4 @@
 - SamplingSurfaceNormalDataPointsFilter:
-    k: 17
-- OrientNormalsDataPointsFilter
+    k: 13
+    keepNormals: 1
+    keepDensities: 1

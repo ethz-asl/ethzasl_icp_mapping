@@ -222,7 +222,7 @@ void Mapper::processCloud(DP& newPointCloud, const std::string& scannerFrame, co
 	
 	// Fetch initial guess and transform cloud with it
 	string reason;
-	if (!tfListener.canTransform(mapFrame,scannerFrame,stamp,&reason))
+	if (!tfListener.waitForTransform(mapFrame,scannerFrame,stamp,ros::Duration(0.1), ros::Duration(0.01), &reason))
 	{
 		ROS_ERROR_STREAM("Cannot lookup TscannerToMap (" << scannerFrame << " to " << mapFrame << "): " << reason);
 		return;

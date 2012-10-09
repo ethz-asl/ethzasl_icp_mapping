@@ -1,15 +1,15 @@
 readingDataPointsFilters:
   - RandomSamplingDataPointsFilter:
-      prob: 0.20
+      prob: 0.2
 
 matcher:
   KDTreeMatcher:
     maxDist: 0.1
-    epsilon: 0.0
+    epsilon: 2.
 
 featureOutlierFilters:
   - TrimmedDistOutlierFilter:
-      ratio: 0.85
+      ratio: 0.9
 
 errorMinimizer:
   PointToPlaneErrorMinimizer
@@ -20,7 +20,7 @@ transformationCheckers:
       minDiffTransErr: 0.01
       smoothLength: 4
   - CounterTransformationChecker:
-      maxIterationCount: 30
+      maxIterationCount: 40
   - BoundTransformationChecker:
       maxRotationNorm: 0.50
       maxTranslationNorm: 0.50
