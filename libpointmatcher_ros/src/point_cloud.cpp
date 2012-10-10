@@ -94,9 +94,9 @@ namespace PointMatcher_ros
 	}
 	
 	template
-	typename PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::PointCloud2& rosMsg);
+	PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::PointCloud2& rosMsg);
 	template
-	typename PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::PointCloud2& rosMsg);
+	PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::PointCloud2& rosMsg);
 	
 	
 	template<typename T>
@@ -220,9 +220,9 @@ namespace PointMatcher_ros
 	}
 	
 	template
-	typename PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame);
+	PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame);
 	template
-	typename PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame);
+	PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame);
 
 
 	template<typename T>
@@ -328,8 +328,8 @@ namespace PointMatcher_ros
 	}
 	
 	template
-	sensor_msgs::PointCloud2 pointMatcherCloudToRosMsg<float>(const typename PointMatcher<float>::DataPoints& pmCloud, const std::string& frame_id, const ros::Time& stamp);
+	sensor_msgs::PointCloud2 pointMatcherCloudToRosMsg<float>(const PointMatcher<float>::DataPoints& pmCloud, const std::string& frame_id, const ros::Time& stamp);
 	template
-	sensor_msgs::PointCloud2 pointMatcherCloudToRosMsg<double>(const typename PointMatcher<double>::DataPoints& pmCloud, const std::string& frame_id, const ros::Time& stamp);
+	sensor_msgs::PointCloud2 pointMatcherCloudToRosMsg<double>(const PointMatcher<double>::DataPoints& pmCloud, const std::string& frame_id, const ros::Time& stamp);
 
 } // PointMatcher_ros
