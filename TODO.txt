@@ -1,6 +1,4 @@
 4- add services for load (do we need it?)
-10- once 9 done, remove modular_cloud_matcher, modular_cloud_matcher_batch
-11- move modular_cloud_matcher_bag to experimental package, cleanup
 
 test release
 update doc on wiki

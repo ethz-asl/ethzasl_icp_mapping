@@ -1,0 +1,31 @@
+<package>
+  <description brief="modular_cloud_matcher_experiments">
+
+     Utilities to do experiments using 3D point cloud matcher based on libpointmatcher (http://github.com/ethz-asl/libpointmatcher)
+
+  </description>
+  <author>François Pomerleau and Stéphane Magnenat</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/modular_cloud_matcher_experiments</url>
+  <depend package="roscpp"/>
+  <depend package="rospy"/>
+  <depend package="rosbag"/>
+  <depend package="std_msgs"/>
+  <depend package="geometry_msgs"/>
+  <depend package="sensor_msgs"/>
+  <depend package="nav_msgs"/>
+  <depend package="tf"/>
+  <depend package="tf2"/>
+  <depend package="tf_conversions"/>
+  <depend package="mapping_msgs"/>
+  <depend package="libnabo"/>
+  <depend package="libpointmatcher"/>
+  <depend package="libpointmatcher_ros"/>
+  <rosdep name="libargtable2-dev"/>
+  <rosdep name="yaml-cpp"/>
+  <rosdep name="eigen"/>
+
+</package>
+
+

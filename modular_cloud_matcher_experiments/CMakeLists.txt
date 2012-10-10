@@ -54,10 +54,6 @@ if (yaml-cpp_INCLUDE_DIRS AND yaml-cpp_LIBRARIES)
 endif (yaml-cpp_INCLUDE_DIRS AND yaml-cpp_LIBRARIES)
 
 rosbuild_add_boost_directories()
-
-rosbuild_add_executable(matcher_service src/matcher_service.cpp)
-target_link_libraries(matcher_service ${EXTRA_LIBS} pointmatcher nabo rt)
-
-rosbuild_add_executable(mapper src/mapper.cpp)
-rosbuild_link_boost(mapper filesystem system)
-target_link_libraries(mapper ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
+# Note: disabled until tf2 supports C++0x
+#rosbuild_add_executable(matcher_bag src/matcher_bag.cpp)
+#target_link_libraries(matcher_bag  ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
