@@ -9,4 +9,6 @@
   <depend stack="common" /> 
   <depend stack="common_msgs" />
   <depend stack="ros" />
+  <depend stack="geometry" />
+  <depend stack="geometry_experimental" />
 </stack>
