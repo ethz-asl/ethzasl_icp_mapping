@@ -1,4 +1,10 @@
+- MaxDistDataPointsFilter:
+    maxDist: 7.0
+    dim: 2
 - SamplingSurfaceNormalDataPointsFilter:
+    samplingMethod: 1
+    maxBoxDim: 0.05
+    averageExistingDescriptors: 0
     k: 13
     keepNormals: 1
-    keepDensities: 1
+    keepDensities: 0

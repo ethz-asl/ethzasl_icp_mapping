@@ -1,5 +1,2 @@
 - RandomSamplingDataPointsFilter:
-      prob: 0.05
-- MaxDistDataPointsFilter:
-      maxDist: 7.0
-      dim: 2
+    prob: 0.2
