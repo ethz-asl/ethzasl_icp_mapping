@@ -1,0 +1,21 @@
+<package>
+  <description brief="gridmap">
+
+     Two-dimensional grid map with support for ray-tracing.
+     Somehow similar to costmap_2d but also provides getters at sub-pixel
+     precision and morphological operations.
+
+  </description>
+  <author>Stéphane Magnenat</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gridmap</url>
+  <depend package="roscpp"/>
+  <depend package="nav_msgs"/>
+  <rosdep name="eigen"/>
+  <export>
+    <cpp cflags="-I${prefix}/include" lflags="-L${prefix}/lib -Wl,-rpath,${prefix}/lib -lgrid-map" />
+  </export>
+</package>
+
+
