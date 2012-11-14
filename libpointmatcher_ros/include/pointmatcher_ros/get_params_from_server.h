@@ -1,6 +1,9 @@
 #ifndef __GET_PARAMS_FROM_SERVER_H
 #define __GET_PARAMS_FROM_SERVER_H
 
+#include <string>
+#include "ros/ros.h"
+
 bool hasParam(const std::string& name)
 {
 	return ros::param::has(std::string("~")+name);

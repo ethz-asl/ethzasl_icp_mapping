@@ -15,56 +15,68 @@
 #include <stdexcept>
 #include <iostream>
 
-GridMap::GridMap(Group* gridMapGroup) :
-	resolution(2),
+GridMap::GridMap(Group* mapGroup, const Value defaultValue) :
+	resolution(0),
 	startX(0),
 	startY(0),
 	width(0),
 	height(0),
-	values(0, 0),
-	gridMapGroup(gridMapGroup),
+	defaultValue(defaultValue),
+	mapGroup(mapGroup),
 	rayCount(0)
 {
-	if (gridMapGroup)
-	{
-		if (gridMapGroup->empty())
-			gridMapGroup->insert(this);
-		else
-			*this = **(gridMapGroup->begin());
-	}
+	assert(mapGroup);
+	if (mapGroup->empty())
+		throw MapGroupEmpty();
+	mapGroup->insert(this);
+	const GridMap& that(**(mapGroup->begin()));
+	resolution = that.resolution;
+	startX = that.startX;
+	startY = that.startY;
+	width = that.width;
+	height = that.height;
+	values.resize(width*height, defaultValue);
 }
 
-GridMap::GridMap(const int resolution, const int startX, const int startY, const int width, const int height, const Value value, Group* gridMapGroup) :
+//! Construct using resolution and default value and a null size, optionally initiate group
+GridMap::GridMap(const float resolution, const Value defaultValue, Group* mapGroup) :
 	resolution(resolution),
-	startX(startX),
-	startY(startY),
-	width(width),
-	height(height),
-	values(width*height, value),
-	gridMapGroup(gridMapGroup),
-	rayCount(0)
-{
-	if (gridMapGroup)
-	{
-		if (gridMapGroup->size() != 0)
-			throw GridMapGroupNotEmpty();
-		gridMapGroup->insert(this);
-	}
-}
-
-GridMap::GridMap(const std::string &pgmFileName, Group* gridMapGroup) :
-	resolution(1),
 	startX(0),
 	startY(0),
-	gridMapGroup(gridMapGroup),
+	width(0),
+	height(0),
+	defaultValue(defaultValue),
+	mapGroup(mapGroup),
 	rayCount(0)
 {
-	if (gridMapGroup)
-	{
-		if (gridMapGroup->size() != 0)
-			throw GridMapGroupNotEmpty();
-		gridMapGroup->insert(this);
-	}
+	initiateMapGroup();
+}
+
+//! Construct using user-provided demonsion, optionally initiate group
+GridMap::GridMap(const float resolution, const float startX, const float startY, const float width, const float height, const Value defaultValue, Group* mapGroup) :
+	resolution(resolution),
+	startX(startX / resolution),
+	startY(startY / resolution),
+	width(width / resolution),
+	height(height / resolution),
+	defaultValue(defaultValue),
+	values(width*height, defaultValue),
+	mapGroup(mapGroup),
+	rayCount(0)
+{
+	initiateMapGroup();
+}
+
+//! Construct using resolution and data from an external file, optionally initiate group
+GridMap::GridMap(const std::string &pgmFileName, const float resolution, const Value defaultValue, Group* mapGroup) :
+	resolution(resolution),
+	startX(0),
+	startY(0),
+	defaultValue(defaultValue),
+	mapGroup(mapGroup),
+	rayCount(0)
+{
+	initiateMapGroup();
 	
 	// TODO: move this into a function and add support for loading a map already in a group
 	std::ifstream ifs(pgmFileName.c_str(), std::ifstream::in);
@@ -92,11 +104,14 @@ GridMap::GridMap(const std::string &pgmFileName, Group* gridMapGroup) :
 	}
 }
 
-GridMap::~GridMap()
+void GridMap::initiateMapGroup()
 {
-	// find in group and delete
-	if (gridMapGroup)
-		gridMapGroup->erase(this);
+	if (mapGroup)
+	{
+		if (!mapGroup->empty())
+			throw MapGroupNotEmpty();
+		mapGroup->insert(this);
+	}
 }
 
 GridMap::GridMap(const GridMap& that) :
@@ -105,12 +120,13 @@ GridMap::GridMap(const GridMap& that) :
 	startY(that.startY),
 	width(that.width),
 	height(that.height),
+	defaultValue(that.defaultValue),
 	values(that.values),
-	gridMapGroup(that.gridMapGroup),
+	mapGroup(that.mapGroup),
 	rayCount(0)
 {
-	if (gridMapGroup)
-		gridMapGroup->insert(this);
+	if (mapGroup)
+		mapGroup->insert(this);
 }
 
 GridMap& GridMap::operator=(const GridMap& that)
@@ -120,14 +136,22 @@ GridMap& GridMap::operator=(const GridMap& that)
 	startY = that.startY;
 	width = that.width;
 	height = that.height;
+	defaultValue = that.defaultValue;
 	values = that.values;
-	if (gridMapGroup)
-		gridMapGroup->erase(this);
-	gridMapGroup = that.gridMapGroup;
-	if (gridMapGroup)
-		gridMapGroup->insert(this);
+	if (mapGroup)
+		mapGroup->erase(this);
+	mapGroup = that.mapGroup;
+	if (mapGroup)
+		mapGroup->insert(this);
 	rayCount = 0;
 	return *this;
+}
+
+GridMap::~GridMap()
+{
+	// find in group and delete
+	if (mapGroup)
+		mapGroup->erase(this);
 }
 
 GridMap::Value& GridMap::atInternalCoord(const int x, const int y)
@@ -173,11 +197,19 @@ GridMap::Value GridMap::getValueNearest(const Vector& pos) const
 	return atInternalCoord(x,y);
 }
 
-void GridMap::setNearestValue(const Vector& pos, const GridMap::Value& value)
+void GridMap::setNearestValue(const Vector& pos, const Value value)
 {
 	int x, y;
 	toInternalCoord(pos, x, y);
 	atInternalCoord(x,y) = value;
+}
+
+void GridMap::addNearestValueSaturated(const Vector& pos, const int delta)
+{
+	int x, y;
+	toInternalCoord(pos, x, y);
+	Value &v(atInternalCoord(x,y));
+	v = saturatedValueFromInt(int(v) + delta);
 }
 
 GridMap::Value GridMap::getValue(const Vector& pos) const
@@ -245,15 +277,21 @@ void GridMap::extendToFit(const Vector& pos)
 	extendMap(x / 256 - 1, y / 256 - 1, x / 256, y / 256);
 }
 
-nav_msgs::OccupancyGrid GridMap::toOccupancyGrid(const std::string& frame_id) const
+nav_msgs::OccupancyGrid GridMap::toOccupancyGrid(const std::string& frame_id, const GridMap* knownMap) const
 {
+	if (knownMap)
+	{
+		if (!mapGroup || (mapGroup != knownMap->mapGroup))
+			throw WrongKnownMap();
+	}
+	
 	nav_msgs::OccupancyGrid og;
 	
 	og.header.stamp = ros::Time::now();
 	og.header.frame_id = frame_id;
 	
 	og.info.map_load_time = ros::Time::now();
-	og.info.resolution = float(resolution) / 100.f;
+	og.info.resolution = float(resolution);
 	og.info.width = width;
 	og.info.height = height;
 	og.info.origin.position.x = float(startX) * og.info.resolution;
@@ -265,19 +303,30 @@ nav_msgs::OccupancyGrid GridMap::toOccupancyGrid(const std::string& frame_id) co
 	og.info.origin.orientation.w = 1;
 	
 	assert(int(values.size()) == width * height);
+	assert((!knownMap) || (knownMap->values.size() == values.size()));
 	og.data.resize(width * height);
 	for (size_t i = 0; i < values.size(); ++i)
-		og.data[i] = ((int(values[i]) + 32768) * 100) / 65535;
+	{
+		if (knownMap && (knownMap->values[i] == -1))
+			og.data[i] = -1;
+		else
+			og.data[i] = ((int(values[i]) + 32768) * 100) / 65535;
+	}
 	
 	return og;
 }
 
 // line update function, with sub-pixel accuracy
 
-// TODO: cleanup, remove limitation of texture size
+template<typename F>
+void GridMap::lineScan(const Vector& start, const Vector& stop, F& functor, const Value& value)
+{
+	Value values[2] = {value, value};
+	lineScan<F>(start, stop, functor, values, 2);
+}
 
 template<typename F>
-void GridMap::lineScan(const Vector& start, const Vector& stop, const signed short texture[], const unsigned textureLength, F& functor)
+void GridMap::lineScan(const Vector& start, const Vector& stop, F& functor, const Value texture[], const unsigned textureLength)
 {
 	int x0, y0, x1, y1;
 
@@ -402,23 +451,28 @@ void GridMap::lineScan(const Vector& start, const Vector& stop, const signed sho
 }
 
 // force instantiation of these templates
-template void GridMap::lineScan<MapCorrelation>(const Vector& start, const Vector& stop, const signed short texture[], const unsigned textureLength, MapCorrelation& functor);
-template void GridMap::lineScan<MapUpdater>(const Vector& start, const Vector& stop, const signed short texture[], const unsigned textureLength, MapUpdater& functor);
-template void GridMap::lineScan<MapConstUpdater>(const Vector& start, const Vector& stop, const signed short texture[], const unsigned textureLength, MapConstUpdater& functor);
-template void GridMap::lineScan<MapWallFinder>(const Vector& start, const Vector& stop, const signed short texture[], const unsigned textureLength, MapWallFinder& functor);
-template void GridMap::lineScan<MapEndOfAreaFinder>(const Vector& start, const Vector& stop, const signed short texture[], const unsigned textureLength, MapEndOfAreaFinder& functor);
-template void GridMap::lineScan<Drawer>(const Vector& start, const Vector& stop, const signed short texture[], const unsigned textureLength, Drawer& functor);
+template void GridMap::lineScan<MapCorrelation>(const Vector& start, const Vector& stop, MapCorrelation& functor, const Value& value);
+template void GridMap::lineScan<MapUpdater>(const Vector& start, const Vector& stop, MapUpdater& functor, const Value& value);
+template void GridMap::lineScan<MapConstUpdater>(const Vector& start, const Vector& stop, MapConstUpdater& functor, const Value& value);
+template void GridMap::lineScan<MapWallFinder>(const Vector& start, const Vector& stop, MapWallFinder& functor, const Value& value);
+template void GridMap::lineScan<MapEndOfAreaFinder>(const Vector& start, const Vector& stop, MapEndOfAreaFinder& functor, const Value& value);
+template void GridMap::lineScan<Drawer>(const Vector& start, const Vector& stop, Drawer& functor, const Value& value);
 
 
-bool GridMap::extendMap(int xMin, int yMin, int xMax, int yMax, const bool applyToGroup)
+bool GridMap::extendMap(int xMin, int yMin, int xMax, int yMax)
 {
-	// if we must extend the map, extend others as well
-	if (gridMapGroup && applyToGroup)
+	// sanity check
+	if (mapGroup)
 	{
 		// we assume that all maps of group are already in sync
-		for (Group::iterator it = gridMapGroup->begin(); it != gridMapGroup->end(); ++it)
-			if (*it != this)
-				(*it)->extendMap(xMin, yMin, xMax, yMax, false);
+		for (Group::iterator it = mapGroup->begin(); it != mapGroup->end(); ++it)
+		{
+			const GridMap& that(**it);
+			assert(that.startX == startX);
+			assert(that.startY == startY);
+			assert(that.width == width);
+			assert(that.height == height);
+		}
 	}
 	
 	// extend coordinates
@@ -464,11 +518,27 @@ bool GridMap::extendMap(int xMin, int yMin, int xMax, int yMax, const bool apply
 	if (newHeight < yMax + 1)
 		newHeight += (yMax + 1 - newHeight + 31) & (~0x1F);
 	
+	// if nothing to do, return
 	if ((deltaStartX == 0) && (deltaStartY == 0) && (newWidth == width) && (newHeight == height))
 		return false;
 	
+	// if we must extend the map, extend others as well
+	if (mapGroup)
+	{
+		// we assume that all maps of group are already in sync
+		for (Group::iterator it = mapGroup->begin(); it != mapGroup->end(); ++it)
+			(*it)->extendMapInternal(deltaStartX, deltaStartY, newWidth, newHeight);
+	}
+	else
+		extendMapInternal(deltaStartX, deltaStartY, newWidth, newHeight);
+	
+	return true;
+}
+
+void GridMap::extendMapInternal(int deltaStartX, int deltaStartY, int newWidth, int newHeight)
+{
 	// create new map
-	Values newValues(newWidth * newHeight, 0);
+	Values newValues(newWidth * newHeight, defaultValue);
 	
 	// copy, we know that we have enough room
 	Values::const_iterator xitIn = values.begin();
@@ -489,8 +559,6 @@ bool GridMap::extendMap(int xMin, int yMin, int xMax, int yMax, const bool apply
 	startY += deltaStartY;
 	width = newWidth;
 	height = newHeight;
-	
-	return true;
 }
 
 void GridMap::invert()
@@ -815,8 +883,6 @@ static GridMap::Vector getRandomPoint(const GridMap::Label& area, const int reso
 	);
 }
 
-signed short dummyTexture[2];
-
 GridMap::VectorPair GridMap::closestPoints(const Label& area0, const Label& area1, const unsigned monteCarloSteps) const
 {
 	const Value id0(area0.get<0>());
@@ -853,12 +919,12 @@ GridMap::VectorPair GridMap::closestPoints(const Label& area0, const Label& area
 		//			We thus save code in return for some uglyness.
 		// find wall of area 0
 		MapEndOfAreaFinder eoa0Finder(*this, id0);
-		const_cast<GridMap&>(*this).lineScan(p0, p1, dummyTexture, 2, eoa0Finder);
+		const_cast<GridMap&>(*this).lineScan(p0, p1, eoa0Finder);
 		if (eoa0Finder.eoaX >= 0 && eoa0Finder.eoaY >= 0)
 			p0 = fromInternalCoord(eoa0Finder.eoaX, eoa0Finder.eoaY);
 		// find wall of area 1
 		MapEndOfAreaFinder eoa1Finder(*this, id1);
-		const_cast<GridMap&>(*this).lineScan(p1, p0, dummyTexture, 2, eoa1Finder);
+		const_cast<GridMap&>(*this).lineScan(p1, p0, eoa1Finder);
 		if (eoa1Finder.eoaX >= 0 && eoa1Finder.eoaY >= 0)
 			p1 = fromInternalCoord(eoa1Finder.eoaX, eoa1Finder.eoaY);
 		

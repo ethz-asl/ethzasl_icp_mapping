@@ -22,6 +22,7 @@
   <depend package="libnabo"/>
   <depend package="libpointmatcher"/>
   <depend package="libpointmatcher_ros"/>
+  <depend package="gridmap"/>
   <rosdep name="libargtable2-dev"/>
   <rosdep name="yaml-cpp"/>
   <rosdep name="eigen"/>

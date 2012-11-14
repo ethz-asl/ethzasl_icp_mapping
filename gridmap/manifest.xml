@@ -1,9 +1,10 @@
 <package>
-  <description brief="gridmap">
+  <description brief="2D grid map">
 
      Two-dimensional grid map with support for ray-tracing.
      Somehow similar to costmap_2d but also provides getters at sub-pixel
-     precision and morphological operations.
+     precision, morphological operations, fast gradient-propagation
+     algorithm as well as support for multiple grids per resize group.
 
   </description>
   <author>Stéphane Magnenat</author>

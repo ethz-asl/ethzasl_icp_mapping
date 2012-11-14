@@ -16,29 +16,40 @@ public:
 	typedef Eigen::Vector2f Vector;
 	typedef std::set<GridMap*> Group;
 	
-	struct GridMapGroupNotEmpty:public std::runtime_error
+	struct MapGroupEmpty:public std::runtime_error
 	{
-		GridMapGroupNotEmpty():std::runtime_error("Map group not empty, use constructor taking only gridMapGroup as argument.") {}
+		MapGroupEmpty():std::runtime_error("Map group empty, use constructor providing at least resolution and defaultValue.") {}
+	};
+	struct MapGroupNotEmpty:public std::runtime_error
+	{
+		MapGroupNotEmpty():std::runtime_error("Map group not empty, use constructor taking only gridMapGroup and defaultValue as argument.") {}
+	};
+	struct WrongKnownMap:public std::runtime_error
+	{
+		WrongKnownMap():std::runtime_error("Known map for OccupancyGrid conversion is not in the same map group as the probabilistic map or map group missing.") {}
 	};
 
 protected:
 	typedef std::vector<Value> Values;
 	
-	int resolution; // resolution, in unit per grid cell
+	float resolution; // resolution, in unit per grid cell
 	int startX, startY; // start of map, in grid cell
 	int width, height; // size of the map, in grid cell
+	Value defaultValue; // default filling value
 	Values values; // map data
-	Group* gridMapGroup; // resize group, when one particle of the group is resized, all are
+	Group* mapGroup; // resize group, when one particle of the group is resized, all are
 	mutable unsigned rayCount; // number of rays cast on this grid
 
 public:
-	GridMap(Group* gridMapGroup = 0);
-	GridMap(const int resolution, const int starX, const int startY, const int width, const int height, const Value value = 0, Group* gridMapGroup = 0);
-	GridMap(const std::string &pgmFileName, Group* gridMapGroup = 0);
-	~GridMap();
+	GridMap(Group* gridMapGroup, const Value defaultValue);
+	GridMap(const float resolution, const Value defaultValue, Group* gridMapGroup = 0);
+	GridMap(const float resolution, const float startX, const float startY, const float width, const float height, const Value defaultValue, Group* gridMapGroup = 0);
+	GridMap(const std::string &pgmFileName, const float resolution, const Value defaultValue, Group* gridMapGroup = 0);
 	
 	GridMap(const GridMap& that);
 	GridMap& operator=(const GridMap& that);
+	
+	~GridMap();
 
 public:
 	// coordinate transform and bound check
@@ -56,7 +67,7 @@ public:
 	inline int getInternalStartY() const { return startY; }
 	inline int getInternalWidth() const { return width; }
 	inline int getInternalHeight() const { return height; }
-	inline int getResolution() const { return resolution; }
+	inline float getResolution() const { return resolution; }
 	// external
 	inline Vector getMinCoord() const { return fromInternalCoord(0, 0); }
 	inline Vector getMaxCoord() const { return fromInternalCoord(width-1, height-1); }
@@ -72,17 +83,22 @@ public:
 	bool isWithinBoundsInternal(const int x, const int y) const;
 	bool isWithinBounds(const Vector& pos) const;
 	//! Set value at pos, sampled without any interpolation
-	void setNearestValue(const Vector& pos, const Value& value);
+	void setNearestValue(const Vector& pos, const Value value);
+	//! Add delta ta value at pos, saturated but sampled without any interpolation
+	void addNearestValueSaturated(const Vector& pos, const int delta);
 	//! Extend to fit position
 	void extendToFit(const Vector& pos);
 	
 	// conversion to ROS
 	//! Return a ROS nav_msgs/OccupancyGrid message
-	nav_msgs::OccupancyGrid toOccupancyGrid(const std::string& frame_id) const;
+	nav_msgs::OccupancyGrid toOccupancyGrid(const std::string& frame_id, const GridMap* knownMap = 0) const;
 	
 	// local operations on map; safe, extends map when required
 	template <typename F>
-	void lineScan(const Vector& start, const Vector& stop, const Value texture[], const unsigned textureLength, F& functor);
+	void lineScan(const Vector& start, const Vector& stop, F& functor, const Value& value = 0);
+	
+	template <typename F>
+	void lineScan(const Vector& start, const Vector& stop, F& functor, const Value texture[], const unsigned textureLength);
 	
 	// global operations on map
 	//! Invert the values of every pixel, if the value is -32768, map it to +32767
@@ -151,8 +167,9 @@ public:
 	void toPGMFile(const std::string& fileName, const int divisorToPGM = 256) const;
 
 protected:
-	void insertIntoGroup();
-	bool extendMap(int xMin, int yMin, int xMax, int yMax, const bool applyToGroup = true);
+	void initiateMapGroup();
+	bool extendMap(int xMin, int yMin, int xMax, int yMax);
+	void extendMapInternal(int deltaStartX, int deltaStartY, int newWidth, int newHeight);
 	void dilateN(const unsigned amount, const int lookup[][2], const size_t lookupSize, const unsigned delta);
 	void erodeN(const unsigned amount, const int lookup[][2], const size_t lookupSize, const unsigned delta);
 };
