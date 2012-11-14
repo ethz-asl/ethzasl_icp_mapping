@@ -15,6 +15,7 @@ struct OccupancyGridBuilder
 	std::string mapFrame;
 	const float maxRange;
 	const int obsVal;
+	const int freeVal;
 	GridMap::Group mapGroup;
 	GridMap probMap;
 	GridMap knownMap;
@@ -25,6 +26,7 @@ struct OccupancyGridBuilder
 		mapFrame(getParam<string>("map_frame", "map")),
 		maxRange(getParam<double>("max_range", 80.)),
 		obsVal(getParam<int>("obs_value", 8000)),
+		freeVal(getParam<int>("free_value", -8000)),
 		probMap(getParam<double>("resolution", 0.05), 0, &mapGroup),
 		knownMap(&mapGroup, -1),
 		mapPub(nh.advertise<nav_msgs::OccupancyGrid>("map", 2, true)),
@@ -35,7 +37,7 @@ struct OccupancyGridBuilder
 	void scanReceived(const sensor_msgs::LaserScan& scan)
 	{
 		typedef GridMap::Vector Vector;
-		MapConstUpdater probUpdater(probMap, -obsVal);
+		MapConstUpdater probUpdater(probMap, freeVal);
 		Drawer knownUpdater(knownMap);
 
 		const ros::Time stamp(scan.header.stamp);
@@ -62,7 +64,8 @@ struct OccupancyGridBuilder
 					probUpdater
 				);
 				if (range < maxRange)
-					probMap.addNearestValueSaturated(Vector(rayEnd.x(), rayEnd.y()), 2*obsVal);
+					probMap.addNearestValueSaturated(Vector(rayEnd.x(),
+							rayEnd.y()), obsVal-freeVal);
 				knownMap.lineScan(
 					Vector(rayStart.x(), rayStart.y()), 
 					Vector(rayEnd.x(), rayEnd.y()),
