@@ -198,7 +198,7 @@ Mapper::~Mapper()
 	// save point cloud
 	if (mapPointCloud)
 	{
-		PM::saveVTK(*mapPointCloud, vtkFinalMapName);
+		mapPointCloud->save(vtkFinalMapName);
 		delete mapPointCloud;
 	}
 }
@@ -435,7 +435,7 @@ bool Mapper::saveMap(mapping_msgs::SaveMap::Request &req, mapping_msgs::SaveMap:
 	
 	try
 	{
-		PM::saveAnyFormat(*mapPointCloud, req.filename.data);
+		mapPointCloud->save(req.filename.data);
 	}
 	catch (const std::runtime_error& e)
 	{

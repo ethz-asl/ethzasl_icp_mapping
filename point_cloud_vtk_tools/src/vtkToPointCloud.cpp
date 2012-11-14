@@ -31,7 +31,7 @@ public:
 
 PublishVTK::PublishVTK(ros::NodeHandle& n, const std::string& fileName):
 	n(n),
-	cloud(PM::loadVTK(fileName)),
+	cloud(DP::load(fileName)),
 	mapFrame(getParam<string>("mapFrameId", "/map"))
 {
 	// ROS initialization

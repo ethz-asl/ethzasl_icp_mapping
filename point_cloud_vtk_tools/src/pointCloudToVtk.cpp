@@ -69,8 +69,8 @@ void ExportVtk::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 	}
 	
 	stringstream nameStream;
-	nameStream << "." << cloudTopic << "_" << cloudMsgIn.header.seq;
-	PM::saveVTK(outCloud, nameStream.str());
+	nameStream << "." << cloudTopic << "_" << cloudMsgIn.header.seq << ".vtk";
+	outCloud.save(nameStream.str());
 }
 
 // Main function supporting the ExportVtk class
