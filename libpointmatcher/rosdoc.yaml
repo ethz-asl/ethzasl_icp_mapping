@@ -1,0 +1,4 @@
+- builder: doxygen
+  homepage: https://github.com/ethz-asl/libpointmatcher
+  exclude_patterns: '*/include/* */upstream_src/pointmatcher/*Impl* */upstream_src/pointmatcher/Bibliography* */upstream_src/pointmatcher/Histogram* */upstream_src/evaluations/* */upstream_src/examples/* */upstream_src/utest/*'
+  tab_size: 4

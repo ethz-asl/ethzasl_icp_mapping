@@ -1,0 +1,4 @@
+- builder: doxygen
+  homepage: https://github.com/ethz-asl/libnabo
+  exclude_patterns: '*/include/* */upstream_src/experimental/* */upstream_src/python/* */upstream_src/tests/* */upstream_src/examples/*'
+  tab_size: 4
