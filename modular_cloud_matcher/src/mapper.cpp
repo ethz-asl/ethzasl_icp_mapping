@@ -22,8 +22,8 @@
 
 #include "std_msgs/String.h"
 #include "std_srvs/Empty.h"
-#include "mapping_msgs/GetPointMap.h"
-#include "mapping_msgs/SaveMap.h"
+#include "map_msgs/GetPointMap.h"
+#include "map_msgs/SaveMap.h"
 
 using namespace std;
 using namespace PointMatcherSupport;
@@ -89,8 +89,8 @@ protected:
 	void publishLoop(double publishPeriod);
 	void publishTransform();
 	
-	bool getPointMap(mapping_msgs::GetPointMap::Request &req, mapping_msgs::GetPointMap::Response &res);
-	bool saveMap(mapping_msgs::SaveMap::Request &req, mapping_msgs::SaveMap::Response &res);
+	bool getPointMap(map_msgs::GetPointMap::Request &req, map_msgs::GetPointMap::Response &res);
+	bool saveMap(map_msgs::SaveMap::Request &req, map_msgs::SaveMap::Response &res);
 	bool reset(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 };
 
@@ -419,7 +419,7 @@ void Mapper::publishTransform()
 	publishLock.unlock();
 }
 
-bool Mapper::getPointMap(mapping_msgs::GetPointMap::Request &req, mapping_msgs::GetPointMap::Response &res)
+bool Mapper::getPointMap(map_msgs::GetPointMap::Request &req, map_msgs::GetPointMap::Response &res)
 {
 	if (!mapPointCloud)
 		return false;
@@ -428,7 +428,7 @@ bool Mapper::getPointMap(mapping_msgs::GetPointMap::Request &req, mapping_msgs::
 	return true;
 }
 
-bool Mapper::saveMap(mapping_msgs::SaveMap::Request &req, mapping_msgs::SaveMap::Response &res)
+bool Mapper::saveMap(map_msgs::SaveMap::Request &req, map_msgs::SaveMap::Response &res)
 {
 	if (!mapPointCloud)
 		return false;
