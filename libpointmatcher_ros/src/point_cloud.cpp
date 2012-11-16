@@ -23,23 +23,43 @@ namespace PointMatcher_ros
 			return DataPoints();
 		
 		// fill labels
+		// conversions of descriptor fields from pcl
+		// see http://www.ros.org/wiki/pcl/Overview
 		Labels featLabels;
 		Labels descLabels;
-		vector<bool> isFeature(rosMsg.fields.size());
-		size_t fieldId(0);
-		for(auto it(rosMsg.fields.begin()); it != rosMsg.fields.end(); ++it, ++fieldId)
+		vector<bool> isFeature;
+		for(auto it(rosMsg.fields.begin()); it != rosMsg.fields.end(); ++it)
 		{
 			const string name(it->name);
 			const size_t count(std::max<size_t>(it->count, 1));
 			if (name == "x" || name == "y" || name == "z")
 			{
 				featLabels.push_back(Label(name, count));
-				isFeature[fieldId] = true;
+				isFeature.push_back(true);
 			}
-			else
+			else if (name == "rgb" || name == "rgba")
+			{
+				descLabels.push_back(Label("color", (name == "rgba") ? 4 : 3));
+				isFeature.push_back(false);
+			}
+			else if ((it+1) != rosMsg.fields.end() && it->name == "normal_x" && (it+1)->name == "normal_y")
+			{
+				if ((it+2) != rosMsg.fields.end() && (it+2)->name == "normal_z")
+				{
+					descLabels.push_back(Label("normals", 3));
+					it += 2;
+				}
+				else
+				{
+					descLabels.push_back(Label("normals", 2));
+					it += 1;
+				}
+				isFeature.push_back(false);
+			}
+			else 
 			{
 				descLabels.push_back(Label(name, count));
-				isFeature[fieldId] = false;
+				isFeature.push_back(false);
 			}
 		}
 		featLabels.push_back(Label("pad", 1));
@@ -52,39 +72,75 @@ namespace PointMatcher_ros
 		// fill cloud
 		// TODO: support big endian, pass through endian-swapping method just after the *reinterpret_cast
 		typedef sensor_msgs::PointField PF;
-		fieldId = 0;
+		size_t fieldId = 0;
 		for(auto it(rosMsg.fields.begin()); it != rosMsg.fields.end(); ++it, ++fieldId)
 		{
-			View view(
-				isFeature[fieldId] ?
-				cloud.getFeatureViewByName(it->name) :
-				cloud.getDescriptorViewByName(it->name)
-			);
-			int ptId(0);
-			const size_t count(std::max<size_t>(it->count, 1));
-			for (size_t y(0); y < rosMsg.height; ++y)
+			if (it->name == "rgb" || it->name == "rgba")
 			{
-				const uint8_t* dataPtr(&rosMsg.data[0] + rosMsg.row_step*y);
-				for (size_t x(0); x < rosMsg.width; ++x)
+				// special case for colors
+				if (((it->datatype != PF::UINT32) && (it->datatype != PF::INT32) && (it->datatype != PF::FLOAT32)) || (it->count != 1))
+					throw runtime_error(
+						(boost::format("Colors in a point cloud must be a single element of size 32 bits, found %1% elements of type %2%") % it->count % unsigned(it->datatype)).str()
+					);
+				View view(cloud.getDescriptorViewByName("color"));
+				int ptId(0);
+				for (size_t y(0); y < rosMsg.height; ++y)
 				{
-					const uint8_t* fPtr(dataPtr + it->offset);
-					for (unsigned dim(0); dim < count; ++dim)
+					const uint8_t* dataPtr(&rosMsg.data[0] + rosMsg.row_step*y);
+					for (size_t x(0); x < rosMsg.width; ++x)
 					{
-						switch (it->datatype)
-						{
-							case PF::INT8: view(dim, ptId) = T(*reinterpret_cast<const int8_t*>(fPtr)); fPtr += 1; break;
-							case PF::UINT8: view(dim, ptId) = T(*reinterpret_cast<const uint8_t*>(fPtr)); fPtr += 1; break;
-							case PF::INT16: view(dim, ptId) = T(*reinterpret_cast<const int16_t*>(fPtr)); fPtr += 2; break;
-							case PF::UINT16: view(dim, ptId) = T(*reinterpret_cast<const uint16_t*>(fPtr)); fPtr += 2; break;
-							case PF::INT32: view(dim, ptId) = T(*reinterpret_cast<const int32_t*>(fPtr)); fPtr += 4; break;
-							case PF::UINT32: view(dim, ptId) = T(*reinterpret_cast<const uint32_t*>(fPtr)); fPtr += 4; break;
-							case PF::FLOAT32: view(dim, ptId) = T(*reinterpret_cast<const float*>(fPtr)); fPtr += 4; break;
-							case PF::FLOAT64: view(dim, ptId) = T(*reinterpret_cast<const double*>(fPtr)); fPtr += 8; break;
-							default: abort();
-						}
+						const uint32_t rgba(*reinterpret_cast<const uint32_t*>(dataPtr + it->offset));
+						const T colorA(T((rgba >> 24) & 0xff) / 255.);
+						const T colorR(T((rgba >> 16) & 0xff) / 255.);
+						const T colorG(T((rgba >> 8) & 0xff) / 255.);
+						const T colorB(T((rgba >> 0) & 0xff) / 255.);
+						view(0, ptId) = colorR;
+						view(1, ptId) = colorG;
+						view(2, ptId) = colorB;
+						if (view.rows() > 3)
+							view(3, ptId) = colorA;
+						dataPtr += rosMsg.point_step;
+						ptId += 1;
 					}
-					dataPtr += rosMsg.point_step;
-					ptId += 1;
+				}
+			}
+			else
+			{
+				// get view for editing data
+				View view(
+					 (it->name == "normal_x") ? cloud.getDescriptorRowViewByName("normals", 0) :
+					((it->name == "normal_y") ? cloud.getDescriptorRowViewByName("normals", 1) :
+					((it->name == "normal_z") ? cloud.getDescriptorRowViewByName("normals", 2) :
+					((isFeature[fieldId]) ? cloud.getFeatureViewByName(it->name) :
+					cloud.getDescriptorViewByName(it->name))))
+				);
+				// use view to read data
+				int ptId(0);
+				const size_t count(std::max<size_t>(it->count, 1));
+				for (size_t y(0); y < rosMsg.height; ++y)
+				{
+					const uint8_t* dataPtr(&rosMsg.data[0] + rosMsg.row_step*y);
+					for (size_t x(0); x < rosMsg.width; ++x)
+					{
+						const uint8_t* fPtr(dataPtr + it->offset);
+						for (unsigned dim(0); dim < count; ++dim)
+						{
+							switch (it->datatype)
+							{
+								case PF::INT8: view(dim, ptId) = T(*reinterpret_cast<const int8_t*>(fPtr)); fPtr += 1; break;
+								case PF::UINT8: view(dim, ptId) = T(*reinterpret_cast<const uint8_t*>(fPtr)); fPtr += 1; break;
+								case PF::INT16: view(dim, ptId) = T(*reinterpret_cast<const int16_t*>(fPtr)); fPtr += 2; break;
+								case PF::UINT16: view(dim, ptId) = T(*reinterpret_cast<const uint16_t*>(fPtr)); fPtr += 2; break;
+								case PF::INT32: view(dim, ptId) = T(*reinterpret_cast<const int32_t*>(fPtr)); fPtr += 4; break;
+								case PF::UINT32: view(dim, ptId) = T(*reinterpret_cast<const uint32_t*>(fPtr)); fPtr += 4; break;
+								case PF::FLOAT32: view(dim, ptId) = T(*reinterpret_cast<const float*>(fPtr)); fPtr += 4; break;
+								case PF::FLOAT64: view(dim, ptId) = T(*reinterpret_cast<const double*>(fPtr)); fPtr += 8; break;
+								default: abort();
+							}
+						}
+						dataPtr += rosMsg.point_step;
+						ptId += 1;
+					}
 				}
 			}
 		}
@@ -276,16 +332,59 @@ namespace PointMatcher_ros
 			offset += scalarSize;
 			addZ = true;
 		}
-		const bool isDescriptior(!pmCloud.descriptorLabels.empty());
+		const bool isDescriptor(!pmCloud.descriptorLabels.empty());
+		bool hasColor(false);
+		unsigned colorPos(0);
+		unsigned colorCount(0);
+		unsigned inDescriptorPos(0);
 		for(auto it(pmCloud.descriptorLabels.begin()); it != pmCloud.descriptorLabels.end(); ++it)
 		{
 			PF pointField;
-			pointField.name = it->text;
-			pointField.offset = offset;
-			pointField.datatype= dataType;
-			pointField.count = it->span;
-			rosCloud.fields.push_back(pointField);
-			offset += it->span * scalarSize;
+			if (it->text == "normals")
+			{
+				assert((it->span == 2) || (it->span == 3));
+				pointField.datatype = dataType;
+				pointField.name = "normal_x";
+				pointField.offset = offset;
+				pointField.count = 1;
+				rosCloud.fields.push_back(pointField);
+				offset += scalarSize;
+				pointField.name = "normal_y";
+				pointField.offset = offset;
+				pointField.count = 1;
+				rosCloud.fields.push_back(pointField);
+				offset += scalarSize;
+				if (it->span == 3)
+				{
+					pointField.name = "normal_z";
+					pointField.offset = offset;
+					pointField.count = 1;
+					rosCloud.fields.push_back(pointField);
+					offset += scalarSize;
+				}
+			}
+			else if (it->text == "color")
+			{
+				colorPos = inDescriptorPos;
+				colorCount = it->span;
+				hasColor = true;
+				pointField.datatype = PF::FLOAT32;
+				pointField.name = (colorCount == 4 ? "rgba" : "rgb");
+				pointField.offset = offset;
+				pointField.count = 1;
+				rosCloud.fields.push_back(pointField);
+				offset += 4;
+			}
+			else
+			{
+				pointField.datatype = dataType;
+				pointField.name = it->text;
+				pointField.offset = offset;
+				pointField.count = it->span;
+				rosCloud.fields.push_back(pointField);
+				offset += it->span * scalarSize;
+			}
+			inDescriptorPos += it->span;
 		}
 		
 		// fill cloud with data
@@ -304,6 +403,10 @@ namespace PointMatcher_ros
 		rosCloud.data.resize(rosCloud.row_step * rosCloud.height);
 		const unsigned featureDim(pmCloud.features.rows()-1);
 		const unsigned descriptorDim(pmCloud.descriptors.rows());
+		assert(descriptorDim == inDescriptorPos);
+		const unsigned postColorPos(colorPos + colorCount);
+		assert(postColorPos <= inDescriptorPos);
+		const unsigned postColorCount(descriptorDim - postColorPos);
 		for (unsigned pt(0); pt < rosCloud.width; ++pt)
 		{
 			uint8_t *fPtr(&rosCloud.data[pt * offset]);
@@ -314,9 +417,31 @@ namespace PointMatcher_ros
 				memset(fPtr, 0, scalarSize);
 				fPtr += scalarSize;
 			}
-			if (isDescriptior)
+			if (isDescriptor)
 			{
-				memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(0, pt)), scalarSize * descriptorDim);
+				if (hasColor)
+				{
+					// before color
+					memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(0, pt)), scalarSize * colorPos);
+					fPtr += scalarSize * colorPos;
+					// compact color
+					uint32_t rgba;
+					unsigned colorR(unsigned(pmCloud.descriptors(colorPos+0, pt) * 255.) & 0xFF);
+					unsigned colorG(unsigned(pmCloud.descriptors(colorPos+1, pt) * 255.) & 0xFF);
+					unsigned colorB(unsigned(pmCloud.descriptors(colorPos+2, pt) * 255.) & 0xFF);
+					unsigned colorA(0);
+					if (colorCount == 4)
+						colorA = unsigned(pmCloud.descriptors(colorPos+3, pt) * 255.) & 0xFF;
+					rgba = colorA << 24 | colorR << 16 | colorG << 8 | colorB;
+					memcpy(fPtr, reinterpret_cast<const uint8_t*>(&rgba), 4);
+					fPtr += 4;
+					// after color
+					memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(postColorPos, pt)), scalarSize * postColorCount);
+				}
+				else
+				{
+					memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(0, pt)), scalarSize * descriptorDim);
+				}
 			}
 		}
 
