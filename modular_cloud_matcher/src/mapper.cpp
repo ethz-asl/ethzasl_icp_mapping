@@ -107,7 +107,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	tfPublishPeriod(getParam<double>("tfPublishPeriod", 0.1)),
 	odomFrame(getParam<string>("odom_frame", "odom")),
 	mapFrame(getParam<string>("map_frame", "map")),
-	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap")),
+	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
 	TOdomToMap(PM::TransformationParameters::Identity(4,4))
 {
 	// set logger
