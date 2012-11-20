@@ -6,8 +6,6 @@
 
 using namespace std;
 
-static const signed short laserScanUpdateTable[21] = { -8000, -8000, -8000, -8000, -8000, -8000, -8000, -8000, -8000, -8000, -8000, -8000, -8000, -8000, -8000, -8000, -8000, -8000, -8000, -8000, 8000 };
-
 struct OccupancyGridBuilder
 {
 	ros::NodeHandle nh;
@@ -16,6 +14,7 @@ struct OccupancyGridBuilder
 	const float maxRange;
 	const int obsVal;
 	const int freeVal;
+	const float invalidDist;
 	GridMap::Group mapGroup;
 	GridMap probMap;
 	GridMap knownMap;
@@ -27,6 +26,8 @@ struct OccupancyGridBuilder
 		maxRange(getParam<double>("max_range", 80.)),
 		obsVal(getParam<int>("obs_value", 8000)),
 		freeVal(getParam<int>("free_value", -8000)),
+		// Distance to clear map if range is invalid; 0 to deactivate
+		invalidDist(getParam<double>("invalid_distance", 1.)), 
 		probMap(getParam<double>("resolution", 0.05), 0, &mapGroup),
 		knownMap(&mapGroup, -1),
 		mapPub(nh.advertise<nav_msgs::OccupancyGrid>("map", 2, true)),
@@ -47,7 +48,12 @@ struct OccupancyGridBuilder
 		for (size_t a = 0; a < scan.ranges.size(); ++a) // angles indice
 		{
 			const float range(scan.ranges[a]);
+			float end = -1;	// Non-acceptable value
 			if (range >= scan.range_min && range <= scan.range_max)
+				end = range;
+			else if (invalidDist > 0) // Distance to clear map if range is invalid
+				end = invalidDist;
+			if (end != -1)
 			{
 				const ros::Time scanStamp(stamp + ros::Duration(scan.time_increment)*a);
 				// get transform
@@ -55,7 +61,7 @@ struct OccupancyGridBuilder
 				tfListener.lookupTransform(mapFrame, scan.header.frame_id, scanStamp, transform);
 				// compute ray positions
 				const tf::Vector3 rayStart = transform(tf::Vector3(0,0,0));
-				const float dist(min(range, maxRange));
+				const float dist(min(end, maxRange));
 				const tf::Vector3 rayEnd = transform(tf::Vector3(cosf(angle) * dist, sinf(angle) * dist, 0));
 				// update map
 				probMap.lineScan(
@@ -63,7 +69,7 @@ struct OccupancyGridBuilder
 					Vector(rayEnd.x(), rayEnd.y()),
 					probUpdater
 				);
-				if (range < maxRange)
+				if (range == end)
 					probMap.addNearestValueSaturated(Vector(rayEnd.x(),
 							rayEnd.y()), obsVal-freeVal);
 				knownMap.lineScan(
