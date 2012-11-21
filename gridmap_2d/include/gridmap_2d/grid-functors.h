@@ -1,7 +1,7 @@
 #ifndef __GRID_FUNCTORS_H
 #define __GRID_FUNCTORS_H
 
-#include "gridmap/grid-map.h"
+#include "grid-map.h"
 
 struct MapCorrelation
 {
