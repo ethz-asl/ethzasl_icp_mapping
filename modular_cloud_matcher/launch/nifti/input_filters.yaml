@@ -7,4 +7,4 @@
     keepDensities: 1
 - ObservationDirectionDataPointsFilter
 - OrientNormalsDataPointsFilter 
-- ShadowDataPointsFilter
+#- ShadowDataPointsFilter

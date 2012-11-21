@@ -8,6 +8,7 @@
 		<param name="odom_frame" value="/odom" />
 		<param name="map_frame" value="/map" />
 		<param name="useROSLogger" value="true" />
+		<param name="minOverlap" value="0.2" /> 
 		<param name="minMapPointCount" value="600000" /> <!-- quick fix to have map published each time -->
 	</node>
 </launch>
