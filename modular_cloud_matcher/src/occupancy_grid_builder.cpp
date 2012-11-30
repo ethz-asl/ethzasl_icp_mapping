@@ -57,7 +57,7 @@ struct OccupancyGridBuilder
 			{
 				const ros::Time scanStamp(stamp + ros::Duration(scan.time_increment)*a);
 				// get transform
-				tfListener.waitForTransform(mapFrame, scan.header.frame_id, scanStamp, ros::Duration(1.0), ros::Duration(0.1)); 
+				tfListener.waitForTransform(mapFrame, scan.header.frame_id, scanStamp, ros::Duration(1.0), ros::Duration(0.1));
 				tfListener.lookupTransform(mapFrame, scan.header.frame_id, scanStamp, transform);
 				// compute ray positions
 				const tf::Vector3 rayStart = transform(tf::Vector3(0,0,0));
@@ -96,7 +96,7 @@ int main(int argc, char* argv[])
 		{
 			ros::spin();
 		}
-		catch (const tf::ExtrapolationException& e)
+		catch (const tf::TransformException& e)
 		{
 			ROS_WARN_STREAM(e.what());
 		}
