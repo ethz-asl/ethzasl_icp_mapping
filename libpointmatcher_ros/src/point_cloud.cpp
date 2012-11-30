@@ -369,8 +369,8 @@ namespace PointMatcher_ros
 				colorPos = inDescriptorPos;
 				colorCount = it->span;
 				hasColor = true;
-				pointField.datatype = PF::FLOAT32;
-				pointField.name = (colorCount == 4 ? "rgba" : "rgb");
+				pointField.datatype = (colorCount == 4) ? PF::UINT32 : PF::FLOAT32;
+				pointField.name = (colorCount == 4) ? "rgba" : "rgb";
 				pointField.offset = offset;
 				pointField.count = 1;
 				rosCloud.fields.push_back(pointField);
