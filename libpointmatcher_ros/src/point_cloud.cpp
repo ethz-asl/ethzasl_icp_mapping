@@ -144,6 +144,7 @@ namespace PointMatcher_ros
 				}
 			}
 		}
+
 		
 		shared_ptr<typename PM::DataPointsFilter> filter(PM::get().DataPointsFilterRegistrar.create("RemoveNaNDataPointsFilter"));
 		return filter->filter(cloud);

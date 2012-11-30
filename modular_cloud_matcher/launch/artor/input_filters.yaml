@@ -1,12 +1,11 @@
-- SimpleSensorNoiseDataPointsFilter
-- SamplingSurfaceNormalDataPointsFilter:
+- RandomSamplingDataPointsFilter:
+    prob: 0.15
+- SurfaceNormalDataPointsFilter:
     knn: 20
-    epsilon: 5
-    ratio: 0.8
+    epsilon: 3.33
     keepNormals: 1
     keepDensities: 1
 - ObservationDirectionDataPointsFilter
 - OrientNormalsDataPointsFilter 
 - MaxDensityDataPointsFilter:
-    maxDensity: 0.1
-#- ShadowDataPointsFilter
+    maxDensity: 0.05

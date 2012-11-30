@@ -56,6 +56,7 @@ class Mapper
 	MapBuildingTask mapBuildingTask;
 	MapBuildingFuture mapBuildingFuture;
 	bool mapBuildingInProgress;
+	bool changeModel;
 
 	// Parameters
 	int minReadingPointCount;
@@ -66,8 +67,11 @@ class Mapper
 	string odomFrame;
 	string mapFrame;
 	string vtkFinalMapName; //!< name of the final vtk map
+	bool useConstMotionModel; 
 
 	PM::TransformationParameters TOdomToMap;
+	PM::TransformationParameters TlastICP1;
+	PM::TransformationParameters TlastICP2;
 	boost::thread publishThread;
 	boost::mutex publishLock;
 	
@@ -100,6 +104,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	transformation(PM::get().REG(Transformation).create("RigidTransformation")),
 	mapPointCloud(0),
 	mapBuildingInProgress(false),
+	changeModel(false),
 	minReadingPointCount(getParam<int>("minReadingPointCount", 2000)),
 	minMapPointCount(getParam<int>("minMapPointCount", 500)),
 	minOverlap(getParam<double>("minOverlap", 0.5)),
@@ -108,7 +113,10 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	odomFrame(getParam<string>("odom_frame", "odom")),
 	mapFrame(getParam<string>("map_frame", "map")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
-	TOdomToMap(PM::TransformationParameters::Identity(4,4))
+	useConstMotionModel(getParam<bool>("useConstMotionModel", false)),
+	TOdomToMap(PM::TransformationParameters::Identity(4,4)),
+	TlastICP1(PM::TransformationParameters::Identity(4,4)),
+	TlastICP2(PM::TransformationParameters::Identity(4,4))
 {
 	// set logger
 	if (getParam<bool>("useROSLogger", false))
@@ -236,6 +244,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	ROS_INFO("Processing new point cloud");
 	{
 		timer t; // Print how long take the algo
+
 		
 		// Apply filters to incoming cloud, in scanner coordinates
 		inputFilters.apply(*newPointCloud);
@@ -248,6 +257,11 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	if (!tfListener.waitForTransform(mapFrame,scannerFrame,stamp,ros::Duration(0.1), ros::Duration(0.01), &reason))
 	{
 		ROS_ERROR_STREAM("Cannot lookup TscannerToMap (" << scannerFrame << " to " << mapFrame << "): " << reason);
+		// Publish tf (generate the first transform)
+		if(!icp.hasMap())
+		{
+			tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, stamp));	
+		}
 		return;
 	}
 	const PM::TransformationParameters TscannerToMap(
@@ -260,7 +274,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 			), dimp1
 		)
 	);
-	ROS_INFO_STREAM("TscannerToMap (" << scannerFrame << " to " << mapFrame << "):\n" << TscannerToMap);
+	ROS_DEBUG_STREAM("TscannerToMap (" << scannerFrame << " to " << mapFrame << "):\n" << TscannerToMap);
 	
 	// Ensure a minimum amount of point after filtering
 	const int ptsCount = newPointCloud->features.cols();
@@ -290,9 +304,10 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	try 
 	{
 		// Apply ICP
-		PM::TransformationParameters Ticp = icp(*newPointCloud, TscannerToMap);
-		//Ticp = PM::TransformationParameters::Identity(4,4);
-		ROS_INFO_STREAM("Ticp:\n" << Ticp);
+		PM::TransformationParameters Ticp;
+		Ticp = icp(*newPointCloud, TscannerToMap);
+
+		ROS_DEBUG_STREAM("Ticp:\n" << Ticp);
 		
 		// Ensure minimum overlap between scans
 		const double estimatedOverlap = icp.errorMinimizer->getOverlap();
@@ -318,7 +333,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 				stamp
 			), dimp1)
 		);
-		ROS_INFO_STREAM("TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << TOdomToScanner);
+		ROS_DEBUG_STREAM("TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << TOdomToScanner);
 		
 		// Compute tf
 		publishLock.lock();
@@ -389,13 +404,16 @@ DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParameters Ticp
 	mapPreFilters.apply(*newPointCloud);
 	
 	// Merge point clouds to map
+	// FIXME: why map in newPointCloud instead of the inverse?
 	if (updateExisting)
 		newPointCloud->concatenate(*mapPointCloud);
 
 	// Map maintenance
+	// FIXME: why minMapPointCount confuse with the use of that parameter in the rest of the code
+	//if(newPointCloud->features.cols() > minMapPointCount)
 	mapPostFilters.apply(*newPointCloud);
 	
-	ROS_INFO_STREAM("New map available, update took " << t.elapsed() << " [s]");
+	ROS_INFO_STREAM("New map available (" << newPointCloud->features.cols() << " pts), update took " << t.elapsed() << " [s]");
 	
 	return newPointCloud;
 }

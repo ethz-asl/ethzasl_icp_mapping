@@ -1,0 +1,21 @@
+<launch>
+	<node name="mapper" type="mapper" pkg="modular_cloud_matcher" output="screen" >
+		<remap from="cloud_in" to="/velodyne/assembled_cloud2" />
+		<param name="subscribe_scan" value="false"/>
+		<param name="icpConfig" value="$(find modular_cloud_matcher)/launch/arthor/icp.yaml" />
+		<param name="inputFiltersConfig" value="$(find modular_cloud_matcher)/launch/arthor/input_filters.yaml" />
+		<param name="mapPostFiltersConfig" value="$(find modular_cloud_matcher)/launch/arthor/map_post_filters.yaml" />
+		<param name="odom_frame" value="/odom" />
+		<param name="map_frame" value="/map" />
+		<param name="useROSLogger" value="true" />
+		<param name="minOverlap" value="0.2" /> 
+		<param name="minReadingPointCount" value="400" /> 
+		<param name="minMapPointCount" value="900000" /> <!-- quick fix to have map published each time -->
+	</node>
+
+	<node name="point_cloud_converter" type="point_cloud_converter" pkg="point_cloud_converter">
+		<remap from="points_in" to="/assembled_cloud" />
+		<remap from="points2_out" to="/velodyne/assembled_cloud2" />
+	</node>
+
+</launch>
