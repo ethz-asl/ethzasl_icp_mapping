@@ -70,8 +70,6 @@ class Mapper
 	bool useConstMotionModel; 
 
 	PM::TransformationParameters TOdomToMap;
-	PM::TransformationParameters TlastICP1;
-	PM::TransformationParameters TlastICP2;
 	boost::thread publishThread;
 	boost::mutex publishLock;
 	
@@ -114,9 +112,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	mapFrame(getParam<string>("map_frame", "map")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
 	useConstMotionModel(getParam<bool>("useConstMotionModel", false)),
-	TOdomToMap(PM::TransformationParameters::Identity(4,4)),
-	TlastICP1(PM::TransformationParameters::Identity(4,4)),
-	TlastICP2(PM::TransformationParameters::Identity(4,4))
+	TOdomToMap(PM::TransformationParameters::Identity(4,4))
 {
 	// set logger
 	if (getParam<bool>("useROSLogger", false))
