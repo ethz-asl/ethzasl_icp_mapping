@@ -1,6 +1,6 @@
 #include "pointmatcher_ros/get_params_from_server.h"
-#include "gridmap_2d/grid-map.h"
-#include "gridmap_2d/grid-functors.h"
+#include "ethzasl_gridmap_2d/grid-map.h"
+#include "ethzasl_gridmap_2d/grid-functors.h"
 #include "tf/transform_listener.h"
 #include "sensor_msgs/LaserScan.h"
 

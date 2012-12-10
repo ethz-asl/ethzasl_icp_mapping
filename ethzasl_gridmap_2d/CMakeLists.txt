@@ -11,4 +11,4 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 find_package(Eigen REQUIRED)
 include_directories(${Eigen_INCLUDE_DIRS})
 
-rosbuild_add_library(gridmap_2d src/grid-map.cpp)
+rosbuild_add_library(ethzasl_gridmap_2d src/grid-map.cpp)

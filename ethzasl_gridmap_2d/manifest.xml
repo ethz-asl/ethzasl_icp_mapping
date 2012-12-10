@@ -10,12 +10,12 @@
   <author>Stéphane Magnenat</author>
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
-  <url>http://ros.org/wiki/gridmap</url>
+  <url>http://ros.org/wiki/ethzasl_gridmap_2d</url>
   <depend package="roscpp"/>
   <depend package="nav_msgs"/>
   <rosdep name="eigen"/>
   <export>
-    <cpp cflags="-I${prefix}/include" lflags="-L${prefix}/lib -Wl,-rpath,${prefix}/lib -lgridmap_2d" />
+    <cpp cflags="-I${prefix}/include" lflags="-L${prefix}/lib -Wl,-rpath,${prefix}/lib -lethzasl_gridmap_2d" />
   </export>
 </package>
 

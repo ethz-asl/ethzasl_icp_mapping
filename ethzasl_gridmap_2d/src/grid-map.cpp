@@ -1,5 +1,5 @@
-#include "gridmap_2d/grid-map.h"
-#include "gridmap_2d/grid-functors.h"
+#include "ethzasl_gridmap_2d/grid-map.h"
+#include "ethzasl_gridmap_2d/grid-functors.h"
 #include "ros/time.h"
 #include <cassert>
 #include <cstdlib>
