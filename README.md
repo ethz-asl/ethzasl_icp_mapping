@@ -12,9 +12,13 @@ Make sure that it is included in your `ROS_PACKAGE_PATH`:
 
 	export ROS_PACKAGE_PATH=$ROS_PACKAGE_PATH:`pwd`/ethzasl_icp_mapping
 
-Then, to compile all packages, just run:
+Install dependencies:
 
-	rosmake --rosdep-install ethzasl_icp_mapping
+	rosdep install ethzasl_icp_mapping
+
+Build stack:
+
+	rosmake ethzasl_icp_mapping
 
 Information about this stack is available on the [ROS] wiki at [http://www.ros.org/wiki/ethzasl_icp_mapping](http://www.ros.org/wiki/ethzasl_icp_mapping).
 
