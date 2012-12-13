@@ -1,11 +1,5 @@
 <launch>
-  <include file="$(find openni_launch)/launch/openni.launch">
-    <arg name="depth_registration" value="false" />
-    <!-- ideally this param should be true, but it openni_launch seems not to be working on 12.04/fuerte with it to true, so it is false for now -->
-  </include>
-  
+  <include file="$(find modular_cloud_matcher)/launch/openni/sensor.launch" />
   <include file="$(find modular_cloud_matcher)/launch/openni/tracker.launch" />
-
   <node pkg="rviz" type="rviz" output="screen" name="rviz" args="-d $(find modular_cloud_matcher)/launch/openni/tracker_viewer.vcg" />
-
 </launch>

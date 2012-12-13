@@ -1,6 +1,6 @@
 readingDataPointsFilters:
   - RandomSamplingDataPointsFilter:
-      prob: 0.1
+      prob: 0.2
   - MaxDistDataPointsFilter:
       maxDist: 7.0
       dim: 2
@@ -23,7 +23,7 @@ transformationCheckers:
       minDiffTransErr: 0.01
       smoothLength: 4
   - CounterTransformationChecker:
-      maxIterationCount: 40
+      maxIterationCount: 60
   - BoundTransformationChecker:
       maxRotationNorm: 0.8
       maxTranslationNorm: 0.4

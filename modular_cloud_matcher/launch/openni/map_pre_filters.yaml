@@ -3,8 +3,8 @@
     dim: 2
 - SamplingSurfaceNormalDataPointsFilter:
     samplingMethod: 1
-    maxBoxDim: 0.1
-    averageExistingDescriptors: 0
-    k: 13
+    maxBoxDim: 0.15
+    averageExistingDescriptors: 1
+    k: 17
     keepNormals: 1
     keepDensities: 0
