@@ -48,11 +48,14 @@ namespace PointMatcher_ros
 				{
 					descLabels.push_back(Label("normals", 3));
 					it += 2;
+					isFeature.push_back(false);
+					isFeature.push_back(false);
 				}
 				else
 				{
 					descLabels.push_back(Label("normals", 2));
 					it += 1;
+					isFeature.push_back(false);
 				}
 				isFeature.push_back(false);
 			}
@@ -63,6 +66,7 @@ namespace PointMatcher_ros
 			}
 		}
 		featLabels.push_back(Label("pad", 1));
+		assert(isFeature.size() == rosMsg.fields.size());
 		
 		// create cloud
 		const unsigned pointCount(rosMsg.width * rosMsg.height);
@@ -369,7 +373,7 @@ namespace PointMatcher_ros
 				colorPos = inDescriptorPos;
 				colorCount = it->span;
 				hasColor = true;
-				pointField.datatype = (colorCount == 4) ? PF::UINT32 : PF::FLOAT32;
+				pointField.datatype = (colorCount == 4) ? uint8_t(PF::UINT32) : uint8_t(PF::FLOAT32);
 				pointField.name = (colorCount == 4) ? "rgba" : "rgb";
 				pointField.offset = offset;
 				pointField.count = 1;
