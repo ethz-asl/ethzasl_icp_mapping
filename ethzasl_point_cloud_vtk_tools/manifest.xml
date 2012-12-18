@@ -1,5 +1,5 @@
 <package>
-  <description brief="point_cloud_vtk_tools">
+  <description brief="ethzasl_point_cloud_vtk_tools">
 
      Tools to save point clouds to VTK files and to republish them
 
@@ -7,7 +7,7 @@
   <author>François Pomerleau and Stéphane Magnenat</author>
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
-  <url>http://ros.org/wiki/point_cloud_vtk_tools</url>
+  <url>http://ros.org/wiki/ethzasl_point_cloud_vtk_tools</url>
   <depend package="roscpp"/>
   <depend package="rospy"/>
   <depend package="rosbag"/>
