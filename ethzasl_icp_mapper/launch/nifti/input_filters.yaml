@@ -7,6 +7,6 @@
     keepDensities: 1
 - ObservationDirectionDataPointsFilter
 - OrientNormalsDataPointsFilter 
-- MaxDensityDataPointsFilter:
-    maxDensity: 0.1
+#- MaxDensityDataPointsFilter
+#    maxDensity: 0.1
 #- ShadowDataPointsFilter
