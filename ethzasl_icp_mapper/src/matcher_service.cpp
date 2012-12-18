@@ -10,7 +10,7 @@
 #include "pointmatcher_ros/aliases.h"
 #include "pointmatcher_ros/ros_logger.h"
 
-#include "modular_cloud_matcher/MatchClouds.h"
+#include "ethzasl_icp_mapper/MatchClouds.h"
 
 #include "tf/tf.h"
 
@@ -26,7 +26,7 @@ class CloudMatcher
 	
 public:
 	CloudMatcher(ros::NodeHandle& n);
-	bool match(modular_cloud_matcher::MatchClouds::Request& req, modular_cloud_matcher::MatchClouds::Response& res);
+	bool match(ethzasl_icp_mapper::MatchClouds::Request& req, ethzasl_icp_mapper::MatchClouds::Response& res);
 };
 
 CloudMatcher::CloudMatcher(ros::NodeHandle& n):
@@ -59,7 +59,7 @@ CloudMatcher::CloudMatcher(ros::NodeHandle& n):
 		PointMatcherSupport::setLogger(new PointMatcherSupport::ROSLogger);
 }
 
-bool CloudMatcher::match(modular_cloud_matcher::MatchClouds::Request& req, modular_cloud_matcher::MatchClouds::Response& res)
+bool CloudMatcher::match(ethzasl_icp_mapper::MatchClouds::Request& req, ethzasl_icp_mapper::MatchClouds::Response& res)
 {
 	// get and check reference
 	const DP referenceCloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(req.reference));
