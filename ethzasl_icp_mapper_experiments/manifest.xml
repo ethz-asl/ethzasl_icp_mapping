@@ -1,5 +1,5 @@
 <package>
-  <description brief="modular_cloud_matcher_experiments">
+  <description brief="ethzasl_icp_mapper_experiments">
 
      Utilities to do experiments using 3D point cloud matcher based on libpointmatcher (http://github.com/ethz-asl/libpointmatcher)
 
@@ -7,7 +7,7 @@
   <author>François Pomerleau and Stéphane Magnenat</author>
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
-  <url>http://ros.org/wiki/modular_cloud_matcher_experiments</url>
+  <url>http://ros.org/wiki/ethzasl_icp_mapper_experiments</url>
   <depend package="roscpp"/>
   <depend package="rospy"/>
   <depend package="rosbag"/>
