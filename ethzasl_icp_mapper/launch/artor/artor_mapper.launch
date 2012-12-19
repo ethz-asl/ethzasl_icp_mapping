@@ -1,10 +1,10 @@
 <launch>
-	<node name="mapper" type="mapper" pkg="modular_cloud_matcher" output="screen" >
+	<node name="mapper" type="mapper" pkg="ethzasl_icp_mapper" output="screen" >
 		<remap from="cloud_in" to="/velodyne/assembled_cloud2" />
 		<param name="subscribe_scan" value="false"/>
-		<param name="icpConfig" value="$(find modular_cloud_matcher)/launch/arthor/icp.yaml" />
-		<param name="inputFiltersConfig" value="$(find modular_cloud_matcher)/launch/arthor/input_filters.yaml" />
-		<param name="mapPostFiltersConfig" value="$(find modular_cloud_matcher)/launch/arthor/map_post_filters.yaml" />
+		<param name="icpConfig" value="$(find ethzasl_icp_mapper)/launch/arthor/icp.yaml" />
+		<param name="inputFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/arthor/input_filters.yaml" />
+		<param name="mapPostFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/arthor/map_post_filters.yaml" />
 		<param name="odom_frame" value="/odom" />
 		<param name="map_frame" value="/map" />
 		<param name="useROSLogger" value="true" />
