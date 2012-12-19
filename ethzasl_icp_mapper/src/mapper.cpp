@@ -1,7 +1,10 @@
 #include <fstream>
 
+#include <boost/version.hpp>
 #include <boost/thread.hpp>
-#include <boost/thread/future.hpp>
+#if BOOST_VERSION >= 104100
+	#include <boost/thread/future.hpp>
+#endif // BOOST_VERSION >=  104100
 
 #include "ros/ros.h"
 #include "ros/console.h"
@@ -50,13 +53,14 @@ class Mapper
 	PM::ICPSequence icp;
 	
 	// multi-threading mapper
+	#if BOOST_VERSION >= 104100
 	typedef boost::packaged_task<PM::DataPoints*> MapBuildingTask;
 	typedef boost::unique_future<PM::DataPoints*> MapBuildingFuture;
 	boost::thread mapBuildingThread;
 	MapBuildingTask mapBuildingTask;
 	MapBuildingFuture mapBuildingFuture;
 	bool mapBuildingInProgress;
-	bool changeModel;
+	#endif // BOOST_VERSION >= 104100
 
 	// Parameters
 	int minReadingPointCount;
@@ -101,8 +105,9 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	pn(pn),
 	transformation(PM::get().REG(Transformation).create("RigidTransformation")),
 	mapPointCloud(0),
+	#if BOOST_VERSION >= 104100
 	mapBuildingInProgress(false),
-	changeModel(false),
+	#endif // BOOST_VERSION >= 104100
 	minReadingPointCount(getParam<int>("minReadingPointCount", 2000)),
 	minMapPointCount(getParam<int>("minMapPointCount", 500)),
 	minOverlap(getParam<double>("minOverlap", 0.5)),
@@ -190,6 +195,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 
 Mapper::~Mapper()
 {
+	#if BOOST_VERSION >= 104100
 	// wait for map-building thread
 	if (mapBuildingInProgress)
 	{
@@ -197,6 +203,7 @@ Mapper::~Mapper()
 		if (mapBuildingFuture.has_value())
 			delete mapBuildingFuture.get();
 	}
+	#endif // BOOST_VERSION >= 104100
 	// wait for publish thread
 	publishThread.join();
 	// save point cloud
@@ -344,15 +351,27 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 			odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(TOdomToMap, mapFrame, stamp));
 		
 		// check if news points should be added to the map
-		if (((estimatedOverlap < maxOverlapToMerge) || (icp.getInternalMap().features.cols() < minMapPointCount)) && (!mapBuildingInProgress))
+		if (
+			((estimatedOverlap < maxOverlapToMerge) || (icp.getInternalMap().features.cols() < minMapPointCount)) &&
+			#if BOOST_VERSION >= 104100
+			(!mapBuildingInProgress)
+			#else // BOOST_VERSION >= 104100
+			true
+			#endif // BOOST_VERSION >= 104100
+		)
 		{
 			// make sure we process the last available map
-			ROS_INFO("Adding new points to the map in background");
 			mapCreationTime = stamp;
+			#if BOOST_VERSION >= 104100
+			ROS_INFO("Adding new points to the map in background");
 			mapBuildingTask = MapBuildingTask(boost::bind(&Mapper::updateMap, this, newPointCloud.release(), Ticp, true));
 			mapBuildingFuture = mapBuildingTask.get_future();
 			mapBuildingThread = boost::thread(boost::move(boost::ref(mapBuildingTask)));
 			mapBuildingInProgress = true;
+			#else // BOOST_VERSION >= 104100
+			ROS_INFO("Adding new points to the map");
+			setMap(updateMap( newPointCloud.release(), Ticp, true));
+			#endif // BOOST_VERSION >= 104100
 		}
 	}
 	catch (PM::ConvergenceError error)
@@ -366,12 +385,14 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 
 void Mapper::processNewMapIfAvailable()
 {
+	#if BOOST_VERSION >= 104100
 	if (mapBuildingInProgress && mapBuildingFuture.has_value())
 	{
 		ROS_INFO_STREAM("New map available");
 		setMap(mapBuildingFuture.get());
 		mapBuildingInProgress = false;
 	}
+	#endif // BOOST_VERSION >= 104100
 }
 
 void Mapper::setMap(DP* newPointCloud)
