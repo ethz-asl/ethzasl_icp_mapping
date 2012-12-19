@@ -8,6 +8,7 @@
   <url>http://ros.org/wiki/ethzasl_mapping</url>
   <depend stack="common" /> 
   <depend stack="common_msgs" />
+  <depend stack="map_msgs" />
   <depend stack="ros" />
   <depend stack="geometry" />
   <depend stack="geometry_experimental" />
