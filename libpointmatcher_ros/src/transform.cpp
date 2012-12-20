@@ -7,10 +7,10 @@
 #include "ros/common.h"
 
 // ugly test depending on roscpp because tf_conversions is not properly versionized
-#if !ROS_VERSION_MINIMUM(1, 9, 36)
+#if !ROS_VERSION_MINIMUM(1, 9, 30)
 	#define transformTFToEigen TransformTFToEigen
 	#define transformEigenToTF TransformEigenToTF
-#endif // not ROS_VERSION_MINIMUM(1, 9, 36)
+#endif // !ROS_VERSION_MINIMUM(1, 9, 30)
 
 namespace PointMatcher_ros
 {
