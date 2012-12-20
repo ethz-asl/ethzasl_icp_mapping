@@ -4,6 +4,13 @@
 #include "tf_conversions/tf_eigen.h"
 #include "eigen_conversions/eigen_msg.h"
 #include "ros/ros.h"
+#include "ros/common.h"
+
+// ugly test depending on roscpp because tf_conversions is not properly versionized
+#if !ROS_VERSION_MINIMUM(1, 9, 36)
+	#define transformTFToEigen TransformTFToEigen
+	#define transformEigenToTF TransformEigenToTF
+#endif // not ROS_VERSION_MINIMUM(1, 9, 36)
 
 namespace PointMatcher_ros
 {
@@ -17,7 +24,7 @@ namespace PointMatcher_ros
 		listener.lookupTransform(target, source, stamp, stampedTr);
 		
 		Eigen::Affine3d eigenTr;
-		tf::TransformTFToEigen(stampedTr, eigenTr);
+		tf::transformTFToEigen(stampedTr, eigenTr);
 		return eigenTr.matrix().cast<T>();
 	}
 	
@@ -87,7 +94,7 @@ namespace PointMatcher_ros
 				)
 			)
 		);
-		tf::TransformEigenToTF(eigenTr, tfTr);
+		tf::transformEigenToTF(eigenTr, tfTr);
 		return tfTr;
 	}
 	
