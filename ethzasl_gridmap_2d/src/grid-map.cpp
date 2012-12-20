@@ -673,22 +673,22 @@ public:
 	typedef std::multimap<Key, Value> MapType;
 	void insertUniquePair(const Key& key, const Value& value)
 	{
-		std::pair<typename MapType::iterator, typename MapType::iterator> range = equal_range (key);
+		std::pair<typename MapType::iterator, typename MapType::iterator> range = this->equal_range (key);
 		if (range.first != range.second)
 		{
 			for (typename MapType::iterator it = range.first; it != range.second; ++it)
 				if (it->second == value)
 					return;
 		}
-		insert(std::pair<Key, Value>(key, value));
+		this->insert(std::pair<Key, Value>(key, value));
 	}
 	void erasePair(const Key& key, const Value& value)
 	{
-		std::pair<typename MapType::iterator, typename MapType::iterator> range = equal_range (key);
+		std::pair<typename MapType::iterator, typename MapType::iterator> range = this->equal_range (key);
 		for (typename MapType::iterator it = range.first; it != range.second; ++it)
 			if (it->second == value)
 			{
-				erase(it);
+				this->erase(it);
 				return;
 			}
 	}
