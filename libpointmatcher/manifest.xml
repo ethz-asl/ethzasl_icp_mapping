@@ -4,7 +4,7 @@
      Fetches libpointmatcher through git submodule and makes it available to ROS
 
   </description>
-  <author>Stéphane Magnenat</author>
+  <author>Stéphane Magnenat, François Pomerleau</author>
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/libpointmatcher</url>
