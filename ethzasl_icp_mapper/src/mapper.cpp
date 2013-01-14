@@ -427,8 +427,8 @@ DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParameters Ticp
 
 	// Map maintenance
 	// FIXME: why minMapPointCount confuse with the use of that parameter in the rest of the code
-	//if(newPointCloud->features.cols() > minMapPointCount)
-	mapPostFilters.apply(*newPointCloud);
+	if(newPointCloud->features.cols() > minMapPointCount)
+		mapPostFilters.apply(*newPointCloud);
 	
 	ROS_INFO_STREAM("New map available (" << newPointCloud->features.cols() << " pts), update took " << t.elapsed() << " [s]");
 	
