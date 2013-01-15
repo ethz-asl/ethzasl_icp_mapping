@@ -14,7 +14,7 @@ matcher:
     maxDist: 5.0
     epsilon: 3.33
 
-featureOutlierFilters:
+outlierFilters:
   - TrimmedDistOutlierFilter:
      ratio: 0.9
   - SurfaceNormalOutlierFilter:
@@ -32,7 +32,7 @@ transformationCheckers:
       maxIterationCount: 40
   - BoundTransformationChecker:
       maxRotationNorm: 0.80
-      maxTranslationNorm: 6.00
+      maxTranslationNorm: 10.00
 
 inspector:
 #  VTKFileInspector
