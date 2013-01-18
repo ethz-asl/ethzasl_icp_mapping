@@ -117,7 +117,8 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	mapFrame(getParam<string>("map_frame", "map")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
 	useConstMotionModel(getParam<bool>("useConstMotionModel", false)),
-	TOdomToMap(PM::TransformationParameters::Identity(4,4))
+	TOdomToMap(PM::TransformationParameters::Identity(4,4)),
+  tfListener(ros::Duration(30))
 {
 	// set logger
 	if (getParam<bool>("useROSLogger", false))
