@@ -1,18 +1,14 @@
-#readingDataPointsFilters:
-#  - RandomSamplingDataPointsFilter:
-#      prob: 0.80
-
 matcher:
   KDTreeMatcher:
-    maxDist: 0.5
+    maxDist: 0.9
     knn: 3
-    epsilon: 1.0
+    epsilon: 3.16
 
-featureOutlierFilters:
+outlierFilters:
   - TrimmedDistOutlierFilter:
-     ratio: 0.8
+     ratio: 0.90
   - SurfaceNormalOutlierFilter:
-     maxAngle: 0.87
+     maxAngle: 0.42
 
 errorMinimizer:
   PointToPlaneErrorMinimizer

@@ -6,10 +6,13 @@
 	<param name="inputFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/openni/input_filters.yaml" />
 	<param name="mapPreFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/openni/map_pre_filters.yaml" />
 	<param name="mapPostFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/openni/map_post_filters.yaml" />
-	<param name="odom_frame" value="/openni_rgb_optical_frame" />
+	<param name="odom_frame" value="/kinect" />
     <param name="map_frame" value="/world" />
-    <param name="maxOverlapToMerge" value="0.9" />
-    <param name="minMapPointCount" value="500" />
-    <param name="useROSLogger" value="true" />
+    <param name="maxOverlapToMerge" value="0.7" />
+    <param name="minMapPointCount" value="0" />
+    <param name="useROSLogger" value="false" />
+    <param name="inputQueueSize" value="1" />
   </node>
+  
+	<node name="static_transform_publisher" type="static_transform_publisher" pkg="tf" args="0 0 0 1.57 3.1416 1.57 /kinect /openni_rgb_optical_frame 100 "/> 
 </launch>

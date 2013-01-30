@@ -1,21 +1,26 @@
-#readingDataPointsFilters:
-#- MaxDensityDataPointsFilter:
-#   maxDensity: 0.5
+readingDataPointsFilters:
+- MaxDensityDataPointsFilter:
+   maxDensity: 0.5
+
+referenceDataPointsFilters:
+  - MaxDistDataPointsFilter:
+      maxDist: 40.0
 
 matcher:
   KDTreeMatcher:
-    knn: 3
-    maxDist: 18.0
-    epsilon: 3.33
+    knn: 4
+    maxDist: 1.5
+    epsilon: 0
 
-featureOutlierFilters:
+outlierFilters:
+#  - SurfaceNormalOutlierFilter:
+#     maxAngle: 1.07
   - TrimmedDistOutlierFilter:
-     ratio: 0.65
-  - SurfaceNormalOutlierFilter:
-     maxAngle: 0.87
+      ratio: 0.7
+
 
 errorMinimizer:
-  PointToPlaneErrorMinimizer
+  PointToPointErrorMinimizer
 
 transformationCheckers:
   - DifferentialTransformationChecker:

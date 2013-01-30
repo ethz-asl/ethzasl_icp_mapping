@@ -1,6 +1,6 @@
-readingDataPointsFilters:
-  - RandomSamplingDataPointsFilter:
-      prob: 0.25
+#readingDataPointsFilters:
+#  - RandomSamplingDataPointsFilter:
+#      prob: 0.25
 
 referenceDataPointsFilters:
   - MaxDistDataPointsFilter:
@@ -14,7 +14,7 @@ matcher:
     maxDist: 5.0
     epsilon: 3.33
 
-featureOutlierFilters:
+outlierFilters:
   - TrimmedDistOutlierFilter:
      ratio: 0.9
   - SurfaceNormalOutlierFilter:

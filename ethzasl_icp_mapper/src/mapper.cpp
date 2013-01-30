@@ -71,6 +71,7 @@ class Mapper
 	string odomFrame;
 	string mapFrame;
 	string vtkFinalMapName; //!< name of the final vtk map
+	int inputQueueSize; 
 	bool useConstMotionModel; 
 
 	PM::TransformationParameters TOdomToMap;
@@ -117,6 +118,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	mapFrame(getParam<string>("map_frame", "map")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
 	useConstMotionModel(getParam<bool>("useConstMotionModel", false)),
+	inputQueueSize(getParam<int>("inputQueueSize", 10)),
 	TOdomToMap(PM::TransformationParameters::Identity(4,4)),
   tfListener(ros::Duration(30))
 {
@@ -180,9 +182,9 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	
 	// topics and services initialization
 	if (getParam<bool>("subscribe_scan", true))
-		scanSub = n.subscribe("scan", 10, &Mapper::gotScan, this);
+		scanSub = n.subscribe("scan", inputQueueSize, &Mapper::gotScan, this);
 	if (getParam<bool>("subscribe_cloud", true))
-		cloudSub = n.subscribe("cloud_in", 10, &Mapper::gotCloud, this);
+		cloudSub = n.subscribe("cloud_in", inputQueueSize, &Mapper::gotCloud, this);
 	mapPub = n.advertise<sensor_msgs::PointCloud2>("point_map", 2, true);
 	odomPub = n.advertise<nav_msgs::Odometry>("icp_odom", 50, true);
 	getPointMapSrv = n.advertiseService("dynamic_point_map", &Mapper::getPointMap, this);
@@ -264,6 +266,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		// Publish tf (generate the first transform)
 		if(!icp.hasMap())
 		{
+			ROS_INFO_STREAM("Publishing initial transformation TscannerToMap (" << scannerFrame << " to " << mapFrame << "): ");
 			tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, stamp));	
 		}
 		return;

@@ -1,4 +1,5 @@
 <launch>
+	
 	<node name="mapper" type="mapper" pkg="ethzasl_icp_mapper" output="screen" >
 		<remap from="cloud_in" to="/velodyne/assembled_cloud2" />
 		<param name="subscribe_scan" value="false"/>
@@ -6,11 +7,12 @@
 		<param name="inputFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/lizhbeth/input_filters.yaml" />
 		<param name="mapPostFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/lizhbeth/map_post_filters.yaml" />
 		<param name="odom_frame" value="/velodyne" />
-		<param name="map_frame" value="/odom" />
+		<param name="map_frame" value="/map" />
 		<param name="useROSLogger" value="true" />
-		<param name="minOverlap" value="0.2" /> 
+		<param name="minOverlap" value="0.5" /> 
+		<param name="maxOverlapToMerge" value="0.99" /> 
 		<param name="minReadingPointCount" value="400" /> 
-		<param name="minMapPointCount" value="900000" /> <!-- quick fix to have map published each time -->
+		<param name="minMapPointCount" value="2000" /> <!-- quick fix to have map published each time -->
 	</node>
-
+	
 </launch>

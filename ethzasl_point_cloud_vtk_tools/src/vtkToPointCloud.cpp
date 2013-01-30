@@ -30,6 +30,7 @@ class PublishVTK
 	const string dataDirectory;
 	const string singleFile;
 	const double publishRate;
+	const bool pauseEachMsg;
 
 	ros::Publisher cloudPub;
 	PMIO::FileInfoVector list;
@@ -48,7 +49,8 @@ PublishVTK::PublishVTK(ros::NodeHandle& n):
 	csvListFiles(getParam<string>("csvListFiles", "")),
 	dataDirectory(getParam<string>("dataDirectory", "")),
 	singleFile(getParam<string>("singleFile", "")),
-	publishRate(getParam<double>("publishRate", 1.0))
+	publishRate(getParam<double>("publishRate", 1.0)),
+	pauseEachMsg(getParam<bool>("pauseEachMsg", false))
 {
 	// ROS initialization
 	cloudPub = n.advertise<sensor_msgs::PointCloud2>(cloudTopic, 1);
@@ -64,6 +66,7 @@ void PublishVTK::publish()
 {
 	if (cloudPub.getNumSubscribers())
 	{
+
 		DP cloud;
 		if(singleFile != "")
 			cloud = DP::load(singleFile);
@@ -71,9 +74,13 @@ void PublishVTK::publish()
 		{
 			if(csvListFiles != "")
 			{
-				cout << endl << "Press <ENTER> to continue or <CTRL-c>  to exit" << endl;
-				cin.clear();
-				cin.ignore(INT_MAX, '\n');
+				if(pauseEachMsg)
+				{
+					cout << endl << "Press <ENTER> to continue or <CTRL-c>  to exit" << endl;
+					cin.clear();
+					cin.ignore(INT_MAX, '\n');
+				}
+
 				ROS_INFO_STREAM("Publishing file [" << currentId << "/" << list.size() << "]: " << list[currentId].readingFileName);
 				cloud = DP::load(list[currentId].readingFileName);
 				currentId++;
@@ -89,6 +96,11 @@ void PublishVTK::publish()
 
 		if(singleFile != "" || csvListFiles != "")
 			cloudPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(cloud, mapFrame, ros::Time::now()));
+		else
+		{
+			ROS_ERROR_STREAM("No files found");
+			abort();
+		}
 	}
 }
 

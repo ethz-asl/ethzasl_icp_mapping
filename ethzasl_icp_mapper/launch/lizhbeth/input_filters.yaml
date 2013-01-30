@@ -15,6 +15,6 @@
 - ObservationDirectionDataPointsFilter
 - OrientNormalsDataPointsFilter 
 - MaxDensityDataPointsFilter:
-    maxDensity: 0.05
+    maxDensity: 10
 - ShadowDataPointsFilter:
    eps: 0.3
