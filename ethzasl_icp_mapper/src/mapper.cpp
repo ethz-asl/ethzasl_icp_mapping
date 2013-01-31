@@ -143,8 +143,14 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 			icp.setDefault();
 		}
 	}
+	else
+	{
+		ROS_INFO_STREAM("No ICP config file given, using default");
+		icp.setDefault();
+	}
 	if (getParam<bool>("useROSLogger", false))
 		PointMatcherSupport::setLogger(new PointMatcherSupport::ROSLogger);
+	
 	if (ros::param::get("~inputFiltersConfig", configFileName))
 	{
 		ifstream ifs(configFileName.c_str());
@@ -157,6 +163,11 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 			ROS_ERROR_STREAM("Cannot load input filters config from YAML file " << configFileName);
 		}
 	}
+	else
+	{
+		ROS_INFO_STREAM("No input filters config file given, not using these filters");
+	}
+	
 	if (ros::param::get("~mapPreFiltersConfig", configFileName))
 	{
 		ifstream ifs(configFileName.c_str());
@@ -169,6 +180,11 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 			ROS_ERROR_STREAM("Cannot load map pre-filters config from YAML file " << configFileName);
 		}
 	}
+	else
+	{
+		ROS_INFO_STREAM("No map pre-filters config file given, not using these filters");
+	}
+	
 	if (ros::param::get("~mapPostFiltersConfig", configFileName))
 	{
 		ifstream ifs(configFileName.c_str());
@@ -180,6 +196,10 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 		{
 			ROS_ERROR_STREAM("Cannot load map post-filters config from YAML file " << configFileName);
 		}
+	}
+	else
+	{
+		ROS_INFO_STREAM("No map post-filters config file given, not using these filters");
 	}
 	
 	// topics and services initialization
