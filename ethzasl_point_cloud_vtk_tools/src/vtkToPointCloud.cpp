@@ -10,7 +10,6 @@
 #include "pointmatcher_ros/point_cloud.h"
 #include "pointmatcher_ros/transform.h"
 #include "pointmatcher_ros/get_params_from_server.h"
-#include "pointmatcher_ros/aliases.h"
 #include "pointmatcher_ros/ros_logger.h"
 
 
@@ -19,6 +18,8 @@ using namespace PointMatcherSupport;
 
 class PublishVTK
 {
+	typedef PointMatcher<float> PM;
+	typedef PM::DataPoints DP;
 	typedef PointMatcherIO<float> PMIO;
 
 	ros::NodeHandle& n;
@@ -117,7 +118,6 @@ void PublishVTK::run()
 // Main function supporting the ExportVtk class
 int main(int argc, char **argv)
 {
-	
 	ros::init(argc, argv, "VtkToPointCloud_node");
 	ros::NodeHandle n;
 	PublishVTK pub(n);

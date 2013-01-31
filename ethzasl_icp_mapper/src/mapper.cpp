@@ -14,7 +14,6 @@
 #include "pointmatcher_ros/point_cloud.h"
 #include "pointmatcher_ros/transform.h"
 #include "pointmatcher_ros/get_params_from_server.h"
-#include "pointmatcher_ros/aliases.h"
 #include "pointmatcher_ros/ros_logger.h"
 
 #include "nav_msgs/Odometry.h"
@@ -33,6 +32,9 @@ using namespace PointMatcherSupport;
 
 class Mapper
 {
+	typedef PointMatcher<float> PM;
+	typedef PM::DataPoints DP;
+	
 	ros::NodeHandle& n;
 	ros::NodeHandle& pn;
 	
@@ -117,8 +119,8 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	odomFrame(getParam<string>("odom_frame", "odom")),
 	mapFrame(getParam<string>("map_frame", "map")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
-	useConstMotionModel(getParam<bool>("useConstMotionModel", false)),
 	inputQueueSize(getParam<int>("inputQueueSize", 10)),
+	useConstMotionModel(getParam<bool>("useConstMotionModel", false)),
 	TOdomToMap(PM::TransformationParameters::Identity(4,4)),
   tfListener(ros::Duration(30))
 {
@@ -414,7 +416,7 @@ void Mapper::setMap(DP* newPointCloud)
 		mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud, mapFrame, mapCreationTime));
 }
 
-DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParameters Ticp, bool updateExisting)
+Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParameters Ticp, bool updateExisting)
 {
 	timer t;
 	

@@ -9,7 +9,6 @@
 #include "pointmatcher_ros/point_cloud.h"
 #include "pointmatcher_ros/transform.h"
 #include "pointmatcher_ros/get_params_from_server.h"
-#include "pointmatcher_ros/aliases.h"
 #include "pointmatcher_ros/ros_logger.h"
 
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
@@ -23,6 +22,9 @@ using namespace PointMatcherSupport;
 
 class ExportVtk
 {
+	typedef PointMatcher<float> PM;
+	typedef PM::DataPoints DP;
+	
 	ros::NodeHandle& n;
 	
 	ros::Subscriber cloudSub;

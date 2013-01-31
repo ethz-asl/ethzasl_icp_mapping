@@ -7,7 +7,6 @@
 #include "pointmatcher_ros/point_cloud.h"
 #include "pointmatcher_ros/transform.h"
 #include "pointmatcher_ros/get_params_from_server.h"
-#include "pointmatcher_ros/aliases.h"
 #include "pointmatcher_ros/ros_logger.h"
 
 #include "ethzasl_icp_mapper/MatchClouds.h"
@@ -18,6 +17,9 @@ using namespace std;
 
 class CloudMatcher
 {
+	typedef PointMatcher<float> PM;
+	typedef PM::DataPoints DP;
+
 	ros::NodeHandle& n;
 	
 	PM::ICP icp;
@@ -104,7 +106,7 @@ bool CloudMatcher::match(ethzasl_icp_mapper::MatchClouds::Request& req, ethzasl_
 	try 
 	{
 		const PM::TransformationParameters transform(icp(readingCloud, referenceCloud));
-		tf::transformTFToMsg(PointMatcher_ros::eigenMatrixToTransform<Scalar>(transform), res.transform);
+		tf::transformTFToMsg(PointMatcher_ros::eigenMatrixToTransform<float>(transform), res.transform);
 		ROS_INFO_STREAM("match ratio: " << icp.errorMinimizer->getWeightedPointUsedRatio() << endl);
 	}
 	catch (PM::ConvergenceError error)
