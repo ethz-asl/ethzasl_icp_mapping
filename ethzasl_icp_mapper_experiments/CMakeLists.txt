@@ -38,22 +38,7 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-# look for yaml-cpp library
-find_path(yaml-cpp_INCLUDE_DIRS yaml-cpp/yaml.h
-	/usr/local/include
-	/usr/include
-)
-find_library(yaml-cpp_LIBRARIES yaml-cpp PATHS
-	/usr/local/lib
-	/usr/lib
-NO_DEFAULT_PATH)
-if (yaml-cpp_INCLUDE_DIRS AND yaml-cpp_LIBRARIES)
-	include_directories(${yaml-cpp_INCLUDE_DIRS})
-	set(EXTRA_LIBS ${EXTRA_LIBS} ${yaml-cpp_LIBRARIES})
-	add_definitions(-DHAVE_YAML_CPP)
-endif (yaml-cpp_INCLUDE_DIRS AND yaml-cpp_LIBRARIES)
-
 rosbuild_add_boost_directories()
 # Note: disabled until tf2 supports C++0x
 #rosbuild_add_executable(matcher_bag src/matcher_bag.cpp)
-#target_link_libraries(matcher_bag  ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
+#target_link_libraries(matcher_bag  ${EXTRA_LIBS} pointmatcher nabo argtable2 rt yaml-cpp)

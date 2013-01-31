@@ -38,27 +38,14 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-# look for yaml-cpp library
-find_path(yaml-cpp_INCLUDE_DIRS yaml-cpp/yaml.h
-	/usr/local/include
-)
-find_library(yaml-cpp_LIBRARIES yaml-cpp PATHS
-	/usr/local/lib
-)
-if (yaml-cpp_INCLUDE_DIRS AND yaml-cpp_LIBRARIES)
-	include_directories(${yaml-cpp_INCLUDE_DIRS})
-	set(EXTRA_LIBS ${EXTRA_LIBS} ${yaml-cpp_LIBRARIES})
-	add_definitions(-DHAVE_YAML_CPP)
-endif (yaml-cpp_INCLUDE_DIRS AND yaml-cpp_LIBRARIES)
-
 rosbuild_add_boost_directories()
 
 rosbuild_add_executable(matcher_service src/matcher_service.cpp)
-target_link_libraries(matcher_service ${EXTRA_LIBS} pointmatcher nabo rt)
+target_link_libraries(matcher_service ${EXTRA_LIBS} rt yaml-cpp)
 
 rosbuild_add_executable(occupancy_grid_builder src/occupancy_grid_builder.cpp)
-target_link_libraries(occupancy_grid_builder ${EXTRA_LIBS} pointmatcher nabo)
+target_link_libraries(occupancy_grid_builder ${EXTRA_LIBS})
 
 rosbuild_add_executable(mapper src/mapper.cpp)
 rosbuild_link_boost(mapper filesystem system)
-target_link_libraries(mapper ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
+target_link_libraries(mapper ${EXTRA_LIBS} argtable2 rt yaml-cpp)

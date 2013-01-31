@@ -35,27 +35,14 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-# look for yaml-cpp library
-find_path(yaml-cpp_INCLUDE_DIRS yaml-cpp/yaml.h
-	/usr/local/include
-)
-find_library(yaml-cpp_LIBRARIES yaml-cpp PATHS
-	/usr/local/lib
-)
-if (yaml-cpp_INCLUDE_DIRS AND yaml-cpp_LIBRARIES)
-	include_directories(${yaml-cpp_INCLUDE_DIRS})
-	set(EXTRA_LIBS ${EXTRA_LIBS} ${yaml-cpp_LIBRARIES})
-	add_definitions(-DHAVE_YAML_CPP)
-endif (yaml-cpp_INCLUDE_DIRS AND yaml-cpp_LIBRARIES)
-
 rosbuild_add_boost_directories()
 
 rosbuild_add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
 rosbuild_link_boost(pointCloudToVtk filesystem system)
-target_link_libraries(pointCloudToVtk ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
+target_link_libraries(pointCloudToVtk ${EXTRA_LIBS} argtable2 rt yaml-cpp)
 
 rosbuild_add_executable(vtkToPointCloud src/vtkToPointCloud.cpp)
 rosbuild_link_boost(vtkToPointCloud filesystem system)
-target_link_libraries(vtkToPointCloud ${EXTRA_LIBS} pointmatcher nabo argtable2 rt)
+target_link_libraries(vtkToPointCloud ${EXTRA_LIBS} argtable2 rt yaml-cpp)
 
 
