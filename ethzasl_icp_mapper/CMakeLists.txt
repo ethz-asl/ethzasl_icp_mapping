@@ -38,6 +38,8 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
+add_definitions(-DHAVE_YAML_CPP)
+
 rosbuild_add_boost_directories()
 
 rosbuild_add_executable(matcher_service src/matcher_service.cpp)

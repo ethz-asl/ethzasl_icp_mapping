@@ -38,5 +38,7 @@ find_package(roscpp)
 find_package(Eigen REQUIRED)
 include_directories(${Eigen_INCLUDE_DIRS})
 
+add_definitions(-DHAVE_YAML_CPP)
+
 rosbuild_add_boost_directories()
 rosbuild_add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)
