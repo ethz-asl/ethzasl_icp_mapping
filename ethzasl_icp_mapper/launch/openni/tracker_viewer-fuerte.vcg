@@ -3,7 +3,7 @@ Background\ ColorG=0
 Background\ ColorR=0
 Camera\ Config=0.464798 3.51233 5.772 1.18601 0.654074 0.404604
 Camera\ Type=rviz::OrbitViewController
-Fixed\ Frame=/world
+Fixed\ Frame=/map
 Point\ Cloud2..AxisColorAutocompute\ Value\ Bounds=1
 Point\ Cloud2..AxisColorAxis=2
 Point\ Cloud2..AxisColorMax\ Value=2.06258
@@ -88,7 +88,7 @@ Name=PointCloud2
 [TF.Frames.]
 kinect.Enabled=1
 openni_rgb_optical_frame.Enabled=1
-world.Enabled=1
+map.Enabled=1
 [Window]
 Height=1055
 Width=1682
