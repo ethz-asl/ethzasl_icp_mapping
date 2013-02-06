@@ -46,7 +46,7 @@ rosbuild_add_executable(matcher_service src/matcher_service.cpp)
 target_link_libraries(matcher_service ${EXTRA_LIBS} rt yaml-cpp)
 
 rosbuild_add_executable(occupancy_grid_builder src/occupancy_grid_builder.cpp)
-target_link_libraries(occupancy_grid_builder ${EXTRA_LIBS})
+target_link_libraries(occupancy_grid_builder ${EXTRA_LIBS} yaml-cpp)
 
 rosbuild_add_executable(mapper src/mapper.cpp)
 rosbuild_link_boost(mapper filesystem system)
