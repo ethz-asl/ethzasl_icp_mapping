@@ -76,6 +76,7 @@ class Mapper
 	string vtkFinalMapName; //!< name of the final vtk map
 	int inputQueueSize; 
 	bool useConstMotionModel; 
+	bool processingNewCloud; 
 
 	PM::TransformationParameters TOdomToMap;
 	boost::thread publishThread;
@@ -117,12 +118,13 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	minMapPointCount(getParam<int>("minMapPointCount", 500)),
 	minOverlap(getParam<double>("minOverlap", 0.5)),
 	maxOverlapToMerge(getParam<double>("maxOverlapToMerge", 0.9)),
-	tfPublishPeriod(getParam<double>("tfPublishPeriod", 0.1)),
+	tfPublishPeriod(getParam<double>("tfPublishPeriod", 1.0)),
 	odomFrame(getParam<string>("odom_frame", "odom")),
 	mapFrame(getParam<string>("map_frame", "map")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
 	inputQueueSize(getParam<int>("inputQueueSize", 10)),
 	useConstMotionModel(getParam<bool>("useConstMotionModel", false)),
+	processingNewCloud(false),
 	TOdomToMap(PM::TransformationParameters::Identity(4,4)),
 	publishStamp(ros::Time::now()),
   tfListener(ros::Duration(30))
@@ -217,10 +219,8 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	saveMapSrv = pn.advertiseService("save_map", &Mapper::saveMap, this);
 	resetSrv = pn.advertiseService("reset", &Mapper::reset, this);
 
-	// initial transform
-	// TODO: deal with that once tf publish is clean
-	//publishTransform();
-	//publishThread = boost::thread(boost::bind(&Mapper::publishLoop, this, tfPublishPeriod));
+	// refreshing tf transform thread
+	publishThread = boost::thread(boost::bind(&Mapper::publishLoop, this, tfPublishPeriod));
 }
 
 Mapper::~Mapper()
@@ -259,6 +259,10 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 
 void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scannerFrame, const ros::Time& stamp, uint32_t seq)
 {
+
+	// FIXME confirm that modification. Intention: stop publishing tf with time now if a new point cloud is being processed.
+	processingNewCloud = true;
+
 	// if the future has completed, use the new map
 	processNewMapIfAvailable();
 	
@@ -286,20 +290,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	}
 	
 	string reason;
-	// Fetch initial guess and transform cloud with it
-	// TODO: remove that once tf publish is clean
-	//if (!tfListener.waitForTransform(mapFrame,scannerFrame,stamp,ros::Duration(0.1), ros::Duration(0.01), &reason))
-	//{
-	//	ROS_ERROR_STREAM("Cannot lookup TscannerToMap (" << scannerFrame << " to " << mapFrame << "): " << reason);
-	//	// Publish tf (generate the first transform)
-	//	if(!icp.hasMap())
-	//	{
-	//		ROS_INFO_STREAM("Publishing initial transformation TscannerToMap (" << scannerFrame << " to " << mapFrame << "): ");
-	//		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, stamp));	
-	//	}
-	//	return;
-	//}
-
+	
 	// Fetch transformation from scanner to odom
 	if (!tfListener.canTransform(scannerFrame,odomFrame,stamp,&reason))
 	{
@@ -307,7 +298,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		return;
 	}
 
-	// FIXME I think the right name is TScannerToOdom
 	const PM::TransformationParameters TOdomToScanner(
 		PointMatcher_ros::eigenMatrixToDim<float>(
 			PointMatcher_ros::transformListenerToEigenMatrix<float>(
@@ -320,19 +310,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	ROS_DEBUG_STREAM("TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << TOdomToScanner);
 	ROS_DEBUG_STREAM("TOdomToMap(" << odomFrame<< " to " << mapFrame << "):\n" << TOdomToMap);
 		
-
 	const PM::TransformationParameters TscannerToMap = TOdomToMap * TOdomToScanner.inverse();
-	//const PM::TransformationParameters TscannerToMap(
-	//	PointMatcher_ros::eigenMatrixToDim<float>(
-	//		PointMatcher_ros::transformListenerToEigenMatrix<float>(
-	//			tfListener, 
-	//			mapFrame,
-	//			scannerFrame,
-	//			stamp 
-	//		), dimp1
-	//	)
-	//);
-	
 	ROS_DEBUG_STREAM("TscannerToMap (" << scannerFrame << " to " << mapFrame << "):\n" << TscannerToMap);
 	
 	// Ensure a minimum amount of point after filtering
@@ -378,9 +356,10 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		}
 		
 		// Compute tf
-		publishLock.lock();
 		publishStamp = stamp;
+		publishLock.lock();
 		TOdomToMap = Ticp * TOdomToScanner;
+		processingNewCloud = false;
 		publishLock.unlock();
 		
 		ROS_DEBUG_STREAM("TOdomToMap:\n" << TOdomToMap);
@@ -495,9 +474,13 @@ void Mapper::publishLoop(double publishPeriod)
 
 void Mapper::publishTransform()
 {
-	publishLock.lock();
-	tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, publishStamp));
-	publishLock.unlock();
+	if(processingNewCloud == false)
+	{
+		publishLock.lock();
+		// Note: we use now as timestamp to refresh the tf and avoid other buffer to be empty
+		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, ros::Time::now()));
+		publishLock.unlock();
+	}
 }
 
 bool Mapper::getPointMap(map_msgs::GetPointMap::Request &req, map_msgs::GetPointMap::Response &res)
