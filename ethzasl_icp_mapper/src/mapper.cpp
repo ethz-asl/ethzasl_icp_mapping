@@ -118,7 +118,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	minMapPointCount(getParam<int>("minMapPointCount", 500)),
 	minOverlap(getParam<double>("minOverlap", 0.5)),
 	maxOverlapToMerge(getParam<double>("maxOverlapToMerge", 0.9)),
-	tfPublishPeriod(getParam<double>("tfPublishPeriod", 1.0)),
+	tfPublishPeriod(getParam<double>("tfPublishPeriod", 0.001)),
 	odomFrame(getParam<string>("odom_frame", "odom")),
 	mapFrame(getParam<string>("map_frame", "map")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
