@@ -7,8 +7,9 @@ F. Pomerleau, S. Magnenat, F. Colas, M. Liu, R. Siegwart, "Tracking a Depth Came
 Bag files used for the results can be found at:
 http://projects.asl.ethz.ch/datasets/doku.php?id=kinect:iros2011kinect
 
-Files tuned for ethzasl_icp_mapping commit XXX
-and for libpointmatcher commit XXX
+Files tuned for ethzasl_icp_mapping commit 1e03bf34170f69169aa9c4ec248421f799e2e04f
+and for libpointmatcher commit 10a14031f8aa5238804ed0d4dddf03a24bcf7310
+on ROS fuerte
 -->
 
 <launch>
