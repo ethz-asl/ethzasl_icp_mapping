@@ -20,7 +20,6 @@
 #include "tf/transform_broadcaster.h"
 #include "tf_conversions/tf_eigen.h"
 #include "tf/transform_listener.h"
-#include "tf/transform_broadcaster.h"
 
 #include "std_msgs/String.h"
 #include "std_srvs/Empty.h"
@@ -431,6 +430,7 @@ void Mapper::setMap(DP* newPointCloud)
 	icp.setMap(*mapPointCloud);
 	
 	// Publish map point cloud
+	// FIXME this crash when used without descriptor
 	if (mapPub.getNumSubscribers())
 		mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud, mapFrame, mapCreationTime));
 }
