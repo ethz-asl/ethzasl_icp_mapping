@@ -51,3 +51,8 @@ target_link_libraries(occupancy_grid_builder ${EXTRA_LIBS} yaml-cpp)
 rosbuild_add_executable(mapper src/mapper.cpp)
 rosbuild_link_boost(mapper filesystem system)
 target_link_libraries(mapper ${EXTRA_LIBS} argtable2 rt yaml-cpp)
+
+rosbuild_add_executable(map_maintainer src/map_maintainer.cpp)
+rosbuild_link_boost(map_maintainer filesystem system signals)
+target_link_libraries(map_maintainer ${EXTRA_LIBS} argtable2 rt yaml-cpp)
+

@@ -18,12 +18,15 @@
   <depend package="tf"/>
   <depend package="tf2"/>
   <depend package="tf_conversions"/>
+  <depend package="message_filters"/>
   <depend package="map_msgs"/>
   <depend package="libnabo"/>
   <depend package="libpointmatcher"/>
   <depend package="libpointmatcher_ros"/>
   <depend package="ethzasl_gridmap_2d"/>
-  <rosdep name="libargtable2-dev"/>
+	<depend package="visualization_msgs"/>
+	<depend package="interactive_markers"/>
+	<rosdep name="libargtable2-dev"/>
   <rosdep name="yaml-cpp"/>
   <rosdep name="eigen"/>
 
