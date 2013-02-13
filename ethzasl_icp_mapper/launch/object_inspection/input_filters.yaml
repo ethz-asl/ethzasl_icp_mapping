@@ -1,0 +1,5 @@
+- ObservationDirectionDataPointsFilter
+#- MaxDistDataPointsFilter:
+#    maxDist: 5.5
+#    dim: 1
+

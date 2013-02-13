@@ -1,0 +1,17 @@
+<!-- 
+-->
+
+<launch>
+  <node name="object_map" type="map_maintainer" pkg="ethzasl_icp_mapper" output="screen"> 
+		<remap from="cloud_in" to="/depth_registered/points" />
+		<param name="inputFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/object_inspection/input_filters.yaml" />
+		<param name="mapPreFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/object_inspection/map_pre_filters.yaml" />
+		<param name="mapPostFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/object_inspection/map_post_filters.yaml" />
+		<param name="object_frame" value="/object1" />
+		<param name="map_frame" value="/map" />
+		<param name="size_x" value="1.5" />
+		<param name="size_y" value="1.0" />
+		<param name="size_z" value="1.5" />
+  </node>
+  
+</launch>
