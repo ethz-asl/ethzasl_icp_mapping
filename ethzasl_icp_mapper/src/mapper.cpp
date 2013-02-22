@@ -124,7 +124,6 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	inputQueueSize(getParam<int>("inputQueueSize", 10)),
 	useConstMotionModel(getParam<bool>("useConstMotionModel", false)),
 	processingNewCloud(false),
-	TOdomToMap(PM::TransformationParameters::Identity(4,4)),
 	publishStamp(ros::Time::now()),
   tfListener(ros::Duration(30))
 {
@@ -276,7 +275,9 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		return;
 	}
 	
+	// Dimension of the point cloud, important since we handle 2D and 3D
 	const int dimp1(newPointCloud->features.rows());
+
 	ROS_INFO("Processing new point cloud");
 	{
 		timer t; // Print how long take the algo
@@ -289,7 +290,13 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	}
 	
 	string reason;
-	
+	// Initialize the transformation to identity if empty
+ 	if(!icp.hasMap())
+ 	{
+		// we need to know the dimensionality of the point cloud to initialize properly
+		TOdomToMap = PM::TransformationParameters::Identity(dimp1, dimp1);
+	}
+
 	// Fetch transformation from scanner to odom
 	if (!tfListener.canTransform(scannerFrame,odomFrame,stamp,&reason))
 	{
@@ -474,7 +481,7 @@ void Mapper::publishLoop(double publishPeriod)
 
 void Mapper::publishTransform()
 {
-	if(processingNewCloud == false)
+	if(processingNewCloud == false && icp.hasMap())
 	{
 		publishLock.lock();
 		// Note: we use now as timestamp to refresh the tf and avoid other buffer to be empty
