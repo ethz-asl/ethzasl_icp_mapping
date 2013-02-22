@@ -1,4 +1,6 @@
-#- MaxDistDataPointsFilter:
-#    maxDist: 5.5
-#    dim: 1
+- SimpleSensorNoiseDataPointsFilter:
+    sensorType: 3
+- MaxDistDataPointsFilter:
+    maxDist: 4.5
+    dim: -1
 

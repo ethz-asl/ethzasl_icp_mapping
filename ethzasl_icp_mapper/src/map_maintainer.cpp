@@ -58,6 +58,8 @@ class MapMaintener
 	//ros::ServiceServer saveMapSrv;
 	//ros::ServiceServer resetSrv;
 
+	PM::ICP icp;
+
 	PM::DataPointsFilters inputFilters;
 	PM::DataPointsFilters mapPreFilters;
 	PM::DataPointsFilters mapPostFilters;
@@ -76,7 +78,10 @@ class MapMaintener
 	boost::shared_ptr<InteractiveMarkerServer> server;
 	MenuHandler menu_handler;
 	bool mappingActive;
-	MenuHandler::EntryHandle h_start;
+	bool singleScan;
+	MenuHandler::EntryHandle h_single;
+	MenuHandler::EntryHandle h_start; 
+	MenuHandler::EntryHandle h_pause;
 	MenuHandler::EntryHandle h_stop;
 	MenuHandler::EntryHandle h_save;
 
@@ -103,7 +108,9 @@ protected:
 	void update_tf(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
 
 
+	void singleScanCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
 	void startMapCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
+	void pauseMapCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
 	void stopMapCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
 	void saveMapCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
 
@@ -124,14 +131,33 @@ MapMaintener::MapMaintener(ros::NodeHandle& n, ros::NodeHandle& pn):
 	size_y(getParam<double>("size_y", 1.0)),
 	size_z(getParam<double>("size_z", 1.0)),
 	mappingActive(false),
+	singleScan(false),
   tfListener(ros::Duration(30)),
 	TObjectToMap(PM::TransformationParameters::Identity(4,4)),
 	objectFrame(getParam<string>("object_frame", "map")),
 	mapFrame(getParam<string>("map_frame", "map"))
 {
 	
-	// load config
+	// load configs
 	string configFileName;
+	if (ros::param::get("~icpConfig", configFileName))
+	{
+		ifstream ifs(configFileName.c_str());
+		if (ifs.good())
+		{
+			icp.loadFromYaml(ifs);
+		}
+		else
+		{
+			ROS_ERROR_STREAM("Cannot load ICP config from YAML file " << configFileName);
+			icp.setDefault();
+		}
+	}
+	else
+	{
+		ROS_INFO_STREAM("No ICP config file given, using default");
+		icp.setDefault();
+	}
 
 	if (ros::param::get("~inputFiltersConfig", configFileName))
 	{
@@ -212,7 +238,9 @@ MapMaintener::MapMaintener(ros::NodeHandle& n, ros::NodeHandle& pn):
 	// Setup interactive maker
   server.reset( new InteractiveMarkerServer("MapCenter","", false) );
 
+	h_single = menu_handler.insert( "Record single scan", boost::bind(&MapMaintener::singleScanCallback, this, _1));
 	h_start = menu_handler.insert( "Start object mapping", boost::bind(&MapMaintener::startMapCallback, this, _1));
+	h_pause = menu_handler.insert( "Pause object mapping", boost::bind(&MapMaintener::pauseMapCallback, this, _1));
   h_stop = menu_handler.insert( "Stop/reset object mapping", boost::bind(&MapMaintener::stopMapCallback, this, _1));
 	menu_handler.setVisible(h_stop, false);
 	h_save = menu_handler.insert( "Save object to VTK", boost::bind(&MapMaintener::saveMapCallback, this, _1));
@@ -241,14 +269,16 @@ void MapMaintener::gotCloud(const sensor_msgs::PointCloud2ConstPtr& cloudMsgIn, 
 {
 	// IMPORTANT:  We need to receive the point clouds in local coordinates (scanner or robot)
 
-	if(!mappingActive)
-		return;
+	if(mappingActive || singleScan)
+	{
+		// Convert pointcloud2 to DataPoint
+		DP cloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(*cloudMsgIn));
+		// Convert odometry msg to TransformationParameters
+		TP TScannerToMap = 	PointMatcher_ros::odomMsgToEigenMatrix<float>(*odom);
+		processCloud(cloud, TScannerToMap);
+	}
 
-	// Convert pointcloud2 to DataPoint
-	DP cloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(*cloudMsgIn));
-	// Convert odometry msg to TransformationParameters
-	TP TScannerToMap = 	PointMatcher_ros::odomMsgToEigenMatrix<float>(*odom);
-	processCloud(cloud, TScannerToMap);
+	singleScan = false;
 }
 
 // Point cloud processing
@@ -282,7 +312,6 @@ void MapMaintener::processCloud(DP newPointCloud, const TP TScannerToMap)
 	// Preparation of cloud for inclusion in map
 	mapPreFilters.apply(newPointCloud);
 	
-	cout << newPointCloud.features.cols() << endl;
 	// FIXME put that as parameter
 	if(newPointCloud.features.cols() < 400)
 		return;
@@ -302,6 +331,29 @@ void MapMaintener::processCloud(DP newPointCloud, const TP TScannerToMap)
 		return;
 	}
 
+
+	PM::TransformationParameters Tcorr;
+	try
+	{
+		Tcorr = icp(newPointCloud, mapPointCloud);
+	}
+	catch (PM::ConvergenceError error)
+	{
+		ROS_WARN_STREAM("ICP failed to converge: " << error.what());
+		return;
+	}
+
+
+	const double estimatedOverlap = icp.errorMinimizer->getOverlap();
+	if(estimatedOverlap < 0.40)
+	{
+		ROS_WARN_STREAM("Estimated overlap too small: " << estimatedOverlap);
+		return;
+	}
+
+	ROS_INFO_STREAM("Tcorr:\n" << Tcorr);
+
+	newPointCloud = transformation->compute(newPointCloud, Tcorr); 
 	// Merge point clouds to map
 	mapPointCloud.concatenate(newPointCloud);
 
@@ -317,8 +369,8 @@ void MapMaintener::processCloud(DP newPointCloud, const TP TScannerToMap)
 
 	ROS_INFO_STREAM("Total map merging: " << t.elapsed() << " [s]");
 
-	ros::Rate r(2);
-	r.sleep();
+	//ros::Rate r(2);
+	//r.sleep();
 }
 
 
@@ -367,13 +419,6 @@ void MapMaintener::makeMenuMarker( std::string name )
 	// Header
 	// TODO: adapt that for real system
 	int_marker.header.frame_id = mapFrame;
-	// Initial pose and shape
-//	int_marker.pose.position.y = 0.0;
-//	int_marker.pose.position.x = 0.0;
-//	int_marker.pose.position.z = 0.0;
-
-//	geometry_msgs::PoseStamped marker_local;
-//	geometry_msgs::PoseStamped marker_global;
 	int_marker.pose.position.x = 0.0;
 	int_marker.pose.position.y = 0.0;
 	int_marker.pose.position.z = 0.0;
@@ -382,7 +427,7 @@ void MapMaintener::makeMenuMarker( std::string name )
 
  	// Information
 	int_marker.name = name;
-	int_marker.description = "Move to the zone of interest";
+	//int_marker.description = "Move to the zone of interest";
 	
 	// Create 6 DoF control axis
 	addRotAndTransCtrl(int_marker, 1, 1, 0, 0, "x");
@@ -429,30 +474,58 @@ void MapMaintener::addRotAndTransCtrl(InteractiveMarker &int_marker, const doubl
 // Marker callback
 void MapMaintener::update_tf(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
 {
-	if(!mappingActive)
+	//InteractiveMarker int_marker;
+	//server->get("object_menu", int_marker);
+
+	if(mapPointCloud.features.cols() == 0)
 	{	
 		nav_msgs::Odometry odom;
 		odom.pose.pose = feedback->pose;
 		publishLock.lock();
 		TObjectToMap = 	PointMatcher_ros::odomMsgToEigenMatrix<float>(odom);
 		publishLock.unlock();
+		
+		//int_marker.description = "Move to the zone of interest";
+		menu_handler.reApply( *server);
+		server->applyChanges();
+	}
+	else
+	{
+		//int_marker.description = "Reset the map to apply change";
 		menu_handler.reApply( *server);
 		server->applyChanges();
 	}
 }
 
+void MapMaintener::singleScanCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
+{
+		singleScan = true;
+}
+
 void MapMaintener::startMapCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
 {
 	menu_handler.setVisible(h_start, false);
+	menu_handler.setVisible(h_pause, true);
 	menu_handler.setVisible(h_stop, true);
 	menu_handler.reApply( *server);
   server->applyChanges();
 	mappingActive = true;
 }
 
+void MapMaintener::pauseMapCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
+{
+	menu_handler.setVisible(h_start, true);
+	menu_handler.setVisible(h_pause, false);
+	menu_handler.setVisible(h_stop, true);
+	menu_handler.reApply( *server);
+  server->applyChanges();
+	mappingActive = false;
+}
+
 void MapMaintener::stopMapCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
 {
 	menu_handler.setVisible(h_start, true);
+	menu_handler.setVisible(h_pause, false);
 	menu_handler.setVisible(h_stop, false);
 	menu_handler.reApply( *server);
   server->applyChanges();

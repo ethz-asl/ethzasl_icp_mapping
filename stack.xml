@@ -1,9 +1,9 @@
 <stack>
   <description brief="ethzasl_icp_mapping">
-    3D mapping tools for robotic applications
+    3d mapping tools for robotic applications
   </description>
-  <author>François Pomerleau and Stéphane Magnenat</author>
-  <license>BSD</license>  
+  <author>françois pomerleau and stéphane magnenat</author>
+  <license>bsd</license>  
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/ethzasl_mapping</url>
   <depend stack="common" /> 
@@ -12,4 +12,5 @@
   <depend stack="ros" />
   <depend stack="geometry" />
   <depend stack="geometry_experimental" />
+  <depend stack="visualization" />
 </stack>
