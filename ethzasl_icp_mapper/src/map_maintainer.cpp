@@ -124,7 +124,7 @@ MapMaintener::MapMaintener(ros::NodeHandle& n, ros::NodeHandle& pn):
 	pn(pn),
 	cloud_sub(n, "cloud_in", 1),
 	odom_sub(n, "icp_odom", 1),
-	sync(MySyncPolicy(10), cloud_sub, odom_sub),
+	sync(MySyncPolicy(1), cloud_sub, odom_sub),
 	transformation(PM::get().REG(Transformation).create("RigidTransformation")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap_maintained.vtk")),
 	size_x(getParam<double>("size_x", 1.0)),
@@ -336,6 +336,7 @@ void MapMaintener::processCloud(DP newPointCloud, const TP TScannerToMap)
 	try
 	{
 		Tcorr = icp(newPointCloud, mapPointCloud);
+		TObjectToMap = TObjectToMap * Tcorr.inverse();
 	}
 	catch (PM::ConvergenceError error)
 	{
@@ -351,7 +352,7 @@ void MapMaintener::processCloud(DP newPointCloud, const TP TScannerToMap)
 		return;
 	}
 
-	ROS_INFO_STREAM("Tcorr:\n" << Tcorr);
+	ROS_DEBUG_STREAM("Tcorr:\n" << Tcorr);
 
 	newPointCloud = transformation->compute(newPointCloud, Tcorr); 
 	// Merge point clouds to map

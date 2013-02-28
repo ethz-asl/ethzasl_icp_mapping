@@ -9,9 +9,9 @@
 		<param name="mapPostFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/object_inspection/map_post_filters.yaml" />
 		<param name="object_frame" value="/car1" />
 		<param name="map_frame" value="/map" />
-		<param name="size_x" value="5.0" />
+		<param name="size_x" value="7.5" />
 		<param name="size_y" value="3.0" />
-		<param name="size_z" value="2.0" />
+		<param name="size_z" value="2.5" />
   </node>
   
 </launch>
