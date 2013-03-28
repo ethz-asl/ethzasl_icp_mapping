@@ -56,3 +56,7 @@ rosbuild_add_executable(map_maintainer src/map_maintainer.cpp)
 rosbuild_link_boost(map_maintainer filesystem system signals)
 target_link_libraries(map_maintainer ${EXTRA_LIBS} argtable2 rt yaml-cpp)
 
+rosbuild_add_executable(interact_mapper src/interact_mapper.cpp)
+rosbuild_link_boost(interact_mapper filesystem system signals)
+target_link_libraries(interact_mapper ${EXTRA_LIBS} argtable2 rt yaml-cpp)
+

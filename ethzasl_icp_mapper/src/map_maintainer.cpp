@@ -26,8 +26,6 @@
 
 #include "std_msgs/String.h"
 #include "std_srvs/Empty.h"
-//#include "map_msgs/GetPointMap.h"
-//#include "map_msgs/SaveMap.h"
 
 using namespace std;
 using namespace PointMatcherSupport;

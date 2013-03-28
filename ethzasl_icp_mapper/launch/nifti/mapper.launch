@@ -1,5 +1,5 @@
 <launch>
-	<node name="mapper" type="mapper" pkg="ethzasl_icp_mapper" output="screen" >
+	<node name="mapper" type="mapper" pkg="ethzasl_icp_mapper" output="screen">
 		<remap from="cloud_in" to="/dynamic_point_cloud" />
 		<param name="subscribe_scan" value="false" />
 		<param name="icpConfig" value="$(find ethzasl_icp_mapper)/launch/nifti/icp.yaml" />
@@ -11,5 +11,7 @@
 		<param name="minOverlap" value="0.2" /> 
 		<param name="maxOverlapToMerge" value="0.99" /> 
 		<param name="minMapPointCount" value="1000" /> 
+		<param name="localizing" value="true" /> 
+		<param name="mapping" value="true" /> 
 	</node>
 </launch>

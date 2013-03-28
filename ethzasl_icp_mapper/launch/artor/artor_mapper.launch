@@ -21,7 +21,7 @@ and for libpointmatcher commit e048c4d1180b1de005af072bf137ea4d8cf2b826
 	</node>
 
 	<node name="point_cloud_converter" type="point_cloud_converter" pkg="point_cloud_converter">
-		<remap from="points_in" to="/assembled_cloud" />
+		<remap from="points_in" to="/velodyne/assembled_cloud" />
 		<remap from="points2_out" to="/velodyne/assembled_cloud2" />
 	</node>
 
