@@ -22,9 +22,11 @@
 #include "ethzasl_icp_mapper/SetMode.h"
 #include "ethzasl_icp_mapper/GetMode.h"
 
-#define BOOST_FILESYSTEM_VERSION 3
-#define BOOST_FILESYSTEM_NO_DEPRECATED 
-#include <boost/filesystem.hpp>
+#include "boost/algorithm/string.hpp"
+#include "boost/filesystem.hpp"
+#include "boost/filesystem/path.hpp"
+#include "boost/filesystem/operations.hpp"
+#include "boost/lexical_cast.hpp"
 
 using namespace std;
 using namespace PointMatcherSupport;
@@ -147,7 +149,11 @@ InteractMapper::InteractMapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 				{
 					if(dir_itr->path().extension() == ".vtk")
 					{
+						#if BOOST_FILESYSTEM_VERSION >= 3
 						menu_handler.insert(h_load, dir_itr->path().filename().string(), boost::bind(&InteractMapper::loadMapCallback, this, _1) );
+						#else
+						menu_handler.insert(h_load, dir_itr->path().filename().file_string(), boost::bind(&InteractMapper::loadMapCallback, this, _1) );
+						#endif
 					}
 				}
 			}
