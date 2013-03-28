@@ -18,8 +18,9 @@
 // Services
 #include "map_msgs/SaveMap.h"
 #include "ethzasl_icp_mapper/LoadMap.h"
-#include "ethzasl_icp_mapper/CorrectMap.h"
-#include "ethzasl_icp_mapper/StatesMap.h"
+#include "ethzasl_icp_mapper/CorrectPose.h"
+#include "ethzasl_icp_mapper/SetMode.h"
+#include "ethzasl_icp_mapper/GetMode.h"
 
 #define BOOST_FILESYSTEM_VERSION 3
 #define BOOST_FILESYSTEM_NO_DEPRECATED 
@@ -49,7 +50,8 @@ public:
 	ros::ServiceClient saveMapClient;
 	ros::ServiceClient loadMapClient;
 	ros::ServiceClient correctMapClient;
-	ros::ServiceClient changeStatesClient;
+	ros::ServiceClient setModeClient;
+	ros::ServiceClient getModeClient;
 
 	// Interative markers
 	boost::shared_ptr<InteractiveMarkerServer> server;
@@ -89,20 +91,19 @@ InteractMapper::InteractMapper(ros::NodeHandle& n, ros::NodeHandle& pn):
   tfListener(ros::Duration(30))
 {
 	ROS_INFO_STREAM("Waiting for a mapper node...");
-	ros::service::waitForService("mapper/change_states");
+	ros::service::waitForService("mapper/set_mode");
 	ROS_INFO_STREAM("Mapper node found");
-
 	
 	// Service setups
 	// TODO: remove private tags
 	saveMapClient = n.serviceClient<map_msgs::SaveMap>("mapper/save_map");
 	loadMapClient = n.serviceClient<ethzasl_icp_mapper::LoadMap>("mapper/load_map");
-	correctMapClient = n.serviceClient<ethzasl_icp_mapper::CorrectMap>("mapper/correct_pose");
-	changeStatesClient = n.serviceClient<ethzasl_icp_mapper::StatesMap>("mapper/change_states");
-	
+	correctMapClient = n.serviceClient<ethzasl_icp_mapper::CorrectPose>("mapper/correct_pose");
+	setModeClient = n.serviceClient<ethzasl_icp_mapper::SetMode>("mapper/set_mode");
+	getModeClient = n.serviceClient<ethzasl_icp_mapper::GetMode>("mapper/get_mode");
 
 	// Setup interactive maker
-  server.reset( new InteractiveMarkerServer("MapControl","", false) );
+	server.reset( new InteractiveMarkerServer("MapControl","", false) );
 	h_localize = menu_handler.insert( "Localize", boost::bind(&InteractMapper::localizeCallback, this, _1));
 	h_map = menu_handler.insert( "Map", boost::bind(&InteractMapper::mapCallback, this, _1));
 	h_save = menu_handler.insert( "Save map to VTK", boost::bind(&InteractMapper::saveMapCallback, this, _1));
@@ -111,9 +112,8 @@ InteractMapper::InteractMapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	h_adjustPose = menu_handler.insert( "Correct map pose", boost::bind(&InteractMapper::adjustPoseCallback, this, _1));
 	
 	// Fetch states of the mapper node
-	ethzasl_icp_mapper::StatesMap srv;
-	srv.request.applyChange = false;
-	changeStatesClient.call(srv);
+	ethzasl_icp_mapper::GetMode srv;
+	getModeClient.call(srv);
 	
 	if(srv.response.localize)
 		menu_handler.setCheckState(h_localize, MenuHandler::CHECKED);
@@ -174,7 +174,7 @@ InteractMapper::~InteractMapper()
 // Callbacks
 void InteractMapper::localizeCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
 {
-	ethzasl_icp_mapper::StatesMap srv;
+	ethzasl_icp_mapper::SetMode srv;
 
 	MenuHandler::CheckState state_loc;
 	MenuHandler::CheckState state_map;
@@ -197,15 +197,15 @@ void InteractMapper::localizeCallback( const visualization_msgs::InteractiveMark
 	}
 	
 	menu_handler.reApply( *server );
-  server->applyChanges();
+	server->applyChanges();
 	
 	srv.request.applyChange = true;
-	changeStatesClient.call(srv);
+	setModeClient.call(srv);
 }
 
 void InteractMapper::mapCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
 {
-	ethzasl_icp_mapper::StatesMap srv;
+	ethzasl_icp_mapper::SetMode srv;
 
 	MenuHandler::CheckState state_loc;
 	MenuHandler::CheckState state_map;
@@ -230,10 +230,10 @@ void InteractMapper::mapCallback( const visualization_msgs::InteractiveMarkerFee
 	}
 	
 	menu_handler.reApply( *server );
-  server->applyChanges();
+	server->applyChanges();
 	
 	srv.request.applyChange = true;
-	changeStatesClient.call(srv);
+	setModeClient.call(srv);
 }
 
 void InteractMapper::saveMapCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
@@ -245,14 +245,12 @@ void InteractMapper::saveMapCallback( const visualization_msgs::InteractiveMarke
 
 void InteractMapper::loadMapCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
 {
-	
-	ethzasl_icp_mapper::StatesMap srv_states;
+	ethzasl_icp_mapper::SetMode srv_states;
 	menu_handler.setCheckState(h_localize, MenuHandler::UNCHECKED);
 	menu_handler.setCheckState(h_map, MenuHandler::UNCHECKED);
 	srv_states.request.localize = false;
 	srv_states.request.map = false;
-	srv_states.request.applyChange = true;
-	changeStatesClient.call(srv_states);
+	setModeClient.call(srv_states);
 
 	
 	MenuHandler::EntryHandle handle = feedback->menu_entry_id;
@@ -278,13 +276,12 @@ void InteractMapper::adjustPoseCallback( const visualization_msgs::InteractiveMa
 	{
 		menu_handler.setCheckState(h_adjustPose, MenuHandler::CHECKED);
 		
-		ethzasl_icp_mapper::StatesMap srv_states;
+		ethzasl_icp_mapper::SetMode srv_states;
 		menu_handler.setCheckState(h_localize, MenuHandler::UNCHECKED);
 		menu_handler.setCheckState(h_map, MenuHandler::UNCHECKED);
 		srv_states.request.localize = false;
 		srv_states.request.map = false;
-		srv_states.request.applyChange = true;
-		changeStatesClient.call(srv_states);
+		setModeClient.call(srv_states);
 	}
 	
 	menu_handler.reApply( *server );
@@ -333,7 +330,7 @@ void InteractMapper::update_tf(const visualization_msgs::InteractiveMarkerFeedba
 		//cout << "TOdomToMap:\n" << TOdomToMap << endl;
 		//cout << "TCorr:\n" << TCorr << endl;
 
-		ethzasl_icp_mapper::CorrectMap srv;
+		ethzasl_icp_mapper::CorrectPose srv;
 
 		srv.request.odom = PointMatcher_ros::eigenMatrixToOdomMsg<float>(TCorr, mapFrame, ros::Time::now());
 

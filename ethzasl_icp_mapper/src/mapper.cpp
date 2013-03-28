@@ -27,8 +27,9 @@
 #include "map_msgs/GetPointMap.h"
 #include "map_msgs/SaveMap.h"
 #include "ethzasl_icp_mapper/LoadMap.h"
-#include "ethzasl_icp_mapper/CorrectMap.h"
-#include "ethzasl_icp_mapper/StatesMap.h"
+#include "ethzasl_icp_mapper/CorrectPose.h"
+#include "ethzasl_icp_mapper/SetMode.h"
+#include "ethzasl_icp_mapper/GetMode.h"
 
 using namespace std;
 using namespace PointMatcherSupport;
@@ -56,7 +57,8 @@ class Mapper
 	ros::ServiceServer loadMapSrv;
 	ros::ServiceServer resetSrv;
 	ros::ServiceServer correctPoseSrv;
-	ros::ServiceServer statesMapSrv;
+	ros::ServiceServer setModeSrv;
+	ros::ServiceServer getModeSrv;
 
 	PM::DataPointsFilters inputFilters;
 	PM::DataPointsFilters mapPreFilters;
@@ -110,6 +112,7 @@ protected:
 	void processNewMapIfAvailable();
 	void setMap(DP* newPointCloud);
 	DP* updateMap(DP* newPointCloud, const PM::TransformationParameters Ticp, bool updateExisting);
+	void waitForMapBuildingCompleted();
 	
 	void publishLoop(double publishPeriod);
 	void publishTransform();
@@ -119,8 +122,9 @@ protected:
 	bool saveMap(map_msgs::SaveMap::Request &req, map_msgs::SaveMap::Response &res);
 	bool loadMap(ethzasl_icp_mapper::LoadMap::Request &req, ethzasl_icp_mapper::LoadMap::Response &res);
 	bool reset(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
-	bool correctPose(ethzasl_icp_mapper::CorrectMap::Request &req, ethzasl_icp_mapper::CorrectMap::Response &res);
-	bool changeStates(ethzasl_icp_mapper::StatesMap::Request &req, ethzasl_icp_mapper::StatesMap::Response &res);
+	bool correctPose(ethzasl_icp_mapper::CorrectPose::Request &req, ethzasl_icp_mapper::CorrectPose::Response &res);
+	bool setMode(ethzasl_icp_mapper::SetMode::Request &req, ethzasl_icp_mapper::SetMode::Response &res);
+	bool getMode(ethzasl_icp_mapper::GetMode::Request &req, ethzasl_icp_mapper::GetMode::Response &res);
 };
 
 Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
@@ -144,6 +148,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	processingNewCloud(false),
 	localizing(getParam<bool>("localizing", true)),
 	mapping(getParam<bool>("mapping", true)),
+	TOdomToMap(PM::TransformationParameters::Identity(4, 4)),
 	publishStamp(ros::Time::now()),
   tfListener(ros::Duration(30))
 {
@@ -245,7 +250,8 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	loadMapSrv = pn.advertiseService("load_map", &Mapper::loadMap, this);
 	resetSrv = pn.advertiseService("reset", &Mapper::reset, this);
 	correctPoseSrv = pn.advertiseService("correct_pose", &Mapper::correctPose, this);
-	statesMapSrv = pn.advertiseService("change_states", &Mapper::changeStates, this);
+	setModeSrv = pn.advertiseService("set_mode", &Mapper::setMode, this);
+	getModeSrv = pn.advertiseService("get_mode", &Mapper::getMode, this);
 
 	// refreshing tf transform thread
 	publishThread = boost::thread(boost::bind(&Mapper::publishLoop, this, tfPublishPeriod));
@@ -291,11 +297,26 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 	}
 }
 
+struct BoolSetter
+{
+public:
+	bool toSetValue;
+	BoolSetter(bool& target, bool toSetValue):
+		toSetValue(toSetValue),
+		target(target)
+	{}
+	~BoolSetter()
+	{
+		target = toSetValue;
+	}
+protected:
+	bool& target;
+};
+
 void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scannerFrame, const ros::Time& stamp, uint32_t seq)
 {
-
-	// FIXME confirm that modification. Intention: stop publishing tf with time now if a new point cloud is being processed.
 	processingNewCloud = true;
+	BoolSetter stopProcessingSetter(processingNewCloud, false);
 
 	// if the future has completed, use the new map
 	processNewMapIfAvailable();
@@ -308,8 +329,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	if (goodCount == 0)
 	{
 		ROS_ERROR("I found no good points in the cloud");
-		// FIXME: need to put that at every exit statement...
-		processingNewCloud = false;
 		return;
 	}
 	
@@ -319,7 +338,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	ROS_INFO("Processing new point cloud");
 	{
 		timer t; // Print how long take the algo
-
 		
 		// Apply filters to incoming cloud, in scanner coordinates
 		inputFilters.apply(*newPointCloud);
@@ -341,7 +359,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	if (!tfListener.canTransform(scannerFrame,odomFrame,stamp,&reason))
 	{
 		ROS_ERROR_STREAM("Cannot lookup TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << reason);
-		processingNewCloud = false;
 		return;
 	}
 
@@ -365,7 +382,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	if(ptsCount < minReadingPointCount)
 	{
 		ROS_ERROR_STREAM("Not enough points in newPointCloud: only " << ptsCount << " pts.");
-		processingNewCloud = false;
 		return;
 	}
 
@@ -376,7 +392,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		mapCreationTime = stamp;
 		setMap(updateMap(newPointCloud.release(), TscannerToMap, false));
 		// we must not delete newPointCloud because we just stored it in the mapPointCloud
-		processingNewCloud = false;
 		return;
 	}
 	
@@ -384,7 +399,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	if (newPointCloud->features.rows() != icp.getInternalMap().features.rows())
 	{
 		ROS_ERROR_STREAM("Dimensionality missmatch: incoming cloud is " << newPointCloud->features.rows()-1 << " while map is " << icp.getInternalMap().features.rows()-1);
-		processingNewCloud = false;
 		return;
 	}
 	
@@ -402,7 +416,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		if (estimatedOverlap < minOverlap)
 		{
 			ROS_ERROR_STREAM("Estimated overlap too small, ignoring ICP correction!");
-			processingNewCloud = false;
 			return;
 		}
 		
@@ -410,13 +423,12 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		publishStamp = stamp;
 		publishLock.lock();
 		TOdomToMap = Ticp * TOdomToScanner;
-		processingNewCloud = false;
-		publishLock.unlock();
-		
-		ROS_DEBUG_STREAM("TOdomToMap:\n" << TOdomToMap);
-
 		// Publish tf
 		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, stamp));
+		publishLock.unlock();
+		processingNewCloud = false;
+		
+		ROS_DEBUG_STREAM("TOdomToMap:\n" << TOdomToMap);
 		
 		// Publish odometry
 		if (odomPub.getNumSubscribers())
@@ -454,7 +466,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	catch (PM::ConvergenceError error)
 	{
 		ROS_ERROR_STREAM("ICP failed to converge: " << error.what());
-		processingNewCloud = false;
 		return;
 	}
 	
@@ -500,7 +511,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	mapPreFilters.apply(*newPointCloud);
 	
 	// Merge point clouds to map
-	// FIXME: why map in newPointCloud instead of the inverse?
 	if (updateExisting)
 		newPointCloud->concatenate(*mapPointCloud);
 
@@ -511,6 +521,18 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	ROS_INFO_STREAM("New map available (" << newPointCloud->features.cols() << " pts), update took " << t.elapsed() << " [s]");
 	
 	return newPointCloud;
+}
+
+void Mapper::waitForMapBuildingCompleted()
+{
+	#if BOOST_VERSION >= 104100
+	if (mapBuildingInProgress)
+	{
+		// we wait for now, in future we should kill it
+		mapBuildingFuture.wait();
+		mapBuildingInProgress = false;
+	}
+	#endif // BOOST_VERSION >= 104100
 }
 
 void Mapper::publishLoop(double publishPeriod)
@@ -527,22 +549,12 @@ void Mapper::publishLoop(double publishPeriod)
 
 void Mapper::publishTransform()
 {
-
-	if(processingNewCloud == false )
+	if(processingNewCloud == false)
 	{
-		if(icp.hasMap())
-		{
-			publishLock.lock();
-			// Note: we use now as timestamp to refresh the tf and avoid other buffer to be empty
-			// FIXME: does that thing work in 2D?
-			tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, ros::Time::now()));
-			publishLock.unlock();
-		}
-		else
-		{
-			cout << "Publishing identity" << endl;
-			tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(PM::TransformationParameters::Identity(4,4), mapFrame, odomFrame, ros::Time::now()));
-		}
+		publishLock.lock();
+		// Note: we use now as timestamp to refresh the tf and avoid other buffer to be empty
+		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, ros::Time::now()));
+		publishLock.unlock();
 	}
 }
 
@@ -576,21 +588,8 @@ bool Mapper::saveMap(map_msgs::SaveMap::Request &req, map_msgs::SaveMap::Respons
 
 bool Mapper::loadMap(ethzasl_icp_mapper::LoadMap::Request &req, ethzasl_icp_mapper::LoadMap::Response &res)
 {
-	#if BOOST_VERSION >= 104100
-	if (mapBuildingInProgress)
-	{
-		// we wait for now, in future we should kill it
-		mapBuildingFuture.wait();
-		mapBuildingInProgress = false;
-	}
-	#endif // BOOST_VERSION >= 104100
+	waitForMapBuildingCompleted();
 	
-	
-	
-	cout << "Service loadMap called" << endl; 
-
-	// TODO: check that with stephane
-	// FIXME: does that generate memory leak?
 	DP* cloud(new DP(DP::load(req.filename.data)));
 
 	const int dim = cloud->features.rows();
@@ -601,59 +600,51 @@ bool Mapper::loadMap(ethzasl_icp_mapper::LoadMap::Request &req, ethzasl_icp_mapp
 	TOdomToMap = PM::TransformationParameters::Identity(dim,dim);
 	publishLock.unlock();
 
-	setMap(updateMap(cloud, PM::TransformationParameters::Identity(dim,dim), false));
-	//setMap(cloud);
-
-
+	setMap(cloud);
+	
 	return true;
 }
 
 bool Mapper::reset(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
 {
+	waitForMapBuildingCompleted();
+	
 	// note: no need for locking as we do ros::spin(), to update if we go for multi-threading
 	publishLock.lock();
-	// FIXME: will not work in 2D
 	TOdomToMap = PM::TransformationParameters::Identity(4,4);
 	publishLock.unlock();
 
-	// FIXME: no multi-threading wait here? mapPointCloud?
 	icp.clearMap();
+	
 	return true;
 }
 
-
-bool Mapper::correctPose(ethzasl_icp_mapper::CorrectMap::Request &req, ethzasl_icp_mapper::CorrectMap::Response &res)
+bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req, ethzasl_icp_mapper::CorrectPose::Response &res)
 {
 	publishLock.lock();
 	TOdomToMap = PointMatcher_ros::odomMsgToEigenMatrix<float>(req.odom);
-	
 	tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, ros::Time::now()));
 	publishLock.unlock();
 
 	return true;
 }
 
-bool Mapper::changeStates(ethzasl_icp_mapper::StatesMap::Request &req, ethzasl_icp_mapper::StatesMap::Response &res)
+bool Mapper::setMode(ethzasl_icp_mapper::SetMode::Request &req, ethzasl_icp_mapper::SetMode::Response &res)
 {
-	cout << "request to changeStates" << endl;
+	// Impossible states
+	if(req.localize == false && req.map == true)
+		return false;
 
-	if(req.applyChange == false)
-	{
-		res.localize = localizing;	
-		res.map = mapping;	
-	}
-	else
-	{
-		// Impossible states
-		if(req.localize == false && req.map == true)
-			return false;
+	localizing = req.localize;
+	mapping = req.map;
+	
+	return true;
+}
 
-		localizing = req.localize;	
-		mapping = req.map;	
-		res.localize = localizing;	
-		res.map = mapping;
-	}
-
+bool Mapper::getMode(ethzasl_icp_mapper::GetMode::Request &req, ethzasl_icp_mapper::GetMode::Response &res)
+{
+	res.localize = localizing;
+	res.map = mapping;
 	return true;
 }
 
