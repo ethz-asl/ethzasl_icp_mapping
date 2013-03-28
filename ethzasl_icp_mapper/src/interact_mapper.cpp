@@ -152,7 +152,7 @@ InteractMapper::InteractMapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 						#if BOOST_FILESYSTEM_VERSION >= 3
 						menu_handler.insert(h_load, dir_itr->path().filename().string(), boost::bind(&InteractMapper::loadMapCallback, this, _1) );
 						#else
-						menu_handler.insert(h_load, dir_itr->path().filename().file_string(), boost::bind(&InteractMapper::loadMapCallback, this, _1) );
+						menu_handler.insert(h_load, dir_itr->path().filename(), boost::bind(&InteractMapper::loadMapCallback, this, _1) );
 						#endif
 					}
 				}
