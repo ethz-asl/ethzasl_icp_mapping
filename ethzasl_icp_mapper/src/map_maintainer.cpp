@@ -305,7 +305,10 @@ void MapMaintener::processCloud(DP newPointCloud, const TP TScannerToMap)
 	
 	
 	// Correct new points using ICP result and move them in their own frame
-	newPointCloud = transformation->compute(newPointCloud, TObjectToMap.inverse() * TScannerToMap); 
+	cout << "TObjectToMap: " << endl << TObjectToMap << endl;
+	cout << "TScannerToMap: " << endl << TScannerToMap << endl;
+	cout << "concat: " << endl << TObjectToMap.inverse() * TScannerToMap << endl;
+	newPointCloud = transformation->compute(newPointCloud, transformation->correctParameters(TObjectToMap.inverse() * TScannerToMap)); 
 	
 	// Preparation of cloud for inclusion in map
 	mapPreFilters.apply(newPointCloud);
@@ -352,6 +355,7 @@ void MapMaintener::processCloud(DP newPointCloud, const TP TScannerToMap)
 
 	ROS_DEBUG_STREAM("Tcorr:\n" << Tcorr);
 
+	cout << "Tcorr: " << endl << Tcorr << endl;
 	newPointCloud = transformation->compute(newPointCloud, Tcorr); 
 	// Merge point clouds to map
 	mapPointCloud.concatenate(newPointCloud);
