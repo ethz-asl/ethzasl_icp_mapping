@@ -49,8 +49,12 @@ struct OccupancyGridBuilder
 		{
 			const float range(scan.ranges[a]);
 			float end = -1;	// Non-acceptable value
+			bool validRange(false);
 			if (range >= scan.range_min && range <= scan.range_max)
+			{
 				end = range;
+				validRange = true;
+			}
 			else if (invalidDist > 0) // Distance to clear map if range is invalid
 				end = invalidDist;
 			if (end != -1)
@@ -69,7 +73,7 @@ struct OccupancyGridBuilder
 					Vector(rayEnd.x(), rayEnd.y()),
 					probUpdater
 				);
-				if (range == end)
+				if (validRange && (range == dist))
 					probMap.addNearestValueSaturated(Vector(rayEnd.x(),
 							rayEnd.y()), obsVal-freeVal);
 				knownMap.lineScan(
