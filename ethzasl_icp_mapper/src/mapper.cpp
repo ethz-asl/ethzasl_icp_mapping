@@ -79,19 +79,20 @@ class Mapper
 	#endif // BOOST_VERSION >= 104100
 
 	// Parameters
-	int minReadingPointCount;
-	int minMapPointCount;
-	double minOverlap;
-	double maxOverlapToMerge;
-	double tfPublishPeriod;
-	string odomFrame;
-	string mapFrame;
-	string vtkFinalMapName; //!< name of the final vtk map
-	int inputQueueSize; 
 	bool useConstMotionModel; 
 	bool processingNewCloud; 
 	bool localizing;
 	bool mapping;
+	int minReadingPointCount;
+	int minMapPointCount;
+	int inputQueueSize; 
+	double minOverlap;
+	double maxOverlapToMerge;
+	double tfRefreshPeriod;  //!< if set to zero, tf will be publish at the rate of the incoming point cloud messages 
+	string odomFrame;
+	string mapFrame;
+	string vtkFinalMapName; //!< name of the final vtk map
+	
 
 	PM::TransformationParameters TOdomToMap;
 	boost::thread publishThread;
@@ -139,7 +140,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	minMapPointCount(getParam<int>("minMapPointCount", 500)),
 	minOverlap(getParam<double>("minOverlap", 0.5)),
 	maxOverlapToMerge(getParam<double>("maxOverlapToMerge", 0.9)),
-	tfPublishPeriod(getParam<double>("tfPublishPeriod", 0.001)),
+	tfRefreshPeriod(getParam<double>("tfRefreshPeriod", 0.01)),
 	odomFrame(getParam<string>("odom_frame", "odom")),
 	mapFrame(getParam<string>("map_frame", "map")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
@@ -254,7 +255,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	getModeSrv = pn.advertiseService("get_mode", &Mapper::getMode, this);
 
 	// refreshing tf transform thread
-	publishThread = boost::thread(boost::bind(&Mapper::publishLoop, this, tfPublishPeriod));
+	publishThread = boost::thread(boost::bind(&Mapper::publishLoop, this, tfRefreshPeriod));
 }
 
 Mapper::~Mapper()
