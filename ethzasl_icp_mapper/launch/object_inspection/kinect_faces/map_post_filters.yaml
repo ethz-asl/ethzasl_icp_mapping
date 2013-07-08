@@ -5,7 +5,7 @@
     keepDensities: 1
 - OrientNormalsDataPointsFilter 
 - MaxDensityDataPointsFilter:
-    maxDensity: 1000000000
+    maxDensity: 1000000
 - MaxPointCountDataPointsFilter:
     maxCount: 500000
     prob: 0.75

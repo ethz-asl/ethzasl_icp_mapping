@@ -236,7 +236,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	{
 		ROS_INFO_STREAM("No map post-filters config file given, not using these filters");
 	}
-	
+
 	// topics and services initialization
 	if (getParam<bool>("subscribe_scan", true))
 		scanSub = n.subscribe("scan", inputQueueSize, &Mapper::gotScan, this);
@@ -356,12 +356,14 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	}
 
 	// Fetch transformation from scanner to odom
-	if (!tfListener.canTransform(scannerFrame,odomFrame,stamp,&reason))
+	// FIXME: conflic between Kinect application and Artor rosbag (confirm that everything is working)
+	if (!tfListener.waitForTransform(scannerFrame, odomFrame, ros::Time::now(), ros::Duration(1.0), ros::Duration(0.01), &reason))
 	{
 		ROS_ERROR_STREAM("Cannot lookup TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << reason);
 		return;
 	}
 
+	// We don't need to wait for transform. It is already called in transformListenerToEigenMatrix()
 	const PM::TransformationParameters TOdomToScanner(
 		PointMatcher_ros::eigenMatrixToDim<float>(
 			PointMatcher_ros::transformListenerToEigenMatrix<float>(
@@ -468,6 +470,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		ROS_ERROR_STREAM("ICP failed to converge: " << error.what());
 		return;
 	}
+	//TODO: add warning about real-time capability
 	
 	ROS_INFO_STREAM("Total ICP took: " << t.elapsed() << " [s]");
 }

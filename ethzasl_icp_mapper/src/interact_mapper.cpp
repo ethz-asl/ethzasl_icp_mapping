@@ -349,7 +349,7 @@ void InteractMapper::update_tf(const visualization_msgs::InteractiveMarkerFeedba
 		
 		//menu_handler.reApply( *server );
 		//server->applyChanges();
-		//ros::Duration(0.1).sleep();
+		ros::Duration(0.1).sleep();
 	}
 }
 

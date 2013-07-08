@@ -12,7 +12,8 @@ outlierFilters:
       ratio: 0.65
 
 errorMinimizer:
-  PointToPlaneErrorMinimizer
+  PointToPlaneErrorMinimizer:
+    force2D: 0
 
 transformationCheckers:
   - DifferentialTransformationChecker:

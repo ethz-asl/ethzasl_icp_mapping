@@ -11,7 +11,7 @@ referenceDataPointsFilters:
 matcher:
   KDTreeMatcher:
     knn: 3
-    maxDist: 5.0
+    maxDist: 8.0
     epsilon: 3.33
 
 outlierFilters:
@@ -32,7 +32,7 @@ transformationCheckers:
       maxIterationCount: 40
   - BoundTransformationChecker:
       maxRotationNorm: 0.80
-      maxTranslationNorm: 10.00
+      maxTranslationNorm: 30.00
 
 inspector:
 #  VTKFileInspector

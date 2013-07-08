@@ -3,6 +3,8 @@ FP: 30 Jan. 2013
 
 Files tuned for ethzasl_icp_mapping commit 52d78c96c2cf2f58a400c649c561dbfec95e41a4
 and for libpointmatcher commit e048c4d1180b1de005af072bf137ea4d8cf2b826
+
+To debug, use: launch minus prefix= "gdb minus minus args"
 -->
 
 <launch>
