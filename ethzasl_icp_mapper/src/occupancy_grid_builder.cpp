@@ -15,6 +15,7 @@ struct OccupancyGridBuilder
 	const int obsVal;
 	const int freeVal;
 	const float invalidDist;
+	const float mapTFUpdatePeriod;
 	GridMap::Group mapGroup;
 	GridMap probMap;
 	GridMap knownMap;
@@ -28,6 +29,8 @@ struct OccupancyGridBuilder
 		freeVal(getParam<int>("free_value", -8000)),
 		// Distance to clear map if range is invalid; 0 to deactivate
 		invalidDist(getParam<double>("invalid_distance", 1.)), 
+		// Timeout for the tf request
+		mapTFUpdatePeriod(getParam<double>("map_tf_update_period", 1.)), 
 		probMap(getParam<double>("resolution", 0.05), 0, &mapGroup),
 		knownMap(&mapGroup, -1),
 		mapPub(nh.advertise<nav_msgs::OccupancyGrid>("map", 2, true)),
@@ -61,7 +64,7 @@ struct OccupancyGridBuilder
 			{
 				const ros::Time scanStamp(stamp + ros::Duration(scan.time_increment)*a);
 				// get transform
-				tfListener.waitForTransform(mapFrame, scan.header.frame_id, scanStamp, ros::Duration(1.0), ros::Duration(0.1));
+				tfListener.waitForTransform(mapFrame, scan.header.frame_id, scanStamp, ros::Duration(mapTFUpdatePeriod), ros::Duration(0.1));
 				tfListener.lookupTransform(mapFrame, scan.header.frame_id, scanStamp, transform);
 				// compute ray positions
 				const tf::Vector3 rayStart = transform(tf::Vector3(0,0,0));
