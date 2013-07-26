@@ -20,6 +20,7 @@
 #include "tf/transform_broadcaster.h"
 #include "tf_conversions/tf_eigen.h"
 #include "tf/transform_listener.h"
+#include "eigen_conversions/eigen_msg.h"
 
 // Services
 #include "std_msgs/String.h"
@@ -30,6 +31,7 @@
 #include "ethzasl_icp_mapper/CorrectPose.h"
 #include "ethzasl_icp_mapper/SetMode.h"
 #include "ethzasl_icp_mapper/GetMode.h"
+#include "ethzasl_icp_mapper/GetBoundedMap.h" // FIXME: should that be moved to map_msgs?
 
 using namespace std;
 using namespace PointMatcherSupport;
@@ -59,6 +61,7 @@ class Mapper
 	ros::ServiceServer correctPoseSrv;
 	ros::ServiceServer setModeSrv;
 	ros::ServiceServer getModeSrv;
+	ros::ServiceServer getBoundedMapSrv;
 
 	PM::DataPointsFilters inputFilters;
 	PM::DataPointsFilters mapPreFilters;
@@ -126,6 +129,7 @@ protected:
 	bool correctPose(ethzasl_icp_mapper::CorrectPose::Request &req, ethzasl_icp_mapper::CorrectPose::Response &res);
 	bool setMode(ethzasl_icp_mapper::SetMode::Request &req, ethzasl_icp_mapper::SetMode::Response &res);
 	bool getMode(ethzasl_icp_mapper::GetMode::Request &req, ethzasl_icp_mapper::GetMode::Response &res);
+	bool getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethzasl_icp_mapper::GetBoundedMap::Response &res);
 };
 
 Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
@@ -136,19 +140,19 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	#if BOOST_VERSION >= 104100
 	mapBuildingInProgress(false),
 	#endif // BOOST_VERSION >= 104100
+	useConstMotionModel(getParam<bool>("useConstMotionModel", false)),
+	processingNewCloud(false),
+	localizing(getParam<bool>("localizing", true)),
+	mapping(getParam<bool>("mapping", true)),
 	minReadingPointCount(getParam<int>("minReadingPointCount", 2000)),
 	minMapPointCount(getParam<int>("minMapPointCount", 500)),
+	inputQueueSize(getParam<int>("inputQueueSize", 10)),
 	minOverlap(getParam<double>("minOverlap", 0.5)),
 	maxOverlapToMerge(getParam<double>("maxOverlapToMerge", 0.9)),
 	tfRefreshPeriod(getParam<double>("tfRefreshPeriod", 0.01)),
 	odomFrame(getParam<string>("odom_frame", "odom")),
 	mapFrame(getParam<string>("map_frame", "map")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
-	inputQueueSize(getParam<int>("inputQueueSize", 10)),
-	useConstMotionModel(getParam<bool>("useConstMotionModel", false)),
-	processingNewCloud(false),
-	localizing(getParam<bool>("localizing", true)),
-	mapping(getParam<bool>("mapping", true)),
 	TOdomToMap(PM::TransformationParameters::Identity(4, 4)),
 	publishStamp(ros::Time::now()),
   tfListener(ros::Duration(30))
@@ -253,6 +257,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	correctPoseSrv = pn.advertiseService("correct_pose", &Mapper::correctPose, this);
 	setModeSrv = pn.advertiseService("set_mode", &Mapper::setMode, this);
 	getModeSrv = pn.advertiseService("get_mode", &Mapper::getMode, this);
+	getBoundedMapSrv = pn.advertiseService("get_bounded_map", &Mapper::getBoundedMap, this);
 
 	// refreshing tf transform thread
 	publishThread = boost::thread(boost::bind(&Mapper::publishLoop, this, tfRefreshPeriod));
@@ -358,22 +363,31 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 
 	// Fetch transformation from scanner to odom
 	// FIXME: conflic between Kinect application and Artor rosbag (confirm that everything is working)
-	if (!tfListener.waitForTransform(scannerFrame, odomFrame, ros::Time::now(), ros::Duration(1.0), ros::Duration(0.01), &reason))
+	//if (!tfListener.waitForTransform(scannerFrame, odomFrame, stamp, ros::Duration(1.0), ros::Duration(0.01), &reason))
+	//{
+	//	ROS_ERROR_STREAM("Cannot lookup TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << reason);
+	//	return;
+	//}
+
+	// We don't need to wait for transform. It is already called in transformListenerToEigenMatrix()
+	PM::TransformationParameters TOdomToScanner;
+	try
 	{
-		ROS_ERROR_STREAM("Cannot lookup TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << reason);
+		TOdomToScanner = PointMatcher_ros::eigenMatrixToDim<float>(
+				PointMatcher_ros::transformListenerToEigenMatrix<float>(
+				tfListener,
+				scannerFrame,
+				odomFrame,
+				stamp
+			), dimp1);
+	}
+	catch(tf::ExtrapolationException e)
+	{
+		ROS_ERROR_STREAM("Extrapolation Exception. stamp = "<< stamp << " now = " << ros::Time::now() << " delta = " << ros::Time::now() - stamp);
 		return;
 	}
 
-	// We don't need to wait for transform. It is already called in transformListenerToEigenMatrix()
-	const PM::TransformationParameters TOdomToScanner(
-		PointMatcher_ros::eigenMatrixToDim<float>(
-			PointMatcher_ros::transformListenerToEigenMatrix<float>(
-			tfListener,
-			scannerFrame,
-			odomFrame,
-			stamp
-		), dimp1)
-	);
+
 	ROS_DEBUG_STREAM("TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << TOdomToScanner);
 	ROS_DEBUG_STREAM("TOdomToMap(" << odomFrame<< " to " << mapFrame << "):\n" << TOdomToMap);
 		
@@ -567,6 +581,7 @@ bool Mapper::getPointMap(map_msgs::GetPointMap::Request &req, map_msgs::GetPoint
 	if (!mapPointCloud)
 		return false;
 	
+	// FIXME: do we need a mutex here?
 	res.map = PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud, mapFrame, ros::Time::now());
 	return true;
 }
@@ -649,6 +664,70 @@ bool Mapper::getMode(ethzasl_icp_mapper::GetMode::Request &req, ethzasl_icp_mapp
 {
 	res.localize = localizing;
 	res.map = mapping;
+	return true;
+}
+
+
+
+bool Mapper::getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethzasl_icp_mapper::GetBoundedMap::Response &res)
+{
+	if (!mapPointCloud)
+		return false;
+
+	const float max_x = req.topRightCorner.x;
+	const float max_y = req.topRightCorner.y;
+	const float max_z = req.topRightCorner.z;
+
+	const float min_x = req.bottomLeftCorner.x;
+	const float min_y = req.bottomLeftCorner.y;
+	const float min_z = req.bottomLeftCorner.z;
+
+	cerr << "min [" << min_x << ", " << min_y << ", " << min_z << "] " << endl;
+	cerr << "max [" << max_x << ", " << max_y << ", " << max_z << "] " << endl;
+
+
+
+	tf::StampedTransform stampedTr;
+	
+	Eigen::Affine3d eigenTr;
+	tf::poseMsgToEigen(req.mapCenter, eigenTr);
+	const Eigen::MatrixXf T = eigenTr.matrix().inverse().cast<float>();
+	//const Eigen::MatrixXf T = eigenTr.matrix().cast<float>();
+
+
+		
+	// FIXME: do we need a mutex here?
+	const DP centeredPointCloud = transformation->compute(*mapPointCloud, T); 
+	DP cutPointCloud = centeredPointCloud.createSimilarEmpty();
+
+	cerr << centeredPointCloud.features.topLeftCorner(3, 10) << endl;
+	cerr << T << endl;
+
+	int newPtCount = 0;
+	for(int i=0; i < centeredPointCloud.features.cols(); i++)
+	{
+		const float x = centeredPointCloud.features(0,i);
+		const float y = centeredPointCloud.features(1,i);
+		const float z = centeredPointCloud.features(2,i);
+		
+		if(x < max_x && x > min_x )
+			//&&
+			// y < max_y && y > min_y &&
+		  // z < max_z && z > min_z 	)
+		{
+			cutPointCloud.setColFrom(newPtCount, centeredPointCloud, i);
+			newPtCount++;	
+		}
+	}
+
+	cerr << "Extract " << newPtCount << " points from the map" << endl;
+	
+	cutPointCloud.conservativeResize(newPtCount);
+	cutPointCloud = transformation->compute(cutPointCloud, T.inverse()); 
+
+	
+	// Send the resulting point cloud in ROS format
+	res.boundedMap = PointMatcher_ros::pointMatcherCloudToRosMsg<float>(cutPointCloud, mapFrame, ros::Time::now());
 	return true;
 }
 

@@ -11,9 +11,13 @@
 #include "pointmatcher_ros/get_params_from_server.h"
 
 #include "nav_msgs/Odometry.h"
+#include "geometry_msgs/Pose.h"
+
 #include "tf/transform_broadcaster.h"
+#include "tf/transform_datatypes.h"
 #include "tf_conversions/tf_eigen.h"
 #include "tf/transform_listener.h"
+#include "eigen_conversions/eigen_msg.h"
 
 // Services
 #include "map_msgs/SaveMap.h"
@@ -21,12 +25,21 @@
 #include "ethzasl_icp_mapper/CorrectPose.h"
 #include "ethzasl_icp_mapper/SetMode.h"
 #include "ethzasl_icp_mapper/GetMode.h"
+#include "ethzasl_icp_mapper/GetBoundedMap.h"
 
 #include "boost/algorithm/string.hpp"
 #include "boost/filesystem.hpp"
 #include "boost/filesystem/path.hpp"
 #include "boost/filesystem/operations.hpp"
 #include "boost/lexical_cast.hpp"
+
+// ugly test depending on roscpp because tf_conversions is not properly versionized
+#if !ROS_VERSION_MINIMUM(1, 9, 30)
+	#define transformTFToEigen TransformTFToEigen
+	#define transformEigenToTF TransformEigenToTF
+#endif // !ROS_VERSION_MINIMUM(1, 9, 30)
+
+
 
 using namespace std;
 using namespace PointMatcherSupport;
@@ -48,12 +61,17 @@ public:
 	const string odomFrame;
 	const string mapFrame;
 	
+	// Publisher
+	ros::Publisher test_mapPub;
+
 	// Services
 	ros::ServiceClient saveMapClient;
 	ros::ServiceClient loadMapClient;
 	ros::ServiceClient correctMapClient;
 	ros::ServiceClient setModeClient;
 	ros::ServiceClient getModeClient;
+	// test
+	ros::ServiceClient getBoundedMapClient;
 
 	// Interative markers
 	boost::shared_ptr<InteractiveMarkerServer> server;
@@ -63,8 +81,10 @@ public:
 	MenuHandler::EntryHandle h_load;
 	MenuHandler::EntryHandle h_save;
 	MenuHandler::EntryHandle h_adjustPose;
+	MenuHandler::EntryHandle h_getboundedMap;
 
 	tf::TransformListener tfListener;
+	geometry_msgs::Pose markerPose;
 
 	InteractMapper(ros::NodeHandle& n, ros::NodeHandle& pn);
 	~InteractMapper();
@@ -75,6 +95,8 @@ protected:
 	void saveMapCallback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
 	void loadMapCallback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
 	void adjustPoseCallback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
+	void getBoundedMapCallback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
+	
 	void update_tf(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
 
 private:
@@ -96,6 +118,9 @@ InteractMapper::InteractMapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	ros::service::waitForService("mapper/set_mode");
 	ROS_INFO_STREAM("Mapper node found");
 	
+	// Publisher
+	test_mapPub = n.advertise<sensor_msgs::PointCloud2>("debug_bounded_map", 2, true);
+
 	// Service setups
 	// TODO: remove private tags
 	saveMapClient = n.serviceClient<map_msgs::SaveMap>("mapper/save_map");
@@ -103,6 +128,7 @@ InteractMapper::InteractMapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	correctMapClient = n.serviceClient<ethzasl_icp_mapper::CorrectPose>("mapper/correct_pose");
 	setModeClient = n.serviceClient<ethzasl_icp_mapper::SetMode>("mapper/set_mode");
 	getModeClient = n.serviceClient<ethzasl_icp_mapper::GetMode>("mapper/get_mode");
+	getBoundedMapClient = n.serviceClient<ethzasl_icp_mapper::GetBoundedMap>("mapper/get_bounded_map");
 
 	// Setup interactive maker
 	server.reset( new InteractiveMarkerServer("MapControl","", false) );
@@ -112,6 +138,8 @@ InteractMapper::InteractMapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	h_load = menu_handler.insert( "Load map from VTK");
 
 	h_adjustPose = menu_handler.insert( "Correct map pose", boost::bind(&InteractMapper::adjustPoseCallback, this, _1));
+	
+	h_getboundedMap = menu_handler.insert( "Publish 3x3 meter map", boost::bind(&InteractMapper::getBoundedMapCallback, this, _1));
 	
 	// Fetch states of the mapper node
 	ethzasl_icp_mapper::GetMode srv;
@@ -302,6 +330,8 @@ void InteractMapper::update_tf(const visualization_msgs::InteractiveMarkerFeedba
 	{
 		nav_msgs::Odometry odom;
 		odom.pose.pose = feedback->pose;
+		markerPose = feedback->pose;
+
 		const PM::TransformationParameters TMarkerToMap =
 			PointMatcher_ros::odomMsgToEigenMatrix<float>(odom);
 
@@ -353,6 +383,37 @@ void InteractMapper::update_tf(const visualization_msgs::InteractiveMarkerFeedba
 	}
 }
 
+void InteractMapper::getBoundedMapCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
+{
+	ethzasl_icp_mapper::GetBoundedMap srv;
+	srv.request.topRightCorner.x = 1.5;
+	srv.request.topRightCorner.y = 1.5;
+	srv.request.topRightCorner.z = 1.5;
+
+	srv.request.bottomLeftCorner.x = -1.5;
+	srv.request.bottomLeftCorner.y = -1.5;
+	srv.request.bottomLeftCorner.z = -1.5;
+
+	// FIXME: throw exeception: finish debug here...
+	tf::StampedTransform stampedTr;
+	tfListener.waitForTransform(mapFrame, baseFrame, ros::Time::now(), ros::Duration(2));
+	tfListener.lookupTransform(mapFrame, baseFrame, ros::Time::now(), stampedTr);
+	
+	Eigen::Affine3d eigenTr;
+	tf::transformTFToEigen(stampedTr, eigenTr);
+
+	srv.request.mapCenter.orientation.x = eigenTr.rotation().x();
+	srv.request.mapCenter.orientation.z = eigenTr.rotation().y();
+	srv.request.mapCenter.orientation.y = eigenTr.rotation().z();
+	srv.request.mapCenter.orientation.w = eigenTr.rotation().w();
+	srv.request.mapCenter.position.x = eigenTr.translation().x();
+	srv.request.mapCenter.position.y = eigenTr.translation().y();
+	srv.request.mapCenter.position.z = eigenTr.translation().z();
+	getBoundedMapClient.call(srv);
+
+	test_mapPub.publish(srv.response.boundedMap);
+
+}
 
 
 //================================================
