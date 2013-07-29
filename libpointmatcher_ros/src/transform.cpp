@@ -20,22 +20,9 @@ namespace PointMatcher_ros
 		typedef typename PointMatcher<T>::TransformationParameters TransformationParameters;
 		
 		tf::StampedTransform stampedTr;
-		// TODO: (investigate) when use at high speed (Kinect) the lookupTransform throw exeption: ExtrapolationException
-		//bool success = false;
-		//while(!success)
-		//{
-			//try
-			//{
-				listener.waitForTransform(target, source, stamp, ros::Duration(2));
-				listener.lookupTransform(target, source, stamp, stampedTr);
-				//success = true;
-			//}
-			//catch(tf::ExtrapolationException e)
-			//{
-				//ROS_WARN_STREAM("Extrapolation Exception. stamp = "<< stamp << " now = " << ros::Time::now() << " delta = " << ros::Time::now() - stamp << "  Retrying...");
-			//}
-		//}
-		
+		listener.waitForTransform(target, source, stamp, ros::Duration(2));
+		listener.lookupTransform(target, source, stamp, stampedTr);
+						
 		Eigen::Affine3d eigenTr;
 		tf::transformTFToEigen(stampedTr, eigenTr);
 		return eigenTr.matrix().cast<T>();

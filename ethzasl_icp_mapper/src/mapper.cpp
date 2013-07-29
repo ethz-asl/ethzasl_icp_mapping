@@ -63,13 +63,15 @@ class Mapper
 	ros::ServiceServer getModeSrv;
 	ros::ServiceServer getBoundedMapSrv;
 
+	ros::Time mapCreationTime;
+	ros::Time lastPoinCloudTime;
+
 	PM::DataPointsFilters inputFilters;
 	PM::DataPointsFilters mapPreFilters;
 	PM::DataPointsFilters mapPostFilters;
-	unique_ptr<PM::Transformation> transformation;
-	ros::Time mapCreationTime;
 	PM::DataPoints *mapPointCloud;
 	PM::ICPSequence icp;
+	unique_ptr<PM::Transformation> transformation;
 	
 	// multi-threading mapper
 	#if BOOST_VERSION >= 104100
@@ -135,8 +137,8 @@ protected:
 Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	n(n),
 	pn(pn),
-	transformation(PM::get().REG(Transformation).create("RigidTransformation")),
 	mapPointCloud(0),
+	transformation(PM::get().REG(Transformation).create("RigidTransformation")),
 	#if BOOST_VERSION >= 104100
 	mapBuildingInProgress(false),
 	#endif // BOOST_VERSION >= 104100
@@ -362,14 +364,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	}
 
 	// Fetch transformation from scanner to odom
-	// FIXME: conflic between Kinect application and Artor rosbag (confirm that everything is working)
-	//if (!tfListener.waitForTransform(scannerFrame, odomFrame, stamp, ros::Duration(1.0), ros::Duration(0.01), &reason))
-	//{
-	//	ROS_ERROR_STREAM("Cannot lookup TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << reason);
-	//	return;
-	//}
-
-	// We don't need to wait for transform. It is already called in transformListenerToEigenMatrix()
+	// Note: we don't need to wait for transform. It is already called in transformListenerToEigenMatrix()
 	PM::TransformationParameters TOdomToScanner;
 	try
 	{
@@ -485,9 +480,16 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		ROS_ERROR_STREAM("ICP failed to converge: " << error.what());
 		return;
 	}
-	//TODO: add warning about real-time capability
 	
-	ROS_INFO_STREAM("Total ICP took: " << t.elapsed() << " [s]");
+	//Statistics about time and real-time capability
+	int realTimeRatio = 100*t.elapsed() / (stamp.toSec()-lastPoinCloudTime.toSec());
+	ROS_INFO_STREAM("[TIME] Total ICP took: " << t.elapsed() << " [s]");
+	if(realTimeRatio < 80)
+		ROS_INFO_STREAM("[TIME] Real-time capability: " << realTimeRatio << "%");
+	else
+		ROS_WARN_STREAM("[TIME] Real-time capability: " << realTimeRatio << "%");
+
+	lastPoinCloudTime = stamp;
 }
 
 void Mapper::processNewMapIfAvailable()
@@ -536,7 +538,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	if(newPointCloud->features.cols() > minMapPointCount)
 		mapPostFilters.apply(*newPointCloud);
 	
-	ROS_INFO_STREAM("New map available (" << newPointCloud->features.cols() << " pts), update took " << t.elapsed() << " [s]");
+	ROS_INFO_STREAM("[TIME] New map available (" << newPointCloud->features.cols() << " pts), update took " << t.elapsed() << " [s]");
 	
 	return newPointCloud;
 }
@@ -691,9 +693,11 @@ bool Mapper::getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethz
 	
 	Eigen::Affine3d eigenTr;
 	tf::poseMsgToEigen(req.mapCenter, eigenTr);
-	const Eigen::MatrixXf T = eigenTr.matrix().inverse().cast<float>();
+	Eigen::MatrixXf T = eigenTr.matrix().inverse().cast<float>();
 	//const Eigen::MatrixXf T = eigenTr.matrix().cast<float>();
 
+	cerr << "T:" << endl << T << endl;
+	T = transformation->correctParameters(T);
 
 		
 	// FIXME: do we need a mutex here?
@@ -710,10 +714,9 @@ bool Mapper::getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethz
 		const float y = centeredPointCloud.features(1,i);
 		const float z = centeredPointCloud.features(2,i);
 		
-		if(x < max_x && x > min_x )
-			//&&
-			// y < max_y && y > min_y &&
-		  // z < max_z && z > min_z 	)
+		if(x < max_x && x > min_x &&
+			 y < max_y && y > min_y &&
+		   z < max_z && z > min_z 	)
 		{
 			cutPointCloud.setColFrom(newPtCount, centeredPointCloud, i);
 			newPtCount++;	

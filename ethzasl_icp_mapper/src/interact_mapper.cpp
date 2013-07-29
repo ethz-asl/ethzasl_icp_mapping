@@ -396,8 +396,9 @@ void InteractMapper::getBoundedMapCallback( const visualization_msgs::Interactiv
 
 	// FIXME: throw exeception: finish debug here...
 	tf::StampedTransform stampedTr;
-	tfListener.waitForTransform(mapFrame, baseFrame, ros::Time::now(), ros::Duration(2));
-	tfListener.lookupTransform(mapFrame, baseFrame, ros::Time::now(), stampedTr);
+	ros::Time stamp = ros::Time::now();
+	tfListener.waitForTransform(mapFrame, baseFrame, stamp, ros::Duration(2));
+	tfListener.lookupTransform(mapFrame, baseFrame, stamp, stampedTr);
 	
 	Eigen::Affine3d eigenTr;
 	tf::transformTFToEigen(stampedTr, eigenTr);
