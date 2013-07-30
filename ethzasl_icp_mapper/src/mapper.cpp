@@ -50,6 +50,7 @@ class Mapper
 	
 	// Publisher
 	ros::Publisher mapPub;
+	ros::Publisher outlierPub;
 	ros::Publisher odomPub;
 	ros::Publisher odomErrorPub;
 	
@@ -250,6 +251,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	if (getParam<bool>("subscribe_cloud", true))
 		cloudSub = n.subscribe("cloud_in", inputQueueSize, &Mapper::gotCloud, this);
 	mapPub = n.advertise<sensor_msgs::PointCloud2>("point_map", 2, true);
+	outlierPub = n.advertise<sensor_msgs::PointCloud2>("outliers", 2, true);
 	odomPub = n.advertise<nav_msgs::Odometry>("icp_odom", 50, true);
 	odomErrorPub = n.advertise<nav_msgs::Odometry>("icp_error_odom", 50, true);
 	getPointMapSrv = n.advertiseService("dynamic_point_map", &Mapper::getPointMap, this);
@@ -441,7 +443,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		processingNewCloud = false;
 		
 		ROS_DEBUG_STREAM("TOdomToMap:\n" << TOdomToMap);
-		
+
 		// Publish odometry
 		if (odomPub.getNumSubscribers())
 			odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(Ticp, mapFrame, stamp));
@@ -449,6 +451,13 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		// Publish error on odometry
 		if (odomErrorPub.getNumSubscribers())
 			odomErrorPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(TOdomToMap, mapFrame, stamp));
+
+		// Publish outliers
+		if (outlierPub.getNumSubscribers())
+		{
+			DP outliers = PM::extractOutliers(transformation->compute(*newPointCloud, Ticp), *mapPointCloud, 0.6);
+			outlierPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(outliers, mapFrame, mapCreationTime));
+		}
 
 		// check if news points should be added to the map
 		if (
