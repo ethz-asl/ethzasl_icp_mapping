@@ -1,17 +1,17 @@
 readingDataPointsFilters:
   - RandomSamplingDataPointsFilter:
-      prob: 0.25
+      prob: 0.2
 
 referenceDataPointsFilters:
   - MaxDistDataPointsFilter:
-      maxDist: 70.0
-#  - RandomSamplingDataPointsFilter:
-#      prob: 0.1
+      maxDist: 50.0
+  - RandomSamplingDataPointsFilter:
+      prob: 0.1
 
 matcher:
   KDTreeMatcher:
     knn: 3
-    maxDist: 8.0
+    maxDist: 10.0
     epsilon: 3.33
 
 outlierFilters:
