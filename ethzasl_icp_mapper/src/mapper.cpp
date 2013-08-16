@@ -455,8 +455,8 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		// Publish outliers
 		if (outlierPub.getNumSubscribers())
 		{
-			DP outliers = PM::extractOutliers(transformation->compute(*newPointCloud, Ticp), *mapPointCloud, 0.6);
-			outlierPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(outliers, mapFrame, mapCreationTime));
+			//DP outliers = PM::extractOutliers(transformation->compute(*newPointCloud, Ticp), *mapPointCloud, 0.6);
+			//outlierPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(outliers, mapFrame, mapCreationTime));
 		}
 
 		// check if news points should be added to the map
