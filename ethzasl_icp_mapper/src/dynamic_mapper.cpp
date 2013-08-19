@@ -10,7 +10,6 @@
 #include "ros/console.h"
 #include "pointmatcher/PointMatcher.h"
 #include "pointmatcher/Timer.h"
-#include "pointmatcher/MatchersImpl.h"
 
 #include "nabo/nabo.h"
 
