@@ -54,7 +54,7 @@ class Mapper
 	ros::Subscriber scanSub;
 	ros::Subscriber cloudSub;
 	
-	// Publisher
+	// Publishers
 	ros::Publisher mapPub;
 	ros::Publisher outlierPub;
 	ros::Publisher odomPub;
@@ -70,9 +70,11 @@ class Mapper
 	ros::ServiceServer getModeSrv;
 	ros::ServiceServer getBoundedMapSrv;
 
+	// Time
 	ros::Time mapCreationTime;
 	ros::Time lastPoinCloudTime;
 
+	// libpointmatcher
 	PM::DataPointsFilters inputFilters;
 	PM::DataPointsFilters mapPreFilters;
 	PM::DataPointsFilters mapPostFilters;
@@ -113,6 +115,8 @@ class Mapper
 	
 	tf::TransformListener tfListener;
 	tf::TransformBroadcaster tfBroadcaster;
+
+	const float eps;
 	
 public:
 	Mapper(ros::NodeHandle& n, ros::NodeHandle& pn);
@@ -164,7 +168,8 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
 	TOdomToMap(PM::TransformationParameters::Identity(4, 4)),
 	publishStamp(ros::Time::now()),
-  tfListener(ros::Duration(30))
+  tfListener(ros::Duration(30)),
+	eps(0.0001)
 {
 
 	// Ensure proper states
@@ -336,6 +341,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 
 	// if the future has completed, use the new map
 	processNewMapIfAvailable();
+	cerr << "received new map" << endl;
 	
 	// IMPORTANT:  We need to receive the point clouds in local coordinates (scanner or robot)
 	timer t;
@@ -543,8 +549,11 @@ void Mapper::setMap(DP* newPointCloud)
 	
 	// set new map
 	mapPointCloud = newPointCloud;
+	cerr << "copying map to ICP" << endl;
 	icp.setMap(*mapPointCloud);
 	
+	
+	cerr << "publishing map" << endl;
 	// Publish map point cloud
 	// FIXME this crash when used without descriptor
 	if (mapPub.getNumSubscribers())
@@ -554,7 +563,29 @@ void Mapper::setMap(DP* newPointCloud)
 Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParameters Ticp, bool updateExisting)
 {
 	timer t;
-		
+
+	// FIXME: those are parameters
+	const float priorStatic = 0.8;
+	const float priorDyn = 0.2;
+
+	// Prepare empty field if not existing
+	if(newPointCloud->descriptorExists("observedTime") == false)
+	{
+		//newPointCloud->addDescriptor("observedTime", PM::Matrix::Zero(1, newPointCloud->features.cols()));
+		newPointCloud->addDescriptor("observedTime", PM::Matrix::Constant(1, newPointCloud->features.cols(), priorStatic));
+	}
+	
+	if(newPointCloud->descriptorExists("unobservedTime") == false)
+	{
+		//newPointCloud->addDescriptor("unobservedTime", PM::Matrix::Zero(1, newPointCloud->features.cols()));
+		newPointCloud->addDescriptor("unobservedTime", PM::Matrix::Constant(1, newPointCloud->features.cols(), priorDyn));
+	}
+	
+	if(newPointCloud->descriptorExists("dynamic_ratio") == false)
+	{
+		newPointCloud->addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, newPointCloud->features.cols()));
+	}
+
 	if (!updateExisting)
 	{
 		// FIXME: correct that, ugly
@@ -563,6 +594,8 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 		mapPostFilters.apply(*newPointCloud);
 		return newPointCloud;
 	}
+
+	
 	
 	const int readPtsCount(newPointCloud->features.cols());
 	const int mapPtsCount(mapPointCloud->features.cols());
@@ -636,18 +669,162 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	Matches::Dists dists(1,mapCutPtsCount);
 	Matches::Ids ids(1,mapCutPtsCount);
 	
-
-	// BUG: if ids and dists not the same size of feature, infinit loop
 	// FIXME: this is a parameter
 	const float maxAngle = 0.04; // 0.08 rad is 5 deg
 	featureNNS->knn(angles_map, ids, dists, 1, 0, NNS::ALLOW_SELF_MATCH, maxAngle);
 
+	// Define views on descriptors
+	DP::View viewOn_normals_overlap = newPointCloud->getDescriptorViewByName("normals");
+	DP::View viewOn_obsDir_overlap = newPointCloud->getDescriptorViewByName("observationDirections");
+	DP::View viewOn_Msec_overlap = newPointCloud->getDescriptorViewByName("stamps_Msec");
+	DP::View viewOn_sec_overlap = newPointCloud->getDescriptorViewByName("stamps_sec");
+	DP::View viewOn_nsec_overlap = newPointCloud->getDescriptorViewByName("stamps_nsec");
+
+	DP::View viewOnObservedTime = mapPointCloud->getDescriptorViewByName("observedTime");
+	DP::View viewOnUnobservedTime = mapPointCloud->getDescriptorViewByName("unobservedTime");
+	DP::View viewOnDynamicRatio = mapPointCloud->getDescriptorViewByName("dynamic_ratio");
+	
+	DP::View viewOn_normals_map = mapPointCloud->getDescriptorViewByName("normals");
+	DP::View viewOn_Msec_map = mapPointCloud->getDescriptorViewByName("stamps_Msec");
+	DP::View viewOn_sec_map = mapPointCloud->getDescriptorViewByName("stamps_sec");
+	DP::View viewOn_nsec_map = mapPointCloud->getDescriptorViewByName("stamps_nsec");
+	
+	// FIXME: those are parameters
+	const float eps_a = 0.2; // ratio of distance
+	const float eps_d = 0.1; // in meters
+	const float alpha = 0.99;
+	const float beta = 0.99;
+
+
+	viewOnDynamicRatio = PM::Matrix::Zero(1, mapPtsCount);
+	for(int i=0; i < mapCutPtsCount; i++)
+	{
+		if(dists(i) != numeric_limits<float>::infinity())
+		{
+			const int readId = ids(0,i);
+			const int mapId = globalId(0,i);
+			
+			// in local coordinates
+			const Eigen::Vector3f readPt = newPointCloud->features.col(readId).head(3);
+			const Eigen::Vector3f mapPt = mapLocalFrameCut.features.col(i).head(3);
+			const Eigen::Vector3f mapPt_n = mapPt.normalized();
+			const float delta = (readPt - mapPt).norm();
+			const float d_max = eps_a * readPt.norm();
+
+			//const double timeMap = viewOn_Msec_map(0,mapId)*10e5 + viewOn_sec_map(0,mapId) + viewOn_nsec_map(0,mapId)*10e-10;
+			//const double timeRead = viewOn_Msec_overlap(0,readId)*10e5 + viewOn_sec_overlap(0,readId) + viewOn_nsec_overlap(0,readId)*10e-10;
+			//const double deltaTime = timeRead - timeMap;
+
+			const Eigen::Vector3f normal_map = viewOn_normals_map.col(mapId);
+			const Eigen::Vector3f normal_read = viewOn_normals_overlap.col(readId);
+			const Eigen::Vector3f obsDir = viewOn_obsDir_overlap.col(readId);
+			//const float viewAngle = acos(normal_map.normalized().dot(obsDir.normalized()));
+			//const float normalAngle = acos(normal_map.normalized().dot(normal_read.normalized()));
+			
+			// Weight for dynamic elements
+			const float w_v = eps + (1 - eps)*fabs(normal_map.dot(mapPt_n));
+			//const float w_d1 = 1 + eps - acos(readPt.normalized().dot(mapPt_n))/maxAngle;
+			const float w_d1 =  eps + (1 - eps)*(1 - sqrt(dists(i))/maxAngle);
+			
+			
+			const float offset = delta - eps_d;
+			float w_d2 = 1;
+			if(delta < eps_d || mapPt.norm() > readPt.norm())
+			{
+				w_d2 = eps;
+			}
+			else 
+			{
+				if (offset < d_max)
+				{
+					w_d2 = eps + (1 - eps )*offset/d_max;
+				}
+			}
+
+			float w_p2 = eps;
+			if(delta < eps_d)
+			{
+				w_p2 = 1;
+			}
+			else
+			{
+				if(offset < d_max)
+				{
+					w_p2 = eps + (1 - eps)*(1 - offset/d_max);
+				}
+			}
+
+			//cerr << "readPt.norm(): "<< readPt.norm()  << "mapPt.norm(): "<< mapPt.norm() << ", w_p2: " << w_p2 << ", w_d2: " << w_d2 << endl;
+		
+
+			// We don't update point behind the reading
+			if((readPt.norm() + eps_d + d_max) >= mapPt.norm())
+			{
+				const float lastDyn = viewOnUnobservedTime(0,mapId);
+				const float lastStatic = viewOnObservedTime(0, mapId);
+
+				const float c1 = (1 - (w_v*(1 - w_d1)));
+				const float c2 = w_v*(1 - w_d1);
+				
+
+				//viewOnUnobservedTime(0,mapId) += (w_v + w_d2) * w_d1/2;
+				//viewOnUnobservedTime(0,mapId) += (w_v * w_d2);
+				
+				//viewOnObservedTime(0, mapId) += (w_p2) * w_d1;
+				//viewOnObservedTime(0, mapId) += w_p2;
+
+				//Lock dynamic point to stay dynamic under a threshold
+				if(lastDyn < 0.9)
+				{
+					viewOnUnobservedTime(0,mapId) = c1*lastDyn + c2*w_d2*((1 - alpha)*lastStatic + beta*lastDyn);
+					viewOnObservedTime(0, mapId) = c1*lastStatic + c2*w_p2*(alpha*lastStatic + (1 - beta)*lastDyn);
+				}
+				else
+				{
+					viewOnObservedTime(0,mapId) = eps;
+					viewOnUnobservedTime(0,mapId) = 1-eps;
+				}
+				
+				
+				
+				// normalization
+				const float sumZ = viewOnUnobservedTime(0,mapId) + viewOnObservedTime(0, mapId);
+				assert(sumZ >= eps);	
+				
+				viewOnUnobservedTime(0,mapId) /= sumZ;
+				viewOnObservedTime(0,mapId) /= sumZ;
+				
+				//viewOnDynamicRatio(0,mapId) =viewOnUnobservedTime(0, mapId);
+				viewOnDynamicRatio(0,mapId) = w_d2;
+
+				//viewOnDynamicRatio(0,mapId) =	w_d2;
+
+
+				
+
+				
+
+
+
+				// Refresh time
+				viewOn_Msec_map(0,mapId) = viewOn_Msec_overlap(0,readId);	
+				viewOn_sec_map(0,mapId) = viewOn_sec_overlap(0,readId);	
+				viewOn_nsec_map(0,mapId) = viewOn_nsec_overlap(0,readId);	
+			}
+
+
+		}
+	}
+
+
+
 
 	// Correct new points using ICP result
-	*newPointCloud = transformation->compute(*newPointCloud, Ticp); 
+	//*newPointCloud = transformation->compute(*newPointCloud, Ticp); 
 
 	// Generate temporary map for density computation
-	DP tmp_map = (*mapPointCloud);
+	//DP tmp_map = (*mapPointCloud); // FIXME: this should be on mapLocalFrameCut
+	DP tmp_map = mapLocalFrameCut; // FIXME: this should be on mapLocalFrameCut
 	tmp_map.concatenate(*newPointCloud);
 
 	// Compute density
@@ -664,7 +841,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	
 	featureNNS->knn(newPointCloud->features, matches_overlap.ids, matches_overlap.dists, 1, 0);
 	
-	cout << "finished reading splitting search" << endl;
 	
 	DP overlap(newPointCloud->createSimilarEmpty());
 	DP no_overlap(newPointCloud->createSimilarEmpty());
@@ -673,6 +849,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 
 	// FIXME: this is a parameter
 	const float maxDist = pow(0.3, 2);
+	//const float maxDist = pow(0.1, 2);
 
 	int ptsOut = 0;
 	int ptsIn = 0;
@@ -696,105 +873,30 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	cout << "ptsOut=" << ptsOut << ", ptsIn=" << ptsIn << endl;
 
 	// Publish outliers
-	if (outlierPub.getNumSubscribers())
-	{
-		outlierPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(no_overlap, mapFrame, mapCreationTime));
-	}
+	//if (outlierPub.getNumSubscribers())
+	//{
+		//outlierPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(no_overlap, mapFrame, mapCreationTime));
+	//}
 
 	// Initialize descriptors
-	no_overlap.addDescriptor("observedTime", PM::Matrix::Zero(1, no_overlap.features.cols()));
-	if(mapPointCloud->descriptorExists("observedTime") == false)
-	{
-		mapPointCloud->addDescriptor("observedTime", PM::Matrix::Zero(1, mapPointCloud->features.cols()));
-	}
+	//no_overlap.addDescriptor("observedTime", PM::Matrix::Zero(1, no_overlap.features.cols()));
+	no_overlap.addDescriptor("observedTime", PM::Matrix::Constant(1, no_overlap.features.cols(), priorStatic));
+	//no_overlap.addDescriptor("unobservedTime", PM::Matrix::Zero(1, no_overlap.features.cols()));
+	no_overlap.addDescriptor("unobservedTime", PM::Matrix::Constant(1, no_overlap.features.cols(), priorDyn));
 
-	no_overlap.addDescriptor("unobservedTime", PM::Matrix::Zero(1, no_overlap.features.cols()));
-	if(mapPointCloud->descriptorExists("unobservedTime") == false)
-	{
-		mapPointCloud->addDescriptor("unobservedTime", PM::Matrix::Zero(1, mapPointCloud->features.cols()));
-	}
-	
 	no_overlap.addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, no_overlap.features.cols()));
-	if(mapPointCloud->descriptorExists("dynamic_ratio") == false)
-	{
-		mapPointCloud->addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, mapPointCloud->features.cols()));
-	}
-
-	// Define views on descriptors
-	DP::View viewOnObservedTime = mapPointCloud->getDescriptorViewByName("observedTime");
-	DP::View viewOnUnobservedTime = mapPointCloud->getDescriptorViewByName("unobservedTime");
-	DP::View viewOnDynamicRatio = mapPointCloud->getDescriptorViewByName("dynamic_ratio");
-	
-	// BUG: cannot use ConsView here...
-	DP::View viewOn_normals_map = mapPointCloud->getDescriptorViewByName("normals");
-	DP::View viewOn_Msec_map = mapPointCloud->getDescriptorViewByName("stamps_Msec");
-	DP::View viewOn_sec_map = mapPointCloud->getDescriptorViewByName("stamps_sec");
-	DP::View viewOn_nsec_map = mapPointCloud->getDescriptorViewByName("stamps_nsec");
-	
-	DP::View viewOn_normals_overlap = newPointCloud->getDescriptorViewByName("normals");
-	DP::View viewOn_obsDir_overlap = newPointCloud->getDescriptorViewByName("observationDirections");
-	DP::View viewOn_Msec_overlap = newPointCloud->getDescriptorViewByName("stamps_Msec");
-	DP::View viewOn_sec_overlap = newPointCloud->getDescriptorViewByName("stamps_sec");
-	DP::View viewOn_nsec_overlap = newPointCloud->getDescriptorViewByName("stamps_nsec");
-
-	//viewOnDynamicRatio = PM::Matrix::Zero(1, mapPtsCount);
-	for(int i=0; i < mapCutPtsCount; i++)
-	{
-		const int readId = ids(0,i);
-		const int mapId = globalId(0,i);
-		const double timeMap = viewOn_Msec_map(0,mapId)*10e5 + viewOn_sec_map(0,mapId) + viewOn_nsec_map(0,mapId)*10e-10;
-		const double timeRead = viewOn_Msec_overlap(0,readId)*10e5 + viewOn_sec_overlap(0,readId) + viewOn_nsec_overlap(0,readId)*10e-10;
-		const double deltaTime = timeRead - timeMap;
-		const Eigen::Vector3f normal_map = viewOn_normals_map.col(mapId);
-		const Eigen::Vector3f normal_read = viewOn_normals_overlap.col(readId);
-		const Eigen::Vector3f obsDir = viewOn_obsDir_overlap.col(readId);
-		const float viewAngle = acos(normal_map.normalized().dot(obsDir.normalized()));
-		const float normalAngle = acos(normal_map.normalized().dot(normal_read.normalized()));
-
-
-		//if(deltaTime > 0 && dists(i) != numeric_limits<float>::infinity())
-		if(dists(i) != numeric_limits<float>::infinity())
-		{
-			//viewOnDynamicRatio(0,mapId) = 1;
-			bool updateTimestamp = false;
-			// Classification
-			// 0.34 rad = 20 deg
-			if(radius_map(0,i) < (radius_reading(0,readId) * 0.8))
-			{
-				//if(viewAngle < 0.78 || (normalAngle > 1.53 && normalAngle < 1.60))
-				{
-					//viewOnUnobservedTime(0,mapId) += deltaTime;
-					viewOnUnobservedTime(0,mapId) += 1;
-					//viewOnDynamicRatio(0,mapId) = 2;
-					updateTimestamp = true;
-				}
-			}	
-			else
-			{
-				if(radius_map(0,i) < (radius_reading(0,readId) * 1.0))
-				{
-					//viewOnObservedTime(0, mapId) += deltaTime;
-					viewOnObservedTime(0, mapId) += 1;
-					//viewOnDynamicRatio(0,mapId) = 3;
-					updateTimestamp = true;
-				}
-			}
-
-			if(updateTimestamp)
-			{
-				viewOnDynamicRatio(0,mapId) =viewOnUnobservedTime(0, mapId)/(viewOnObservedTime(0, mapId)+viewOnUnobservedTime(0,mapId));
-				viewOn_Msec_map(0,mapId) = viewOn_Msec_overlap(0,readId);	
-				viewOn_sec_map(0,mapId) = viewOn_sec_overlap(0,readId);	
-				viewOn_nsec_map(0,mapId) = viewOn_nsec_overlap(0,readId);	
-			}
-		}
-	}
-
-	
 
 	// shrink the newPointCloud to the new information
 	*newPointCloud = no_overlap;
+	
 
+	
+	// Correct new points using ICP result
+	*newPointCloud = transformation->compute(*newPointCloud, Ticp);
+	
+	
+	
+	
 	// Merge point clouds to map
 	newPointCloud->concatenate(*mapPointCloud);
 	mapPostFilters.apply(*newPointCloud);

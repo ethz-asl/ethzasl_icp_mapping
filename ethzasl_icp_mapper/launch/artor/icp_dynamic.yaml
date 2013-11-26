@@ -1,10 +1,10 @@
 readingDataPointsFilters:
   - RandomSamplingDataPointsFilter:
-      prob: 0.2
+      prob: 0.3
 
 referenceDataPointsFilters:
-  - MaxDistDataPointsFilter:
-      maxDist: 50.0
+#  - MaxDistDataPointsFilter:
+#      maxDist: 20.0
   - RandomSamplingDataPointsFilter:
       prob: 0.01
 
@@ -12,13 +12,16 @@ matcher:
   KDTreeMatcher:
     knn: 3
     maxDist: 10.0
-    epsilon: 3.33
+    epsilon: 0
 
 outlierFilters:
   - TrimmedDistOutlierFilter:
-     ratio: 0.9
+     ratio: 0.8
   - SurfaceNormalOutlierFilter:
      maxAngle: 1.57
+  - GenericDescriptorOutlierFilter:
+     source: reference
+     descName: observedTime
 
 errorMinimizer:
   PointToPlaneErrorMinimizer
@@ -27,7 +30,7 @@ transformationCheckers:
   - DifferentialTransformationChecker:
       minDiffRotErr: 0.001
       minDiffTransErr: 0.01
-      smoothLength: 4
+      smoothLength: 2
   - CounterTransformationChecker:
       maxIterationCount: 40
   - BoundTransformationChecker:

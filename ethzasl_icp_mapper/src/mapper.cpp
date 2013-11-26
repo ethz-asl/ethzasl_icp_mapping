@@ -388,7 +388,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	ROS_DEBUG_STREAM("TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << TOdomToScanner);
 	ROS_DEBUG_STREAM("TOdomToMap(" << odomFrame<< " to " << mapFrame << "):\n" << TOdomToMap);
 		
-	const PM::TransformationParameters TscannerToMap = TOdomToMap * TOdomToScanner.inverse();
+	const PM::TransformationParameters TscannerToMap = transformation->correctParameters(TOdomToMap * TOdomToScanner.inverse());
 	ROS_DEBUG_STREAM("TscannerToMap (" << scannerFrame << " to " << mapFrame << "):\n" << TscannerToMap);
 	
 	// Ensure a minimum amount of point after filtering
@@ -420,6 +420,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	{
 		// Apply ICP
 		PM::TransformationParameters Ticp;
+
 		Ticp = icp(*newPointCloud, TscannerToMap);
 
 		ROS_DEBUG_STREAM("Ticp:\n" << Ticp);

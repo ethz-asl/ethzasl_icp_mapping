@@ -1,11 +1,11 @@
 - RandomSamplingDataPointsFilter:
-    prob: 0.5
+    prob: 0.2
 - SurfaceNormalDataPointsFilter:
-    knn: 20
+    knn: 10
     epsilon: 3.33
     keepNormals: 1
     keepDensities: 1
 - ObservationDirectionDataPointsFilter
 - OrientNormalsDataPointsFilter 
 - MaxDensityDataPointsFilter:
-    maxDensity: 10.0
+    maxDensity: 50.0

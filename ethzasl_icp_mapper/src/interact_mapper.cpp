@@ -55,6 +55,8 @@ public:
 	ros::NodeHandle& n;
 	ros::NodeHandle& pn;
 
+	int states_updatePose;
+
 	// Parameters
 	const string mapPath;
 	const string baseFrame;
@@ -118,6 +120,8 @@ InteractMapper::InteractMapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	ros::service::waitForService("mapper/set_mode");
 	ROS_INFO_STREAM("Mapper node found");
 	
+	states_updatePose = 0;
+
 	// Publisher
 	test_mapPub = n.advertise<sensor_msgs::PointCloud2>("debug_bounded_map", 2, true);
 
@@ -290,6 +294,8 @@ void InteractMapper::loadMapCallback( const visualization_msgs::InteractiveMarke
 	MenuHandler::EntryHandle handle = feedback->menu_entry_id;
 	string filename;
 	menu_handler.getTitle(handle, filename);
+
+	ROS_INFO_STREAM("Loading " << filename);
 	
 	ethzasl_icp_mapper::LoadMap srv;
 	srv.request.filename.data = mapPath + "/" + filename;
@@ -303,31 +309,35 @@ void InteractMapper::adjustPoseCallback( const visualization_msgs::InteractiveMa
 {
 	MenuHandler::CheckState state;
 	menu_handler.getCheckState(h_adjustPose, state);
+	
+	if(state == MenuHandler::UNCHECKED)
+	{
+		cerr << "checked " << states_updatePose << endl;
+
+		if(states_updatePose == 0)
+			states_updatePose = 1;
+		else
+			states_updatePose = 0;
+
+	}
 
 	if(state == MenuHandler::CHECKED)
-		menu_handler.setCheckState(h_adjustPose, MenuHandler::UNCHECKED);
-	else
 	{
-		menu_handler.setCheckState(h_adjustPose, MenuHandler::CHECKED);
-		
-		ethzasl_icp_mapper::SetMode srv_states;
-		menu_handler.setCheckState(h_localize, MenuHandler::UNCHECKED);
-		menu_handler.setCheckState(h_map, MenuHandler::UNCHECKED);
-		srv_states.request.localize = false;
-		srv_states.request.map = false;
-		setModeClient.call(srv_states);
+		cerr << "unchecked " << states_updatePose << endl;
+
+		if(states_updatePose == 1)
+			states_updatePose = 2;
+		else
+			states_updatePose = 0;
+
 	}
 	
-	menu_handler.reApply( *server );
-  server->applyChanges();
-}
-
-void InteractMapper::update_tf(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
-{	
-	MenuHandler::CheckState state;
-	menu_handler.getCheckState(h_adjustPose, state);
-	if(state == MenuHandler::CHECKED)
+	if(states_updatePose == 2)
 	{
+		states_updatePose = 0;
+
+		ROS_INFO_STREAM("Updating giving pose");
+
 		nav_msgs::Odometry odom;
 		odom.pose.pose = feedback->pose;
 		markerPose = feedback->pose;
@@ -335,20 +345,24 @@ void InteractMapper::update_tf(const visualization_msgs::InteractiveMarkerFeedba
 		const PM::TransformationParameters TMarkerToMap =
 			PointMatcher_ros::odomMsgToEigenMatrix<float>(odom);
 
+		const ros::Time stamp = ros::Time::now();
+
+		tfListener.waitForTransform(mapFrame, baseFrame, stamp, ros::Duration(0.5));
 		const PM::TransformationParameters TBaseToMap = 
 			PointMatcher_ros::transformListenerToEigenMatrix<float>(
 				tfListener,
 				mapFrame,
 				baseFrame,
-				ros::Time::now()
+				stamp
 			);
 			
+		tfListener.waitForTransform(odomFrame, baseFrame, stamp, ros::Duration(0.5));
 		const PM::TransformationParameters TBaseToOdom = 
 			PointMatcher_ros::transformListenerToEigenMatrix<float>(
 				tfListener,
 				odomFrame,
 				baseFrame,
-				ros::Time::now()
+				stamp
 			);
 		
 	//	const PM::TransformationParameters TOdomToMap = 
@@ -377,10 +391,36 @@ void InteractMapper::update_tf(const visualization_msgs::InteractiveMarkerFeedba
 		//makeMenuMarker("map_menu");
 		
 		
-		//menu_handler.reApply( *server );
-		//server->applyChanges();
-		ros::Duration(0.1).sleep();
+		menu_handler.reApply( *server );
+		server->applyChanges();
+		//ros::Duration(0.1).sleep();
 	}
+
+	if(state == MenuHandler::CHECKED)
+		menu_handler.setCheckState(h_adjustPose, MenuHandler::UNCHECKED);
+	else
+	{
+		menu_handler.setCheckState(h_adjustPose, MenuHandler::CHECKED);
+		
+		ethzasl_icp_mapper::SetMode srv_states;
+		menu_handler.setCheckState(h_localize, MenuHandler::UNCHECKED);
+		menu_handler.setCheckState(h_map, MenuHandler::UNCHECKED);
+		srv_states.request.localize = false;
+		srv_states.request.map = false;
+		setModeClient.call(srv_states);
+	}
+	
+	menu_handler.reApply( *server );
+  server->applyChanges();
+}
+
+void InteractMapper::update_tf(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
+{	
+	MenuHandler::CheckState state;
+	menu_handler.getCheckState(h_adjustPose, state);
+	
+
+	
 }
 
 void InteractMapper::getBoundedMapCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
@@ -492,23 +532,26 @@ int main(int argc, char **argv)
 	ros::Rate r(10);
 	while(ros::ok())
 	{
-		ros::Time stamp = ros::Time::now();
-		if (interact.tfListener.waitForTransform(interact.mapFrame, interact.baseFrame, stamp, ros::Duration(1)))
+		if(interact.states_updatePose != 1)
 		{
-			interact.tfListener.lookupTransform(interact.mapFrame, interact.baseFrame, stamp, stampedTr);
+			ros::Time stamp = ros::Time::now();
+			if (interact.tfListener.waitForTransform(interact.mapFrame, interact.baseFrame, stamp, ros::Duration(1)))
+			{
+				interact.tfListener.lookupTransform(interact.mapFrame, interact.baseFrame, stamp, stampedTr);
 
-			InteractiveMarker int_marker;
-			interact.server->get("map_menu", int_marker);
-			int_marker.pose.position.x = stampedTr.getOrigin().x();
-			int_marker.pose.position.y = stampedTr.getOrigin().y();
-			int_marker.pose.position.z = stampedTr.getOrigin().z();
-			int_marker.pose.orientation.x = stampedTr.getRotation().x();
-			int_marker.pose.orientation.y = stampedTr.getRotation().y();
-			int_marker.pose.orientation.z = stampedTr.getRotation().z();
-			int_marker.pose.orientation.w = stampedTr.getRotation().w();
+				InteractiveMarker int_marker;
+				interact.server->get("map_menu", int_marker);
+				int_marker.pose.position.x = stampedTr.getOrigin().x();
+				int_marker.pose.position.y = stampedTr.getOrigin().y();
+				int_marker.pose.position.z = stampedTr.getOrigin().z();
+				int_marker.pose.orientation.x = stampedTr.getRotation().x();
+				int_marker.pose.orientation.y = stampedTr.getRotation().y();
+				int_marker.pose.orientation.z = stampedTr.getRotation().z();
+				int_marker.pose.orientation.w = stampedTr.getRotation().w();
 
-			interact.server->insert(int_marker);
-			interact.server->applyChanges();
+				interact.server->insert(int_marker);
+				interact.server->applyChanges();
+			}
 		}
 
 		ros::spinOnce();
