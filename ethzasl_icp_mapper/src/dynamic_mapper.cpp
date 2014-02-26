@@ -91,10 +91,11 @@ class Mapper
 	MapBuildingFuture mapBuildingFuture;
 	bool mapBuildingInProgress;
 	#endif // BOOST_VERSION >= 104100
+	bool processingNewCloud; 
 
 	// Parameters
+	bool publishMapTf; 
 	bool useConstMotionModel; 
-	bool processingNewCloud; 
 	bool localizing;
 	bool mapping;
 	int minReadingPointCount;
@@ -106,6 +107,21 @@ class Mapper
 	string odomFrame;
 	string mapFrame;
 	string vtkFinalMapName; //!< name of the final vtk map
+
+	const double mapElevation; // initial correction on z-axis //FIXME: handle the full matrix
+	
+	// Parameters for dynamic filtering
+	const float priorStatic; //!< ratio. Prior to be static when a new point is added
+	const float priorDyn; //!< ratio. Prior to be dynamic when a new point is added
+	const float maxAngle; //!< in rad. Openning angle of a laser beam
+	const float eps_a; //!< ratio. Error proportional to the laser distance
+	const float eps_d; //!< in meter. Fix error on the laser distance
+	const float alpha; //!< ratio. Propability of staying static given that the point was dynamic
+	const float beta; //!< ratio. Propability of staying dynamic given that the point was static
+	const float maxDyn; //!< ratio. Threshold for which a point will stay dynamic
+	const float maxDistNewPoint; //!< in meter. Distance at which a new point will be added in the global map.
+
+
 	
 
 	PM::TransformationParameters TOdomToMap;
@@ -153,8 +169,9 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	#if BOOST_VERSION >= 104100
 	mapBuildingInProgress(false),
 	#endif // BOOST_VERSION >= 104100
-	useConstMotionModel(getParam<bool>("useConstMotionModel", false)),
 	processingNewCloud(false),
+	publishMapTf(getParam<bool>("publishMapTf", true)),
+	useConstMotionModel(getParam<bool>("useConstMotionModel", false)),
 	localizing(getParam<bool>("localizing", true)),
 	mapping(getParam<bool>("mapping", true)),
 	minReadingPointCount(getParam<int>("minReadingPointCount", 2000)),
@@ -166,6 +183,16 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	odomFrame(getParam<string>("odom_frame", "odom")),
 	mapFrame(getParam<string>("map_frame", "map")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
+	mapElevation(getParam<double>("mapElevation", 0)),
+	priorStatic(getParam<double>("priorStatic", 0.5)),
+	priorDyn(getParam<double>("priorDyn", 0.5)),
+	maxAngle(getParam<double>("maxAngle", 0.02)),
+	eps_a(getParam<double>("eps_a", 0.05)),
+	eps_d(getParam<double>("eps_d", 0.02)),
+	alpha(getParam<double>("alpha", 0.99)),
+	beta(getParam<double>("beta", 0.99)),
+	maxDyn(getParam<double>("maxDyn", 0.95)),
+	maxDistNewPoint(pow(getParam<double>("maxDistNewPoint", 0.1),2)),
 	TOdomToMap(PM::TransformationParameters::Identity(4, 4)),
 	publishStamp(ros::Time::now()),
   tfListener(ros::Duration(30)),
@@ -276,6 +303,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 
 	// refreshing tf transform thread
 	publishThread = boost::thread(boost::bind(&Mapper::publishLoop, this, tfRefreshPeriod));
+
 }
 
 Mapper::~Mapper()
@@ -394,8 +422,11 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		// we need to know the dimensionality of the point cloud to initialize properly
 		publishLock.lock();
 		TOdomToMap = PM::TransformationParameters::Identity(dimp1, dimp1);
+		TOdomToMap(2,3) = mapElevation;
 		publishLock.unlock();
 	}
+
+	cout << "TOdomToMap" << endl << TOdomToMap << endl;
 
 	// Fetch transformation from scanner to odom
 	// Note: we don't need to wait for transform. It is already called in transformListenerToEigenMatrix()
@@ -412,7 +443,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	}
 	catch(tf::ExtrapolationException e)
 	{
-		ROS_ERROR_STREAM("Extrapolation Exception. stamp = "<< stamp << " now = " << ros::Time::now() << " delta = " << ros::Time::now() - stamp);
+		ROS_ERROR_STREAM("Extrapolation Exception. stamp = "<< stamp << " now = " << ros::Time::now() << " delta = " << ros::Time::now() - stamp << endl << e.what() );
 		return;
 	}
 
@@ -454,6 +485,24 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		PM::TransformationParameters Ticp;
 		Ticp = icp(*newPointCloud, TscannerToMap);
 
+		// ISER
+		{
+		// extract corrections
+		PM::TransformationParameters Tdelta = Ticp * TscannerToMap.inverse();
+		
+		// remove roll and pitch
+		Tdelta(2,0) = 0; 
+		Tdelta(2,1) = 0; 
+		Tdelta(2,2) = 1; 
+		Tdelta(0,2) = 0; 
+		Tdelta(1,2) = 0;
+		Tdelta(2,3) = 0; //z
+		Tdelta.block(0,0,3,3) = transformation->correctParameters(Tdelta.block(0,0,3,3));
+
+		Ticp = Tdelta*TscannerToMap;
+
+		}
+
 		ROS_DEBUG_STREAM("Ticp:\n" << Ticp);
 		
 		// Ensure minimum overlap between scans
@@ -470,7 +519,11 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		publishLock.lock();
 		TOdomToMap = Ticp * TOdomToScanner;
 		// Publish tf
-		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, stamp));
+		if(publishMapTf == true)
+		{
+			tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, stamp));
+		}
+
 		publishLock.unlock();
 		processingNewCloud = false;
 		
@@ -565,8 +618,11 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	timer t;
 
 	// FIXME: those are parameters
-	const float priorStatic = 0.8;
-	const float priorDyn = 0.2;
+	//const float priorStatic = 0.8; // ICRA 2014
+	//const float priorDyn = 0.2; // ICRA 2014
+	//const float priorStatic = 0.4; // ISER 2014
+	//const float priorDyn = 0.6; // ISER 2014
+
 
 	// Prepare empty field if not existing
 	if(newPointCloud->descriptorExists("observedTime") == false)
@@ -669,13 +725,24 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	Matches::Dists dists(1,mapCutPtsCount);
 	Matches::Ids ids(1,mapCutPtsCount);
 	
-	// FIXME: this is a parameter
-	const float maxAngle = 0.04; // 0.08 rad is 5 deg
+	// FIXME: those are parameters
+	// note: 0.08 rad is 5 deg
+	//const float maxAngle = 0.04; // in rad (ICRA 14)
+	//const float eps_a = 0.2; // ratio of distance (ICRA 14)
+	//const float eps_d = 0.1; // in meters (ICRA 14)
+	//const float maxAngle = 0.02; // in rad (ISER 14)
+	//const float eps_a = 0.05; // ratio of distance (ISER 14)
+	//const float eps_d = 0.02; // in meters (ISER 14)
+	//const float alpha = 0.99;
+	//const float beta = 0.99;
+
+	
+	
 	featureNNS->knn(angles_map, ids, dists, 1, 0, NNS::ALLOW_SELF_MATCH, maxAngle);
 
 	// Define views on descriptors
-	DP::View viewOn_normals_overlap = newPointCloud->getDescriptorViewByName("normals");
-	DP::View viewOn_obsDir_overlap = newPointCloud->getDescriptorViewByName("observationDirections");
+	//DP::View viewOn_normals_overlap = newPointCloud->getDescriptorViewByName("normals");
+	//DP::View viewOn_obsDir_overlap = newPointCloud->getDescriptorViewByName("observationDirections");
 	DP::View viewOn_Msec_overlap = newPointCloud->getDescriptorViewByName("stamps_Msec");
 	DP::View viewOn_sec_overlap = newPointCloud->getDescriptorViewByName("stamps_sec");
 	DP::View viewOn_nsec_overlap = newPointCloud->getDescriptorViewByName("stamps_nsec");
@@ -689,12 +756,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	DP::View viewOn_sec_map = mapPointCloud->getDescriptorViewByName("stamps_sec");
 	DP::View viewOn_nsec_map = mapPointCloud->getDescriptorViewByName("stamps_nsec");
 	
-	// FIXME: those are parameters
-	const float eps_a = 0.2; // ratio of distance
-	const float eps_d = 0.1; // in meters
-	const float alpha = 0.99;
-	const float beta = 0.99;
-
+	
 
 	viewOnDynamicRatio = PM::Matrix::Zero(1, mapPtsCount);
 	for(int i=0; i < mapCutPtsCount; i++)
@@ -716,8 +778,8 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 			//const double deltaTime = timeRead - timeMap;
 
 			const Eigen::Vector3f normal_map = viewOn_normals_map.col(mapId);
-			const Eigen::Vector3f normal_read = viewOn_normals_overlap.col(readId);
-			const Eigen::Vector3f obsDir = viewOn_obsDir_overlap.col(readId);
+			//const Eigen::Vector3f normal_read = viewOn_normals_overlap.col(readId);
+			//const Eigen::Vector3f obsDir = viewOn_obsDir_overlap.col(readId);
 			//const float viewAngle = acos(normal_map.normalized().dot(obsDir.normalized()));
 			//const float normalAngle = acos(normal_map.normalized().dot(normal_read.normalized()));
 			
@@ -773,8 +835,12 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 				//viewOnObservedTime(0, mapId) += (w_p2) * w_d1;
 				//viewOnObservedTime(0, mapId) += w_p2;
 
+				// FIXME: this is a parameter
+				//const float maxDyn = 0.9; // ICRA 14
+				//const float maxDyn = 0.98; // ISER 14
+
 				//Lock dynamic point to stay dynamic under a threshold
-				if(lastDyn < 0.9)
+				if(lastDyn < maxDyn)
 				{
 					viewOnUnobservedTime(0,mapId) = c1*lastDyn + c2*w_d2*((1 - alpha)*lastStatic + beta*lastDyn);
 					viewOnObservedTime(0, mapId) = c1*lastStatic + c2*w_p2*(alpha*lastStatic + (1 - beta)*lastDyn);
@@ -798,13 +864,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 				viewOnDynamicRatio(0,mapId) = w_d2;
 
 				//viewOnDynamicRatio(0,mapId) =	w_d2;
-
-
-				
-
-				
-
-
 
 				// Refresh time
 				viewOn_Msec_map(0,mapId) = viewOn_Msec_overlap(0,readId);	
@@ -848,14 +907,15 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	
 
 	// FIXME: this is a parameter
-	const float maxDist = pow(0.3, 2);
+  //const float maxDist = pow(0.3, 2); // ICRA 2014
+	//const float maxDist = pow(0.1, 2); // ISER 2014
 	//const float maxDist = pow(0.1, 2);
 
 	int ptsOut = 0;
 	int ptsIn = 0;
 	for (int i = 0; i < readPtsCount; ++i)
 	{
-		if (matches_overlap.dists(i) > maxDist)
+		if (matches_overlap.dists(i) > maxDistNewPoint)
 		{
 			no_overlap.setColFrom(ptsOut, *newPointCloud, i);
 			ptsOut++;
@@ -933,7 +993,7 @@ void Mapper::publishLoop(double publishPeriod)
 
 void Mapper::publishTransform()
 {
-	if(processingNewCloud == false)
+	if(processingNewCloud == false && publishMapTf == true)
 	{
 		publishLock.lock();
 		// Note: we use now as timestamp to refresh the tf and avoid other buffer to be empty
@@ -967,7 +1027,7 @@ bool Mapper::saveMap(map_msgs::SaveMap::Request &req, map_msgs::SaveMap::Respons
 		return false;
 	}
 	
-	ROS_INFO_STREAM("Map saved at " <<  req.filename.data << "with " << mapPointCloud->features.cols() << " points.");
+	ROS_INFO_STREAM("Map saved at " <<  req.filename.data << " with " << mapPointCloud->features.cols() << " points.");
 	return true;
 }
 
@@ -983,6 +1043,9 @@ bool Mapper::loadMap(ethzasl_icp_mapper::LoadMap::Request &req, ethzasl_icp_mapp
 
 	publishLock.lock();
 	TOdomToMap = PM::TransformationParameters::Identity(dim,dim);
+	
+	//ISER
+	TOdomToMap(2,3) = mapElevation;
 	publishLock.unlock();
 
 	setMap(cloud);
@@ -1008,6 +1071,18 @@ bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req, ethzasl_
 {
 	publishLock.lock();
 	TOdomToMap = PointMatcher_ros::odomMsgToEigenMatrix<float>(req.odom);
+	
+	//ISER
+	{
+	// remove roll and pitch
+	TOdomToMap(2,0) = 0; 
+	TOdomToMap(2,1) = 0; 
+	TOdomToMap(2,2) = 1; 
+	TOdomToMap(0,2) = 0; 
+	TOdomToMap(1,2) = 0;
+	TOdomToMap(2,3) = mapElevation; //z
+	}
+
 	tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, ros::Time::now()));
 	publishLock.unlock();
 

@@ -552,7 +552,12 @@ int main(int argc, char **argv)
 				interact.server->insert(int_marker);
 				interact.server->applyChanges();
 			}
+			else
+			{
+				ROS_WARN_STREAM("Cannot find transformation from " << interact.mapFrame << " to " << interact.baseFrame);
+			}
 		}
+		
 
 		ros::spinOnce();
 		r.sleep();
