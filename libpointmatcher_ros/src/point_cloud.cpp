@@ -161,7 +161,7 @@ namespace PointMatcher_ros
 	
 	
 	template<typename T>
-	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame)
+	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame, const bool force3D)
 	{
 		typedef PointMatcher<T> PM;
 		typedef typename PM::DataPoints DataPoints;
@@ -172,6 +172,9 @@ namespace PointMatcher_ros
 		Labels featLabels;
 		featLabels.push_back(Label("x", 1));
 		featLabels.push_back(Label("y", 1));
+		if(force3D)
+			featLabels.push_back(Label("z", 1));
+
 		featLabels.push_back(Label("pad", 1));
 		
 		Labels descLabels;
@@ -197,8 +200,10 @@ namespace PointMatcher_ros
 		// fill features
 		const ros::Time& startTime(rosMsg.header.stamp);
 		const ros::Time endTime(startTime + ros::Duration(rosMsg.time_increment * (rosMsg.ranges.size() - 1)));
-		auto xs(cloud.getFeatureViewByName("x"));
-		auto ys(cloud.getFeatureViewByName("y"));
+		//auto xs(cloud.getFeatureViewByName("x"));
+		//auto ys(cloud.getFeatureViewByName("y"));
+		//auto zs(cloud.getFeatureViewByName("z"));
+
 		float angle(rosMsg.angle_min);
 		int j(0);
 		for (size_t i = 0; i < rosMsg.ranges.size(); ++i)
@@ -206,9 +211,11 @@ namespace PointMatcher_ros
 			const float range(rosMsg.ranges[i]);
 			if (range >= rosMsg.range_min && range <= rosMsg.range_max)
 			{
-				xs(0,j) = cos(angle) * range;
-				ys(0,j) = sin(angle) * range;
-				
+				const T x = cos(angle) * range;
+				const T y = sin(angle) * range;
+				//xs(0,j) = cos(angle) * range;
+				//ys(0,j) = sin(angle) * range;
+								
 				if (listener)
 				{
 					/* Note:
@@ -229,16 +236,30 @@ namespace PointMatcher_ros
 						ros::Duration(1.0)
 					);
 					// transform data
-					geometry_msgs::Vector3Stamped pin, pout;
+					//geometry_msgs::Vector3Stamped pin, pout;
+					//pin.header.stamp = curTime;
+					//pin.header.frame_id = rosMsg.header.frame_id;
+					//pin.vector.x = x;
+					//pin.vector.y = y;
+					//pin.vector.z = 0;
+
+					geometry_msgs::PointStamped pin, pout;
 					pin.header.stamp = curTime;
 					pin.header.frame_id = rosMsg.header.frame_id;
-					pin.vector.x = xs(0,j);
-					pin.vector.y = ys(0,j);
-					pin.vector.z = 0;
+					pin.point.x = x;
+					pin.point.y = y;
+					pin.point.z = 0;
 					try
 					{
-						listener->transformVector(
-							rosMsg.header.frame_id,
+						//listener->transformVector(
+						//	fixedFrame,
+						//	endTime,
+						//	pin,
+						//	fixedFrame,
+						//	pout
+						//);
+						listener->transformPoint(
+							fixedFrame,
 							endTime,
 							pin,
 							fixedFrame,
@@ -250,8 +271,17 @@ namespace PointMatcher_ros
 						return DataPoints();
 					}
 					// write back
-					xs(0,j) = pout.vector.x;
-					ys(0,j) = pout.vector.y;
+					//cloud.features(0,j) = pout.vector.x;
+					//cloud.features(1,j) = pout.vector.y;
+					//if(force3D)
+					//	cloud.features(2,j) = pout.vector.z;
+					cloud.features(0,j) = pout.point.x;
+					cloud.features(1,j) = pout.point.y;
+					if(force3D)
+						cloud.features(2,j) = pout.point.z;
+					//cout << "pin: " << pin << endl;
+					//cout << "pout: " << pout << endl;
+
 				}
 				
 				++j;
@@ -281,9 +311,9 @@ namespace PointMatcher_ros
 	}
 	
 	template
-	PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame);
+	PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame, const bool force3D);
 	template
-	PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame);
+	PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame, const bool force3D);
 
 
 	template<typename T>
