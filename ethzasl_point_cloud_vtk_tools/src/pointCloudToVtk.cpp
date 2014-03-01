@@ -28,8 +28,9 @@ class ExportVtk
 	ros::NodeHandle& n;
 	
 	ros::Subscriber cloudSub;
-	string cloudTopic;
-	string mapFrame;
+	const string cloudTopic;
+	const string mapFrame;
+  const bool recordOnce;
 
 	tf::TransformListener tf_listener;
 	std::shared_ptr<PM::Transformation> transformation;
@@ -41,14 +42,15 @@ public:
 
 ExportVtk::ExportVtk(ros::NodeHandle& n):
 	n(n),
+	cloudTopic(getParam<string>("cloudTopic", "/static_point_cloud")),
+	mapFrame(getParam<string>("mapFrameId", "/map")),
+	recordOnce(getParam<bool>("recordOnce", "false")),
 	transformation(PM::get().TransformationRegistrar.create("RigidTransformation"))
 {
 	// ROS initialization
-	cloudTopic = getParam<string>("cloudTopic", "/static_point_cloud");
 	cloudSub = n.subscribe(cloudTopic, 100, &ExportVtk::gotCloud, this);
 	
 	// Parameters for 3D map
-	mapFrame= getParam<string>("mapFrameId", "/map");
 }
 
 
@@ -56,23 +58,34 @@ void ExportVtk::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 {
 	const DP inCloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloudMsgIn));
 	
-	const PM::TransformationParameters tr(PointMatcher_ros::transformListenerToEigenMatrix<float>(tf_listener, cloudMsgIn.header.frame_id, mapFrame, cloudMsgIn.header.stamp));
-	
-	const DP outCloud(transformation->compute(inCloud, tr));
-	
-	if (outCloud.features.cols() == 0)
-	{
-		ROS_ERROR("I found no good points in the cloud");
-		return;
-	}
-	else
-	{
-		ROS_INFO("Saving cloud");
-	}
-	
-	stringstream nameStream;
-	nameStream << "." << cloudTopic << "_" << cloudMsgIn.header.seq << ".vtk";
-	outCloud.save(nameStream.str());
+  try
+  {
+    const PM::TransformationParameters tr(PointMatcher_ros::transformListenerToEigenMatrix<float>(tf_listener,  mapFrame, cloudMsgIn.header.frame_id, cloudMsgIn.header.stamp));
+    
+    const DP outCloud(transformation->compute(inCloud, tr));
+    
+    if (outCloud.features.cols() == 0)
+    {
+      ROS_ERROR("I found no good points in the cloud");
+      return;
+    }
+    else
+    {
+      ROS_INFO("Saving cloud");
+    }
+    
+    stringstream nameStream;
+    nameStream << "." << cloudTopic << "_" << cloudMsgIn.header.seq << ".vtk";
+    outCloud.save(nameStream.str());
+    if(recordOnce)
+    {
+      ros::shutdown();  
+    }
+  }
+  catch (tf::ExtrapolationException e)
+  {
+    ROS_WARN("Still build tf tree, skipping that scan");  
+  }
 }
 
 // Main function supporting the ExportVtk class
@@ -82,6 +95,9 @@ int main(int argc, char **argv)
 	ros::NodeHandle n;
 	ExportVtk exporter(n);
 	ros::spin();
+
+  // Wait for the shutdown to finish
+  while(ros::ok()){}
 	
 	return 0;
 }
