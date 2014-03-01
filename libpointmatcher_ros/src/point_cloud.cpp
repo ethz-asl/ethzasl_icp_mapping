@@ -260,7 +260,7 @@ namespace PointMatcher_ros
 						//);
 						listener->transformPoint(
 							fixedFrame,
-							endTime,
+							curTime, //endTime,
 							pin,
 							fixedFrame,
 							pout
