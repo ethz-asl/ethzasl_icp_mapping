@@ -223,11 +223,7 @@ namespace PointMatcher_ros
 		// fill features
 		const ros::Time& startTime(rosMsg.header.stamp);
 		const ros::Time endTime(startTime + ros::Duration(rosMsg.time_increment * (rosMsg.ranges.size() - 1)));
-		//auto xs(cloud.getFeatureViewByName("x"));
-		//auto ys(cloud.getFeatureViewByName("y"));
-		//auto zs(cloud.getFeatureViewByName("z"));
-
-		//float angle(rosMsg.angle_min);
+    
 		for (size_t i = 0; i < ranges.size(); ++i)
 		{
 			const T angle = rosMsg.angle_min + ids[i]*rosMsg.angle_increment;
@@ -235,9 +231,6 @@ namespace PointMatcher_ros
       const T x = cos(angle) * range;
       const T y = sin(angle) * range;
 
-      //xs(0,j) = cos(angle) * range;
-      //ys(0,j) = sin(angle) * range;
-              
       if (listener)
       {
         /* Note:
@@ -266,16 +259,10 @@ namespace PointMatcher_ros
 
         try
         {
-          //listener->transformVector(
-          //	fixedFrame,
-          //	endTime,
-          //	pin,
-          //	fixedFrame,
-          //	pout
-          //);
+      
           listener->transformPoint(
             fixedFrame,
-            curTime, //endTime,
+            curTime,
             pin,
             fixedFrame,
             pout
@@ -283,6 +270,7 @@ namespace PointMatcher_ros
         }
         catch (const tf::ExtrapolationException& e)
         {
+          //ROS_WARN_STREAM("Couldn't transform point: " << e.what());
           return DataPoints();
         }
 
@@ -296,10 +284,8 @@ namespace PointMatcher_ros
           cloud.features(2,i) = pout.point.z;
 				
 			}
-      // Update the angular value
-			//angle += rosMsg.angle_increment;
 		}
-		
+
 		// fill descriptors
 		if (!rosMsg.intensities.empty())
 		{
