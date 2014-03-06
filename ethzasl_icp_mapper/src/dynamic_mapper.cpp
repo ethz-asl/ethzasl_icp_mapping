@@ -390,9 +390,9 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 
 	if(!(newPointCloud->descriptorExists("stamps_Msec") && newPointCloud->descriptorExists("stamps_sec") && newPointCloud->descriptorExists("stamps_nsec")))
 	{
-		const float Msec = round(stamp.sec/10e5);
-		const float sec = round(Msec*10e5 - stamp.sec);
-		const float nsec = round(stamp.nsec/10e-10);
+		const float Msec = round(stamp.sec/1e6);
+		const float sec = round(stamp.sec - Msec*1e6);
+		const float nsec = round(stamp.nsec);
 
 		const PM::Matrix desc_Msec = PM::Matrix::Constant(1, goodCount, Msec);
 		const PM::Matrix desc_sec = PM::Matrix::Constant(1, goodCount, sec);
