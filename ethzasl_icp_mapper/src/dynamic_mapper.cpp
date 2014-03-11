@@ -625,16 +625,16 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 
 
 	// Prepare empty field if not existing
-	if(newPointCloud->descriptorExists("observedTime") == false)
+	if(newPointCloud->descriptorExists("probabilityStatic") == false)
 	{
-		//newPointCloud->addDescriptor("observedTime", PM::Matrix::Zero(1, newPointCloud->features.cols()));
-		newPointCloud->addDescriptor("observedTime", PM::Matrix::Constant(1, newPointCloud->features.cols(), priorStatic));
+		//newPointCloud->addDescriptor("probabilityStatic", PM::Matrix::Zero(1, newPointCloud->features.cols()));
+		newPointCloud->addDescriptor("probabilityStatic", PM::Matrix::Constant(1, newPointCloud->features.cols(), priorStatic));
 	}
 	
-	if(newPointCloud->descriptorExists("unobservedTime") == false)
+	if(newPointCloud->descriptorExists("probabilityDynamic") == false)
 	{
-		//newPointCloud->addDescriptor("unobservedTime", PM::Matrix::Zero(1, newPointCloud->features.cols()));
-		newPointCloud->addDescriptor("unobservedTime", PM::Matrix::Constant(1, newPointCloud->features.cols(), priorDyn));
+		//newPointCloud->addDescriptor("probabilityDynamic", PM::Matrix::Zero(1, newPointCloud->features.cols()));
+		newPointCloud->addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, newPointCloud->features.cols(), priorDyn));
 	}
 	
 	if(newPointCloud->descriptorExists("dynamic_ratio") == false)
@@ -747,8 +747,8 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	DP::View viewOn_sec_overlap = newPointCloud->getDescriptorViewByName("stamps_sec");
 	DP::View viewOn_nsec_overlap = newPointCloud->getDescriptorViewByName("stamps_nsec");
 
-	DP::View viewOnObservedTime = mapPointCloud->getDescriptorViewByName("observedTime");
-	DP::View viewOnUnobservedTime = mapPointCloud->getDescriptorViewByName("unobservedTime");
+	DP::View viewOnProbabilityStatic = mapPointCloud->getDescriptorViewByName("probabilityStatic");
+	DP::View viewOnProbabilityDynamic = mapPointCloud->getDescriptorViewByName("probabilityDynamic");
 	DP::View viewOnDynamicRatio = mapPointCloud->getDescriptorViewByName("dynamic_ratio");
 	
 	DP::View viewOn_normals_map = mapPointCloud->getDescriptorViewByName("normals");
@@ -822,18 +822,18 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 			// We don't update point behind the reading
 			if((readPt.norm() + eps_d + d_max) >= mapPt.norm())
 			{
-				const float lastDyn = viewOnUnobservedTime(0,mapId);
-				const float lastStatic = viewOnObservedTime(0, mapId);
+				const float lastDyn = viewOnProbabilityDynamic(0,mapId);
+				const float lastStatic = viewOnProbabilityStatic(0, mapId);
 
 				const float c1 = (1 - (w_v*(1 - w_d1)));
 				const float c2 = w_v*(1 - w_d1);
 				
 
-				//viewOnUnobservedTime(0,mapId) += (w_v + w_d2) * w_d1/2;
-				//viewOnUnobservedTime(0,mapId) += (w_v * w_d2);
+				//viewOnProbabilityDynamic(0,mapId) += (w_v + w_d2) * w_d1/2;
+				//viewOnProbabilityDynamic(0,mapId) += (w_v * w_d2);
 				
-				//viewOnObservedTime(0, mapId) += (w_p2) * w_d1;
-				//viewOnObservedTime(0, mapId) += w_p2;
+				//viewOnProbabilityStatic(0, mapId) += (w_p2) * w_d1;
+				//viewOnProbabilityStatic(0, mapId) += w_p2;
 
 				// FIXME: this is a parameter
 				//const float maxDyn = 0.9; // ICRA 14
@@ -842,25 +842,25 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 				//Lock dynamic point to stay dynamic under a threshold
 				if(lastDyn < maxDyn)
 				{
-					viewOnUnobservedTime(0,mapId) = c1*lastDyn + c2*w_d2*((1 - alpha)*lastStatic + beta*lastDyn);
-					viewOnObservedTime(0, mapId) = c1*lastStatic + c2*w_p2*(alpha*lastStatic + (1 - beta)*lastDyn);
+					viewOnProbabilityDynamic(0,mapId) = c1*lastDyn + c2*w_d2*((1 - alpha)*lastStatic + beta*lastDyn);
+					viewOnProbabilityStatic(0, mapId) = c1*lastStatic + c2*w_p2*(alpha*lastStatic + (1 - beta)*lastDyn);
 				}
 				else
 				{
-					viewOnObservedTime(0,mapId) = eps;
-					viewOnUnobservedTime(0,mapId) = 1-eps;
+					viewOnProbabilityStatic(0,mapId) = eps;
+					viewOnProbabilityDynamic(0,mapId) = 1-eps;
 				}
 				
 				
 				
 				// normalization
-				const float sumZ = viewOnUnobservedTime(0,mapId) + viewOnObservedTime(0, mapId);
+				const float sumZ = viewOnProbabilityDynamic(0,mapId) + viewOnProbabilityStatic(0, mapId);
 				assert(sumZ >= eps);	
 				
-				viewOnUnobservedTime(0,mapId) /= sumZ;
-				viewOnObservedTime(0,mapId) /= sumZ;
+				viewOnProbabilityDynamic(0,mapId) /= sumZ;
+				viewOnProbabilityStatic(0,mapId) /= sumZ;
 				
-				//viewOnDynamicRatio(0,mapId) =viewOnUnobservedTime(0, mapId);
+				//viewOnDynamicRatio(0,mapId) =viewOnProbabilityDynamic(0, mapId);
 				viewOnDynamicRatio(0,mapId) = w_d2;
 
 				//viewOnDynamicRatio(0,mapId) =	w_d2;
@@ -939,10 +939,10 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	//}
 
 	// Initialize descriptors
-	//no_overlap.addDescriptor("observedTime", PM::Matrix::Zero(1, no_overlap.features.cols()));
-	no_overlap.addDescriptor("observedTime", PM::Matrix::Constant(1, no_overlap.features.cols(), priorStatic));
-	//no_overlap.addDescriptor("unobservedTime", PM::Matrix::Zero(1, no_overlap.features.cols()));
-	no_overlap.addDescriptor("unobservedTime", PM::Matrix::Constant(1, no_overlap.features.cols(), priorDyn));
+	//no_overlap.addDescriptor("probabilityStatic", PM::Matrix::Zero(1, no_overlap.features.cols()));
+	no_overlap.addDescriptor("probabilityStatic", PM::Matrix::Constant(1, no_overlap.features.cols(), priorStatic));
+	//no_overlap.addDescriptor("probabilityDynamic", PM::Matrix::Zero(1, no_overlap.features.cols()));
+	no_overlap.addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, no_overlap.features.cols(), priorDyn));
 
 	no_overlap.addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, no_overlap.features.cols()));
 

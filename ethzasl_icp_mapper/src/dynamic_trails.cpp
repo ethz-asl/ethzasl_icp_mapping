@@ -509,8 +509,8 @@ PM::DataPoints DynamicTrails::extractDynamicPoints (const PM::DataPoints input, 
 	const float maxGlobalDist = 0.5;
 	globalNNS->knn(input.features, ids_input, dists_input, knn, 0, 0, maxGlobalDist);
 
-	if(globalMap.descriptorExists("observedTime") == false ||
-			globalMap.descriptorExists("unobservedTime") == false ||
+	if(globalMap.descriptorExists("probabilityStatic") == false ||
+			globalMap.descriptorExists("probabilityDynamic") == false ||
 			globalMap.descriptorExists("dynamic_ratio") == false
 		)
 	{
@@ -520,8 +520,8 @@ PM::DataPoints DynamicTrails::extractDynamicPoints (const PM::DataPoints input, 
 	}
 
 	//DP::View viewOnDynamicRatio = globalMap.getDescriptorViewByName("dynamic_ratio");
-	DP::View viewOnObservedTime = globalMap.getDescriptorViewByName("observedTime");
-	DP::View viewOnUnobservedTime = globalMap.getDescriptorViewByName("unobservedTime");
+	DP::View viewOnProbabilityStatic = globalMap.getDescriptorViewByName("probabilityStatic");
+	DP::View viewOnProbabilityDynamic = globalMap.getDescriptorViewByName("probabilityDynamic");
 
 	int dynamicPtsCount=0;
 	for(int i=0; i<inputPtsCount; i++)
@@ -533,9 +533,9 @@ PM::DataPoints DynamicTrails::extractDynamicPoints (const PM::DataPoints input, 
 		for(int k=0; k<knn; k++)
 		{
 			const int mapId = ids_input(k,i);
-			sumObs = max(sumObs, viewOnUnobservedTime(0,mapId) + viewOnObservedTime(0,mapId));
+			sumObs = max(sumObs, viewOnProbabilityDynamic(0,mapId) + viewOnProbabilityStatic(0,mapId));
 			dist = min(dist, dists_input(k,i));
-			dynRatio = max(dynRatio, viewOnUnobservedTime(0, mapId));
+			dynRatio = max(dynRatio, viewOnProbabilityDynamic(0, mapId));
 		}
 
 		{

@@ -20,7 +20,7 @@ outlierFilters:
 #TODO: put that back!
 #  - GenericDescriptorOutlierFilter:
 #     source: reference
-#     descName: observedTime
+#     descName: probabilityStatic
 
 errorMinimizer:
   PointToPointErrorMinimizer:

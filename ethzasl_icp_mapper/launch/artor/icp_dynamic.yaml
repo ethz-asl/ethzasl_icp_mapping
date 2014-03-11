@@ -21,7 +21,7 @@ outlierFilters:
      maxAngle: 1.57
   - GenericDescriptorOutlierFilter:
      source: reference
-     descName: observedTime
+     descName: probabilityStatic
 
 errorMinimizer:
   PointToPlaneErrorMinimizer
