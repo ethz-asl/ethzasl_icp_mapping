@@ -120,6 +120,7 @@ class Mapper
 	const float beta; //!< ratio. Propability of staying dynamic given that the point was static
 	const float maxDyn; //!< ratio. Threshold for which a point will stay dynamic
 	const float maxDistNewPoint; //!< in meter. Distance at which a new point will be added in the global map.
+	const float sensorMaxRange; //!< in meter. Radius in which the global map needs to be updated when a new scan arrived.
 
 
 	
@@ -193,6 +194,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	beta(getParam<double>("beta", 0.99)),
 	maxDyn(getParam<double>("maxDyn", 0.95)),
 	maxDistNewPoint(pow(getParam<double>("maxDistNewPoint", 0.1),2)),
+	sensorMaxRange(getParam<double>("sensorMaxRange", 80.0)),
 	TOdomToMap(PM::TransformationParameters::Identity(4, 4)),
 	publishStamp(ros::Time::now()),
   tfListener(ros::Duration(30)),
@@ -426,7 +428,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		publishLock.unlock();
 	}
 
-	cout << "TOdomToMap" << endl << TOdomToMap << endl;
 
 	// Fetch transformation from scanner to odom
 	// Note: we don't need to wait for transform. It is already called in transformListenerToEigenMatrix()
@@ -484,26 +485,25 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		// Apply ICP
 		PM::TransformationParameters Ticp;
 		Ticp = icp(*newPointCloud, TscannerToMap);
-
+    // extract corrections
+    PM::TransformationParameters Tdelta = Ticp * TscannerToMap.inverse();
+     
 		// ISER
-		{
-		// extract corrections
-		PM::TransformationParameters Tdelta = Ticp * TscannerToMap.inverse();
-		
-		// remove roll and pitch
-		Tdelta(2,0) = 0; 
-		Tdelta(2,1) = 0; 
-		Tdelta(2,2) = 1; 
-		Tdelta(0,2) = 0; 
-		Tdelta(1,2) = 0;
-		Tdelta(2,3) = 0; //z
-		Tdelta.block(0,0,3,3) = transformation->correctParameters(Tdelta.block(0,0,3,3));
+		//{
+    //  // remove roll and pitch
+    //  Tdelta(2,0) = 0; 
+    //  Tdelta(2,1) = 0; 
+    //  Tdelta(2,2) = 1; 
+    //  Tdelta(0,2) = 0; 
+    //  Tdelta(1,2) = 0;
+    //  Tdelta(2,3) = 0; //z
+    //  Tdelta.block(0,0,3,3) = transformation->correctParameters(Tdelta.block(0,0,3,3));
 
-		Ticp = Tdelta*TscannerToMap;
+    //  Ticp = Tdelta*TscannerToMap;
 
-		}
+    //  ROS_DEBUG_STREAM("Ticp:\n" << Ticp);
+		//}
 
-		ROS_DEBUG_STREAM("Ticp:\n" << Ticp);
 		
 		// Ensure minimum overlap between scans
 		const double estimatedOverlap = icp.errorMinimizer->getOverlap();
@@ -531,7 +531,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 
 		// Publish odometry
 		if (odomPub.getNumSubscribers())
-			odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(Ticp, mapFrame, stamp));
+			odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(Tdelta, mapFrame, stamp));
 	
 		// Publish error on odometry
 		if (odomErrorPub.getNumSubscribers())
@@ -543,27 +543,18 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		if (
 			mapping &&
 			((estimatedOverlap < maxOverlapToMerge) || (icp.getInternalMap().features.cols() < minMapPointCount)) &&
-			#if BOOST_VERSION >= 104100
 			(!mapBuildingInProgress)
-			#else // BOOST_VERSION >= 104100
-			true
-			#endif // BOOST_VERSION >= 104100
-		)
+    )
 		{
 			cout << "map Creation..." << endl;
 			// make sure we process the last available map
 			mapCreationTime = stamp;
-			#if BOOST_VERSION >= 104100
 			ROS_INFO("Adding new points to the map in background");
 			mapBuildingTask = MapBuildingTask(boost::bind(&Mapper::updateMap, this, newPointCloud.release(), Ticp, true));
 			mapBuildingFuture = mapBuildingTask.get_future();
 			mapBuildingThread = boost::thread(boost::move(boost::ref(mapBuildingTask)));
 			mapBuildingInProgress = true;
-			#else // BOOST_VERSION >= 104100
-			ROS_INFO("Adding new points to the map");
-			setMap(updateMap( newPointCloud.release(), Ticp, true));
-			#endif // BOOST_VERSION >= 104100
-		}
+    }
 	}
 	catch (PM::ConvergenceError error)
 	{
@@ -584,14 +575,12 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 
 void Mapper::processNewMapIfAvailable()
 {
-	#if BOOST_VERSION >= 104100
 	if (mapBuildingInProgress && mapBuildingFuture.has_value())
 	{
 		ROS_INFO_STREAM("New map available");
 		setMap(mapBuildingFuture.get());
 		mapBuildingInProgress = false;
 	}
-	#endif // BOOST_VERSION >= 104100
 }
 
 void Mapper::setMap(DP* newPointCloud)
@@ -613,7 +602,7 @@ void Mapper::setMap(DP* newPointCloud)
 		mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud, mapFrame, mapCreationTime));
 }
 
-Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParameters Ticp, bool updateExisting)
+Mapper::DP* Mapper::updateMap(DP* newMap, const PM::TransformationParameters Ticp, bool updateExisting)
 {
 	timer t;
 
@@ -625,169 +614,152 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 
 
 	// Prepare empty field if not existing
-	if(newPointCloud->descriptorExists("probabilityStatic") == false)
+  // FIXME: this is only needed for the none overlaping part
+	if(newMap->descriptorExists("probabilityStatic") == false)
 	{
-		//newPointCloud->addDescriptor("probabilityStatic", PM::Matrix::Zero(1, newPointCloud->features.cols()));
-		newPointCloud->addDescriptor("probabilityStatic", PM::Matrix::Constant(1, newPointCloud->features.cols(), priorStatic));
+		//newMap->addDescriptor("probabilityStatic", PM::Matrix::Zero(1, newMap->features.cols()));
+		newMap->addDescriptor("probabilityStatic", PM::Matrix::Constant(1, newMap->features.cols(), priorStatic));
 	}
 	
-	if(newPointCloud->descriptorExists("probabilityDynamic") == false)
+	if(newMap->descriptorExists("probabilityDynamic") == false)
 	{
-		//newPointCloud->addDescriptor("probabilityDynamic", PM::Matrix::Zero(1, newPointCloud->features.cols()));
-		newPointCloud->addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, newPointCloud->features.cols(), priorDyn));
+		//newMap->addDescriptor("probabilityDynamic", PM::Matrix::Zero(1, newMap->features.cols()));
+		newMap->addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, newMap->features.cols(), priorDyn));
 	}
 	
-	if(newPointCloud->descriptorExists("dynamic_ratio") == false)
+	if(newMap->descriptorExists("debug") == false)
 	{
-		newPointCloud->addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, newPointCloud->features.cols()));
+		newMap->addDescriptor("debug", PM::Matrix::Zero(1, newMap->features.cols()));
 	}
 
 	if (!updateExisting)
 	{
 		// FIXME: correct that, ugly
 		cout << "Jumping map creation" << endl;
-		*newPointCloud = transformation->compute(*newPointCloud, Ticp); 
-		mapPostFilters.apply(*newPointCloud);
-		return newPointCloud;
+		*newMap = transformation->compute(*newMap, Ticp); 
+		mapPostFilters.apply(*newMap);
+		return newMap;
 	}
 
 	
 	
-	const int readPtsCount(newPointCloud->features.cols());
+	const int newMapPts(newMap->features.cols());
 	const int mapPtsCount(mapPointCloud->features.cols());
 	
 	// Build a range image of the reading point cloud (local coordinates)
-	PM::Matrix radius_reading = newPointCloud->features.topRows(3).colwise().norm();
+	PM::Matrix radius_newMap = newMap->features.topRows(3).colwise().norm();
 
-	PM::Matrix angles_reading(2, readPtsCount); // 0=inclination, 1=azimuth
+	PM::Matrix angles_newMap(2, newMapPts); // 0=inclination, 1=azimuth
 
 	// No atan in Eigen, so we are for to loop through it...
-	for(int i=0; i<readPtsCount; i++)
+	for(int i=0; i<newMapPts; i++)
 	{
-		const float ratio = newPointCloud->features(2,i)/radius_reading(0,i);
-		//if(ratio < -1 || ratio > 1)
-			//cout << "Error angle!" << endl;
+		const float ratio = newMap->features(2,i)/radius_newMap(0,i);
 
-		angles_reading(0,i) = acos(ratio);
-		angles_reading(1,i) = atan2(newPointCloud->features(1,i), newPointCloud->features(0,i));
+		angles_newMap(0,i) = acos(ratio);
+		angles_newMap(1,i) = atan2(newMap->features(1,i), newMap->features(0,i));
 	}
 
-	std::shared_ptr<NNS> featureNNS;
-	featureNNS.reset( NNS::create(angles_reading));
+	std::shared_ptr<NNS> kdtree;
+	kdtree.reset( NNS::create(angles_newMap));
 
-
+  //-------------- Global map ------------------------------
 	// Transform the global map in local coordinates
-	DP mapLocalFrame = transformation->compute(*mapPointCloud, Ticp.inverse());
+	DP mapLocal = transformation->compute(*mapPointCloud, Ticp.inverse());
 
-	// Remove points out of sensor range
-	// FIXME: this is a parameter
-	const float sensorMaxRange = 80.0;
-	PM::Matrix globalId(1, mapPtsCount); 
+  // ROI: Region of Interest
+  // We reduce the global map to the minimum for the processing
 
-	int mapCutPtsCount = 0;
-	DP mapLocalFrameCut(mapLocalFrame.createSimilarEmpty());
+	//const float sensorMaxRange = 80.0; // ICRA
+	
+  PM::Matrix globalId(1, mapPtsCount); 
+
+	int ROIpts = 0;
+	int notROIpts = 0;
+
+  // Split mapLocal
+	DP mapLocalROI(mapLocal.createSimilarEmpty());
 	for (int i = 0; i < mapPtsCount; i++)
 	{
-		if (mapLocalFrame.features.col(i).head(3).norm() < sensorMaxRange)
+    // Copy the points of the ROI in a new map
+		if (mapLocal.features.col(i).head(3).norm() < sensorMaxRange)
 		{
-			mapLocalFrameCut.setColFrom(mapCutPtsCount, mapLocalFrame, i);
-			globalId(0,mapCutPtsCount) = i;
-			mapCutPtsCount++;
+			mapLocalROI.setColFrom(ROIpts, mapLocal, i);
+			globalId(0,ROIpts) = i;
+			ROIpts++;
 		}
+    else // Remove the points of the ROI from the global map
+    {
+			mapLocal.setColFrom(notROIpts, mapLocal, i);
+			notROIpts++;
+    }
 	}
 
-	mapLocalFrameCut.conservativeResize(mapCutPtsCount);
-	//PM::Parameters params({{"maxDist", toParam(sensorMaxRange)}});
-	//PM::DataPointsFilter* maxDistFilter = 
-	//		PM::get().DataPointsFilterRegistrar.create("MaxDistDataPointsFilter", params);
-
-	//mapLocalFrame = maxDistFilter->filter(mapLocalFrame);
-
-
+	mapLocalROI.conservativeResize(ROIpts);
+	mapLocal.conservativeResize(notROIpts);
 	
-	PM::Matrix radius_map = mapLocalFrameCut.features.topRows(3).colwise().norm();
 
-	PM::Matrix angles_map(2, mapCutPtsCount); // 0=inclination, 1=azimuth
+  // Convert the map in spherical coordinates
+	PM::Matrix radius_map = mapLocalROI.features.topRows(3).colwise().norm();
+	PM::Matrix angles_map(2, ROIpts); // 0=inclination, 1=azimuth
 
-	// No atan in Eigen, so we are for to loop through it...
-	for(int i=0; i<mapCutPtsCount; i++)
+	// No atan in Eigen, so we are looping through it...
+  // TODO: check for: A.binaryExpr(B, std::ptr_fun(atan2))
+	for(int i=0; i < ROIpts; i++)
 	{
-		const float ratio = mapLocalFrameCut.features(2,i)/radius_map(0,i);
+		const float ratio = mapLocalROI.features(2,i)/radius_map(0,i);
 		//if(ratio < -1 || ratio > 1)
 			//cout << "Error angle!" << endl;
 
 		angles_map(0,i) = acos(ratio);
 
-		angles_map(1,i) = atan2(mapLocalFrameCut.features(1,i), mapLocalFrameCut.features(0,i));
+		angles_map(1,i) = atan2(mapLocalROI.features(1,i), mapLocalROI.features(0,i));
 	}
 
-	// Look for NN in spherical coordinates
-	Matches::Dists dists(1,mapCutPtsCount);
-	Matches::Ids ids(1,mapCutPtsCount);
-	
-	// FIXME: those are parameters
-	// note: 0.08 rad is 5 deg
-	//const float maxAngle = 0.04; // in rad (ICRA 14)
-	//const float eps_a = 0.2; // ratio of distance (ICRA 14)
-	//const float eps_d = 0.1; // in meters (ICRA 14)
-	//const float maxAngle = 0.02; // in rad (ISER 14)
-	//const float eps_a = 0.05; // ratio of distance (ISER 14)
-	//const float eps_d = 0.02; // in meters (ISER 14)
-	//const float alpha = 0.99;
-	//const float beta = 0.99;
+  // Prepare access to descriptors
+	DP::View viewOn_Msec_overlap = newMap->getDescriptorViewByName("stamps_Msec");
+	DP::View viewOn_sec_overlap = newMap->getDescriptorViewByName("stamps_sec");
+	DP::View viewOn_nsec_overlap = newMap->getDescriptorViewByName("stamps_nsec");
 
+	DP::View viewOnProbabilityStatic = mapLocalROI.getDescriptorViewByName("probabilityStatic");
+	DP::View viewOnProbabilityDynamic = mapLocalROI.getDescriptorViewByName("probabilityDynamic");
+	DP::View viewDebug = mapLocalROI.getDescriptorViewByName("debug");
+	viewDebug = PM::Matrix::Zero(1, mapPtsCount); // For debuging
 	
-	
-	featureNNS->knn(angles_map, ids, dists, 1, 0, NNS::ALLOW_SELF_MATCH, maxAngle);
-
-	// Define views on descriptors
-	//DP::View viewOn_normals_overlap = newPointCloud->getDescriptorViewByName("normals");
-	//DP::View viewOn_obsDir_overlap = newPointCloud->getDescriptorViewByName("observationDirections");
-	DP::View viewOn_Msec_overlap = newPointCloud->getDescriptorViewByName("stamps_Msec");
-	DP::View viewOn_sec_overlap = newPointCloud->getDescriptorViewByName("stamps_sec");
-	DP::View viewOn_nsec_overlap = newPointCloud->getDescriptorViewByName("stamps_nsec");
-
-	DP::View viewOnProbabilityStatic = mapPointCloud->getDescriptorViewByName("probabilityStatic");
-	DP::View viewOnProbabilityDynamic = mapPointCloud->getDescriptorViewByName("probabilityDynamic");
-	DP::View viewOnDynamicRatio = mapPointCloud->getDescriptorViewByName("dynamic_ratio");
-	
-	DP::View viewOn_normals_map = mapPointCloud->getDescriptorViewByName("normals");
-	DP::View viewOn_Msec_map = mapPointCloud->getDescriptorViewByName("stamps_Msec");
-	DP::View viewOn_sec_map = mapPointCloud->getDescriptorViewByName("stamps_sec");
-	DP::View viewOn_nsec_map = mapPointCloud->getDescriptorViewByName("stamps_nsec");
-	
+	DP::View viewOn_normals_map = mapLocalROI.getDescriptorViewByName("normals");
+	DP::View viewOn_Msec_map = mapLocalROI.getDescriptorViewByName("stamps_Msec");
+	DP::View viewOn_sec_map = mapLocalROI.getDescriptorViewByName("stamps_sec");
+	DP::View viewOn_nsec_map = mapLocalROI.getDescriptorViewByName("stamps_nsec");
 	
 
-	viewOnDynamicRatio = PM::Matrix::Zero(1, mapPtsCount);
-	for(int i=0; i < mapCutPtsCount; i++)
+	// Search for the nearest point in newMap
+	Matches::Dists dists(1, ROIpts);
+	Matches::Ids ids(1, ROIpts);
+	
+	kdtree->knn(angles_map, ids, dists, 1, 0, NNS::ALLOW_SELF_MATCH, maxAngle);
+
+
+  // update probability of being dynamic for all points in ROI
+	for(int i=0; i < ROIpts; i++)
 	{
 		if(dists(i) != numeric_limits<float>::infinity())
 		{
 			const int readId = ids(0,i);
-			const int mapId = globalId(0,i);
+			//const int mapId = globalId(0,i);
+			const int mapId = i;
 			
 			// in local coordinates
-			const Eigen::Vector3f readPt = newPointCloud->features.col(readId).head(3);
-			const Eigen::Vector3f mapPt = mapLocalFrameCut.features.col(i).head(3);
+			const Eigen::Vector3f readPt = newMap->features.col(readId).head(3);
+			const Eigen::Vector3f mapPt = mapLocalROI.features.col(i).head(3);
 			const Eigen::Vector3f mapPt_n = mapPt.normalized();
 			const float delta = (readPt - mapPt).norm();
 			const float d_max = eps_a * readPt.norm();
 
-			//const double timeMap = viewOn_Msec_map(0,mapId)*10e5 + viewOn_sec_map(0,mapId) + viewOn_nsec_map(0,mapId)*10e-10;
-			//const double timeRead = viewOn_Msec_overlap(0,readId)*10e5 + viewOn_sec_overlap(0,readId) + viewOn_nsec_overlap(0,readId)*10e-10;
-			//const double deltaTime = timeRead - timeMap;
-
-			const Eigen::Vector3f normal_map = viewOn_normals_map.col(mapId);
-			//const Eigen::Vector3f normal_read = viewOn_normals_overlap.col(readId);
-			//const Eigen::Vector3f obsDir = viewOn_obsDir_overlap.col(readId);
-			//const float viewAngle = acos(normal_map.normalized().dot(obsDir.normalized()));
-			//const float normalAngle = acos(normal_map.normalized().dot(normal_read.normalized()));
+      const Eigen::Vector3f normal_map = viewOn_normals_map.col(mapId);
 			
-			// Weight for dynamic elements
+      // Weight for dynamic elements
 			const float w_v = eps + (1 - eps)*fabs(normal_map.dot(mapPt_n));
-			//const float w_d1 = 1 + eps - acos(readPt.normalized().dot(mapPt_n))/maxAngle;
 			const float w_d1 =  eps + (1 - eps)*(1 - sqrt(dists(i))/maxAngle);
-			
 			
 			const float offset = delta - eps_d;
 			float w_d2 = 1;
@@ -816,8 +788,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 				}
 			}
 
-			//cerr << "readPt.norm(): "<< readPt.norm()  << "mapPt.norm(): "<< mapPt.norm() << ", w_p2: " << w_p2 << ", w_d2: " << w_d2 << endl;
-		
 
 			// We don't update point behind the reading
 			if((readPt.norm() + eps_d + d_max) >= mapPt.norm())
@@ -827,19 +797,8 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 
 				const float c1 = (1 - (w_v*(1 - w_d1)));
 				const float c2 = w_v*(1 - w_d1);
-				
-
-				//viewOnProbabilityDynamic(0,mapId) += (w_v + w_d2) * w_d1/2;
-				//viewOnProbabilityDynamic(0,mapId) += (w_v * w_d2);
-				
-				//viewOnProbabilityStatic(0, mapId) += (w_p2) * w_d1;
-				//viewOnProbabilityStatic(0, mapId) += w_p2;
-
-				// FIXME: this is a parameter
-				//const float maxDyn = 0.9; // ICRA 14
-				//const float maxDyn = 0.98; // ISER 14
-
-				//Lock dynamic point to stay dynamic under a threshold
+			
+        //Lock dynamic point to stay dynamic under a threshold
 				if(lastDyn < maxDyn)
 				{
 					viewOnProbabilityDynamic(0,mapId) = c1*lastDyn + c2*w_d2*((1 - alpha)*lastStatic + beta*lastDyn);
@@ -851,8 +810,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 					viewOnProbabilityDynamic(0,mapId) = 1-eps;
 				}
 				
-				
-				
 				// normalization
 				const float sumZ = viewOnProbabilityDynamic(0,mapId) + viewOnProbabilityStatic(0, mapId);
 				assert(sumZ >= eps);	
@@ -860,18 +817,14 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 				viewOnProbabilityDynamic(0,mapId) /= sumZ;
 				viewOnProbabilityStatic(0,mapId) /= sumZ;
 				
-				//viewOnDynamicRatio(0,mapId) =viewOnProbabilityDynamic(0, mapId);
-				viewOnDynamicRatio(0,mapId) = w_d2;
-
-				//viewOnDynamicRatio(0,mapId) =	w_d2;
+				//viewDebug(0,mapId) =viewOnProbabilityDynamic(0, mapId);
+				viewDebug(0,mapId) = w_d2;
 
 				// Refresh time
 				viewOn_Msec_map(0,mapId) = viewOn_Msec_overlap(0,readId);	
 				viewOn_sec_map(0,mapId) = viewOn_sec_overlap(0,readId);	
 				viewOn_nsec_map(0,mapId) = viewOn_nsec_overlap(0,readId);	
 			}
-
-
 		}
 	}
 
@@ -879,30 +832,32 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 
 
 	// Correct new points using ICP result
-	//*newPointCloud = transformation->compute(*newPointCloud, Ticp); 
+	//*newMap = transformation->compute(*newMap, Ticp); 
 
 	// Generate temporary map for density computation
-	//DP tmp_map = (*mapPointCloud); // FIXME: this should be on mapLocalFrameCut
-	DP tmp_map = mapLocalFrameCut; // FIXME: this should be on mapLocalFrameCut
-	tmp_map.concatenate(*newPointCloud);
+	//DP tmp_map = (*mapPointCloud); // FIXME: this should be on mapLocalROI
+	DP tmp_map = mapLocalROI; // FIXME: this should be on mapLocalROI
+  
+  //FIXME: Continue refactoring from here
+  //FIXME: why concatenate????
+	tmp_map.concatenate(*newMap);
 
 	// Compute density
-	//std::shared_ptr<NNS> featureNNS;
 
 	cout << "build first kdtree with " << tmp_map.features.cols() << endl;
 	// build and populate NNS
-	featureNNS.reset( NNS::create(tmp_map.features, tmp_map.features.rows() - 1, NNS::KDTREE_LINEAR_HEAP, NNS::TOUCH_STATISTICS));
+	kdtree.reset( NNS::create(tmp_map.features, tmp_map.features.rows() - 1, NNS::KDTREE_LINEAR_HEAP, NNS::TOUCH_STATISTICS));
 	
 	PM::Matches matches_overlap(
-		Matches::Dists(1, readPtsCount),
-		Matches::Ids(1, readPtsCount)
+		Matches::Dists(1, newMapPts),
+		Matches::Ids(1, newMapPts)
 	);
 	
-	featureNNS->knn(newPointCloud->features, matches_overlap.ids, matches_overlap.dists, 1, 0);
+	kdtree->knn(newMap->features, matches_overlap.ids, matches_overlap.dists, 1, 0);
 	
 	
-	DP overlap(newPointCloud->createSimilarEmpty());
-	DP no_overlap(newPointCloud->createSimilarEmpty());
+	DP overlap(newMap->createSimilarEmpty());
+	DP no_overlap(newMap->createSimilarEmpty());
 	
 	
 
@@ -913,16 +868,16 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 
 	int ptsOut = 0;
 	int ptsIn = 0;
-	for (int i = 0; i < readPtsCount; ++i)
+	for (int i = 0; i < newMapPts; ++i)
 	{
 		if (matches_overlap.dists(i) > maxDistNewPoint)
 		{
-			no_overlap.setColFrom(ptsOut, *newPointCloud, i);
+			no_overlap.setColFrom(ptsOut, *newMap, i);
 			ptsOut++;
 		}
 		else
 		{
-			overlap.setColFrom(ptsIn, *newPointCloud, i);
+			overlap.setColFrom(ptsIn, *newMap, i);
 			ptsIn++;
 		}
 	}
@@ -944,27 +899,29 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	//no_overlap.addDescriptor("probabilityDynamic", PM::Matrix::Zero(1, no_overlap.features.cols()));
 	no_overlap.addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, no_overlap.features.cols(), priorDyn));
 
-	no_overlap.addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, no_overlap.features.cols()));
+	no_overlap.addDescriptor("debug", PM::Matrix::Zero(1, no_overlap.features.cols()));
 
-	// shrink the newPointCloud to the new information
-	*newPointCloud = no_overlap;
+	// shrink the newMap to the new information
+	*newMap = no_overlap;
 	
 
 	
 	// Correct new points using ICP result
-	*newPointCloud = transformation->compute(*newPointCloud, Ticp);
+	*newMap = transformation->compute(*newMap, Ticp);
 	
 	
 	
 	
 	// Merge point clouds to map
-	newPointCloud->concatenate(*mapPointCloud);
-	mapPostFilters.apply(*newPointCloud);
+	newMap->concatenate(*mapPointCloud);
+	
+  mapPostFilters.apply(*newMap);
+
 
 	cout << "... end map creation" << endl;
-	ROS_INFO_STREAM("[TIME] New map available (" << newPointCloud->features.cols() << " pts), update took " << t.elapsed() << " [s]");
+	ROS_INFO_STREAM("[TIME] New map available (" << newMap->features.cols() << " pts), update took " << t.elapsed() << " [s]");
 	
-	return newPointCloud;
+	return newMap;
 }
 
 void Mapper::waitForMapBuildingCompleted()

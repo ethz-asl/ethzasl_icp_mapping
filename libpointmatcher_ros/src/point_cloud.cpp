@@ -246,7 +246,7 @@ namespace PointMatcher_ros
           rosMsg.header.frame_id,
           fixedFrame,
           curTime,
-          ros::Duration(1.0)
+          ros::Duration(0.1)
         );
 
         // transform data

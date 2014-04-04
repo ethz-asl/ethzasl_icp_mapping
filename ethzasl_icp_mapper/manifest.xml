@@ -16,7 +16,6 @@
   <depend package="sensor_msgs"/>
   <depend package="nav_msgs"/>
   <depend package="tf"/>
-  <depend package="tf2"/>
   <depend package="tf_conversions"/>
   <depend package="message_filters"/>
   <depend package="map_msgs"/>
