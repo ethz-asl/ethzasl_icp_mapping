@@ -1,15 +1,19 @@
-cmake_minimum_required(VERSION 2.4.6)
-include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
+cmake_minimum_required(VERSION 2.8.3)
 
-# Set the build type.  Options are:
-#  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage
-#  Debug          : w/ debug symbols, w/o optimization
-#  Release        : w/o debug symbols, w/ optimization
-#  RelWithDebInfo : w/ debug symbols, w/ optimization
-#  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
-set(ROS_BUILD_TYPE RelWithDebInfo)
+include(ExternalProject)
 
-rosbuild_init()
+ExternalProject_Add( foreignproject
+  PREFIX foreignprojectlib
+  GIT_REPOSITORY foreignproject.git
+  BUILD_IN_SOURCE
+  BUILD_COMMAND cmake --build .
+  INSTALL_COMMAND ""
+)
+
+project(pointmatcher_ros)
+
+find_package(catkin REQUIRED COMPONENTS nabo)
+
 
 # c++ 0x
 #if("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang") 
