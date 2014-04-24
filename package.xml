@@ -1,0 +1,15 @@
+<package>
+	<name>ethzasl_icp_mapping</name>
+	<version>0.0.1</version>
+	<maintainer email="f.pomerleau@gmail.com">Francois Pomerleau</maintainer>
+	<url type="website">http://ros.org/wiki/ethzasl_mapping</url>
+	<license>new BSD</license>
+
+	<author>Francois Pomerlau</author>
+
+	<buildtool_depend>catkin</buildtool_depend>
+
+	<export>
+		<metapackage />
+	</export>
+</package>

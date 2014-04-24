@@ -1,0 +1,4 @@
+yaml-cpp:
+  ubuntu:
+    apt:
+      packages: [ yaml-cpp0.2.6-dev ]

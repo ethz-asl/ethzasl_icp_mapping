@@ -1,18 +1,15 @@
 cmake_minimum_required(VERSION 2.8.3)
 
-include(ExternalProject)
+project(libpointmatcher_ros)
 
-ExternalProject_Add( foreignproject
-  PREFIX foreignprojectlib
-  GIT_REPOSITORY foreignproject.git
-  BUILD_IN_SOURCE
-  BUILD_COMMAND cmake --build .
-  INSTALL_COMMAND ""
+find_package(catkin REQUIRED COMPONENTS roscpp sensor_msgs nav_msgs tf tf_conversions eigen_conversions)
+
+catkin_package(
+	INCLUDE_DIRS include
+	LIBRARIES ${PROJECT_NAME}
+	CATKIN_DEPENDS roscpp sensor_msgs nav_msgs tf tf_conversions eigen_conversions
+	DEPENDS eigen boost yaml-cpp nabo pointmatcher
 )
-
-project(pointmatcher_ros)
-
-find_package(catkin REQUIRED COMPONENTS nabo)
 
 
 # c++ 0x
@@ -29,6 +26,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 else(CMAKE_COMPILER_IS_GNUCXX)
 	message(SEND_ERROR "You need partial C++0x support for N2351, N2672, N1984. Currently this build toolchain supports only GCC >= 4.4. If your compiler supports these specifications, please send us a patch.")
 endif(CMAKE_COMPILER_IS_GNUCXX)
+
 # well, this breaks libpointmatcher on non-unix platform,
 # please contribute the define for your favorite compiler
 # It must support (compiler support in parenthesis):
@@ -37,12 +35,11 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-find_package(roscpp)
-
 find_package(Eigen REQUIRED)
-include_directories(${Eigen_INCLUDE_DIRS})
 
 add_definitions(-DHAVE_YAML_CPP)
 
-rosbuild_add_boost_directories()
-rosbuild_add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)
+find_package(Boost REQUIRED COMPONENTS thread filesystem system program_options date_time)
+include_directories(include ${Eigen_INCLUDE_DIRS})
+
+add_library(${PROJECT_NAME} src/point_cloud.cpp src/transform.cpp)
