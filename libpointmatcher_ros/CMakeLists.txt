@@ -1,16 +1,19 @@
 cmake_minimum_required(VERSION 2.8.3)
 
-project(libpointmatcher_ros)
+project(pointmatcher_ros)
 
-find_package(catkin REQUIRED COMPONENTS roscpp sensor_msgs nav_msgs tf tf_conversions eigen_conversions)
+find_package(catkin_simple REQUIRED)
 
-catkin_package(
-	INCLUDE_DIRS include
-	LIBRARIES ${PROJECT_NAME}
-	CATKIN_DEPENDS roscpp sensor_msgs nav_msgs tf tf_conversions eigen_conversions
-	DEPENDS eigen boost yaml-cpp nabo pointmatcher
-)
+catkin_simple()
 
+#find_package(catkin REQUIRED COMPONENTS roscpp sensor_msgs nav_msgs tf tf_conversions eigen_conversions)
+
+# catkin_package(
+# 	INCLUDE_DIRS include ${catkin_INCLUDE_DIRS}
+# 	LIBRARIES ${PROJECT_NAME}
+# 	CATKIN_DEPENDS roscpp sensor_msgs nav_msgs tf tf_conversions eigen_conversions
+# 	DEPENDS eigen boost yaml-cpp nabo pointmatcher
+# )
 
 # c++ 0x
 #if("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang") 
@@ -42,4 +45,4 @@ add_definitions(-DHAVE_YAML_CPP)
 find_package(Boost REQUIRED COMPONENTS thread filesystem system program_options date_time)
 include_directories(include ${Eigen_INCLUDE_DIRS})
 
-add_library(${PROJECT_NAME} src/point_cloud.cpp src/transform.cpp)
+cs_add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)

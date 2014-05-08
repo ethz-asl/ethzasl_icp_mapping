@@ -1,5 +1,9 @@
-cmake_minimum_required(VERSION 2.4.6)
-include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
+cmake_minimum_required(VERSION 2.8.3)
+project(ethzasl_point_cloud_vtk_tools)
+
+find_package(catkin_simple REQUIRED)
+
+catkin_simple()
 
 # Set the build type.  Options are:
 #  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage
@@ -7,9 +11,7 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  Release        : w/o debug symbols, w/ optimization
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
-set(ROS_BUILD_TYPE RelWithDebInfo)
-
-rosbuild_init()
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
 # c++ 0x
 #if("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang") 
@@ -35,14 +37,20 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-rosbuild_add_boost_directories()
+find_package(Boost REQUIRED COMPONENTS filesystem)
 
-rosbuild_add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
-rosbuild_link_boost(pointCloudToVtk filesystem system)
-target_link_libraries(pointCloudToVtk ${EXTRA_LIBS} argtable2 rt yaml-cpp)
+find_library(POINTMATCHER_LIBRARY NAMES libnpointmatcher.a pointmatcher PATHS
+	/usr/local/lib
+)
 
-rosbuild_add_executable(vtkToPointCloud src/vtkToPointCloud.cpp)
-rosbuild_link_boost(vtkToPointCloud filesystem system)
-target_link_libraries(vtkToPointCloud ${EXTRA_LIBS} argtable2 rt yaml-cpp)
+find_library(NABO_LIBRARY NAMES libnabo.a nabo)
+
+set (NON_CATKIN_LIBS ${POINTMATCHER_LIBRARY} ${NABO_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} yaml-cpp)
+
+cs_add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
+target_link_libraries(pointCloudToVtk ${NON_CATKIN_LIBS} )
+
+cs_add_executable(vtkToPointCloud src/vtkToPointCloud.cpp)
+target_link_libraries(vtkToPointCloud ${NON_CATKIN_LIBS})
 
 

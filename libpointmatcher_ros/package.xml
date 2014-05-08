@@ -1,5 +1,5 @@
 <package>
-  <name>libpointmatcher_ros</name>
+  <name>pointmatcher_ros</name>
   <description>
      Bridge between libpointmatcher and ROS.
   </description>
@@ -9,7 +9,7 @@
   <license>new BSD</license>
   <url>http://ros.org/wiki/libpointmatcher_ros</url>
 
-  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>catkin_simple</buildtool_depend>
 
   <build_depend>roscpp</build_depend>
   <build_depend>sensor_msgs</build_depend>
@@ -23,7 +23,7 @@
   <build_depend>libpointmatcher</build_depend>
   <build_depend>libnabo</build_depend>
 
-  <run_depend>roscpp</run_depend>
+<!--   <run_depend>roscpp</run_depend>
   <run_depend>sensor_msgs</run_depend>
   <run_depend>nav_msgs</run_depend>
   <run_depend>tf</run_depend>
@@ -33,11 +33,8 @@
   <run_depend>boost</run_depend>
   <run_depend>yaml-cpp</run_depend>
   <run_depend>libpointmatcher</run_depend>
-  <run_depend>libnabo</run_depend>
-
-  <export>
-    <cpp cflags="-I${prefix}/include" lflags="-L${prefix}/lib -Wl,-rpath,${prefix}/lib -lpointmatcher_ros" />
-  </export>
+  <run_depend>libnabo</run_depend> -->
+  
 </package>
 
 
