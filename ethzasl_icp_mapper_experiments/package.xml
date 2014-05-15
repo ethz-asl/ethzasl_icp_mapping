@@ -22,9 +22,9 @@
   <build_depend>nav_msgs</build_depend>
   <build_depend>tf</build_depend>
   <build_depend>tf_conversions</build_depend>
-  <build_depend>nabo</build_depend>
-  <build_depend>pointmatcher</build_depend>
-  <build_depend>pointmatcher_ros</build_depend>
+  <build_depend>lbnabo</build_depend>
+  <build_depend>libpointmatcher</build_depend>
+  <build_depend>libpointmatcher_ros</build_depend>
   <build_depend>libargtable2-dev</build_depend>  
   <build_depend>yaml-cpp</build_depend>
   <build_depend>eigen</build_depend>  

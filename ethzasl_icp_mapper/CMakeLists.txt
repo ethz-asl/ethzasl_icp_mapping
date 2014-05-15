@@ -1,9 +1,28 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(ethzasl_icp_mapper)
 
-find_package(catkin_simple REQUIRED)
+find_package(catkin REQUIRED roscpp rospy rosbag std_msgs geometry_msgs nav_msgs
+tf tf2 tf_conversions message_filters map_msgs libpointmatcher_ros visualization_msgs
+interactive_markers ethzasl_gridmap_2d message_generation)
 
-catkin_simple()
+add_service_files( FILES
+CorrectPose.srv
+GetBoundedMap.srv
+GetMode.srv
+LoadMap.srv
+MatchClouds.srv
+SetMode.srv
+)
+
+generate_messages(DEPENDENCIES sensor_msgs nav_msgs std_msgs geometry_msgs actionlib_msgs)
+
+catkin_package (
+	LIBRARIES ${PROJECT_NAME}
+	CATKIN_DEPENDS roscpp rospy rosbag std_msgs geometry_msgs nav_msgs
+tf tf2 tf_conversions message_filters map_msgs libpointmatcher_ros ethzasl_gridmap_2d visualization_msgs interactive_markers 
+message_runtime
+	DEPENDS libnabo libpointmatcher eigen yaml-cpp libargtable2-dev
+)
 
 # Set the build type.  Options are:
 #  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage
@@ -12,8 +31,6 @@ catkin_simple()
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
-
-#generate_messages()
 
 # c++ 0x
 #if("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang") 
@@ -42,29 +59,36 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 add_definitions(-DHAVE_YAML_CPP)
 
 find_package(Boost REQUIRED COMPONENTS thread filesystem system program_options date_time REQUIRED)
-include_directories(${Boost_INCLUDE_DIRS}) 
+include_directories(include ${Boost_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
 
-set(NON_CATKIN_LIBS ${Boost_FILESYSTEM_LIBRARY} yaml-cpp nabo pointmatcher)
+set(NON_CATKIN_LIBS ${Boost_FILESYSTEM_LIBRARY} yaml-cpp pointmatcher nabo)
 
-cs_add_executable(matcher_service src/matcher_service.cpp)
-target_link_libraries(matcher_service ${NON_CATKIN_LIBS} )
+add_executable(matcher_service src/matcher_service.cpp)
+add_dependencies(matcher_service ${PROJECT_NAME}_gencpp)
+target_link_libraries(matcher_service ${catkin_LIBRARIES} ${NON_CATKIN_LIBS} )
 
-cs_add_executable(occupancy_grid_builder src/occupancy_grid_builder.cpp)
-target_link_libraries(occupancy_grid_builder ${EXTRA_LIBS})
+add_executable(occupancy_grid_builder src/occupancy_grid_builder.cpp)
+add_dependencies(occupancy_grid_builder ${PROJECT_NAME}_gencpp)
+target_link_libraries(occupancy_grid_builder ${catkin_LIBRARIES} ${EXTRA_LIBS})
 
-cs_add_executable(mapper src/mapper.cpp)
-target_link_libraries(mapper ${NON_CATKIN_LIBS})
+add_executable(mapper src/mapper.cpp)
+add_dependencies(mapper ${PROJECT_NAME}_gencpp)
+target_link_libraries(mapper ${catkin_LIBRARIES} ${NON_CATKIN_LIBS})
 
-cs_add_executable(map_maintainer src/map_maintainer.cpp )
-target_link_libraries(map_maintainer ${NON_CATKIN_LIBS} )
+add_executable(map_maintainer src/map_maintainer.cpp )
+add_dependencies(map_maintainer ${PROJECT_NAME}_gencpp)
+target_link_libraries(map_maintainer ${catkin_LIBRARIES} ${NON_CATKIN_LIBS} )
 
-cs_add_executable(interact_mapper src/interact_mapper.cpp )
-target_link_libraries(interact_mapper ${NON_CATKIN_LIBS} )
+add_executable(interact_mapper src/interact_mapper.cpp )
+add_dependencies(interact_mapper ${PROJECT_NAME}_gencpp)
+target_link_libraries(interact_mapper ${catkin_LIBRARIES} ${NON_CATKIN_LIBS} )
 
-cs_add_executable(dynamic_mapper src/dynamic_mapper.cpp )
-target_link_libraries(dynamic_mapper ${NON_CATKIN_LIBS} )
+add_executable(dynamic_mapper src/dynamic_mapper.cpp )
+add_dependencies(dynamic_mapper ${PROJECT_NAME}_gencpp)
+target_link_libraries(dynamic_mapper ${catkin_LIBRARIES} ${NON_CATKIN_LIBS} )
 
-cs_add_executable(dynamic_trails src/dynamic_trails.cpp )
-target_link_libraries(dynamic_trails ${NON_CATKIN_LIBS} )
+add_executable(dynamic_trails src/dynamic_trails.cpp )
+add_dependencies(dynamic_trails ${PROJECT_NAME}_gencpp)
+target_link_libraries(dynamic_trails ${catkin_LIBRARIES} ${NON_CATKIN_LIBS} )
 
 

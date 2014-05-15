@@ -1,5 +1,5 @@
 <package>
-  <name>pointmatcher_ros</name>
+  <name>libpointmatcher_ros</name>
   <description>
      Bridge between libpointmatcher and ROS.
   </description>

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 
-project(pointmatcher_ros)
+project(libpointmatcher_ros)
 
 find_package(catkin_simple REQUIRED)
 
@@ -45,4 +45,4 @@ add_definitions(-DHAVE_YAML_CPP)
 find_package(Boost REQUIRED COMPONENTS thread filesystem system program_options date_time)
 include_directories(include ${Eigen_INCLUDE_DIRS})
 
-cs_add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)
+cs_add_library(libpointmatcher_ros src/point_cloud.cpp src/transform.cpp)
