@@ -1,9 +1,39 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(ethzasl_icp_mapper_experiments)
 
-find_package(catkin_simple REQUIRED)
+find_package(catkin REQUIRED COMPONENTS
+roscpp
+rospy
+rosbag
+std_msgs
+geometry_msgs
+sensor_msgs
+nav_msgs
+tf
+tf_conversions
+libpointmatcher_ros
+)
 
-catkin_simple()
+catkin_package(
+CATKIN_DEPENDS
+roscpp
+rospy
+rosbag
+std_msgs
+geometry_msgs
+sensor_msgs
+nav_msgs
+tf
+tf_conversions
+libpointmatcher_ros
+DEPENDS
+libpointmatcher
+libnabo
+libargtable2-dev
+yaml-cpp
+eigen
+)
+
 
 # Set the build type.  Options are:
 #  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage
@@ -43,5 +73,5 @@ find_package(Boost REQUIRED)
 include_directories(${BOOST_INCLUDE_DIRECTORIES})
 
 # Note: disabled until tf2 supports C++0x
-#cs_add_executable(matcher_bag src/matcher_bag.cpp)
+#add_executable(matcher_bag src/matcher_bag.cpp)
 #target_link_libraries(matcher_bag  ${EXTRA_LIBS} pointmatcher nabo argtable2 rt yaml-cpp)

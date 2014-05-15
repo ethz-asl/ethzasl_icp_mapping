@@ -10,7 +10,7 @@
   <version>0.0.1</version>
   <maintainer email="f.pomerleau@gmail.com">Francois Pomerleau</maintainer>
 
-  <buildtool_depend>catkin_simple</buildtool_depend>
+  <buildtool_depend>catkin</buildtool_depend>
 
   <build_depend>roscpp</build_depend>  
   <build_depend>rospy</build_depend>  
@@ -26,7 +26,23 @@
   <build_depend>libpointmatcher_ros</build_depend>
   <build_depend>libargtable2-dev</build_depend>  
   <build_depend>yaml-cpp</build_depend>
-  <build_depend>eigen</build_depend>  
+  <build_depend>eigen</build_depend>
+
+  <run_depend>roscpp</run_depend>  
+  <run_depend>rospy</run_depend>  
+  <run_depend>rosbag</run_depend>  
+  <run_depend>std_msgs</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>sensor_msgs</run_depend>
+  <run_depend>nav_msgs</run_depend>
+  <run_depend>tf</run_depend>
+  <run_depend>tf_conversions</run_depend>
+  <run_depend>libnabo</run_depend>
+  <run_depend>libpointmatcher</run_depend>
+  <run_depend>libpointmatcher_ros</run_depend>
+  <run_depend>libargtable2-dev</run_depend>  
+  <run_depend>yaml-cpp</run_depend>
+  <run_depend>eigen</run_depend>    
 
 </package>
 

@@ -1,9 +1,23 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(ethzasl_point_cloud_vtk_tools)
 
-find_package(catkin_simple REQUIRED)
+find_package(catkin REQUIRED 
+roscpp
+rospy
+rosbag
+std_msgs
+geometry_msgs
+sensor_msgs
+nav_msgs
+tf
+tf_conversions
+libpointmatcher_ros)
 
-catkin_simple()
+catkin_package(
+CATKIN_DEPENDS roscpp rospy rosbag std_msgs geometry_msgs sensor_msgs nav_msgs
+tf tf_conversions libpointmatcher_ros
+DEPENDS libpointmatcher libnabo libargtable2-dev yaml-cpp eigen
+)
 
 # Set the build type.  Options are:
 #  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage
@@ -39,18 +53,22 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 find_package(Boost REQUIRED COMPONENTS filesystem)
 
-find_library(POINTMATCHER_LIBRARY NAMES libnpointmatcher.a pointmatcher PATHS
-	/usr/local/lib
-)
+# find_library(POINTMATCHER_LIBRARY NAMES libpointmatcher.a pointmatcher PATHS
+# 	/usr/local/lib
+# )
 
-find_library(NABO_LIBRARY NAMES libnabo.a nabo)
+# find_library(NABO_LIBRARY NAMES libnabo.a nabo)
 
-set (NON_CATKIN_LIBS ${POINTMATCHER_LIBRARY} ${NABO_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} yaml-cpp)
+set (NON_CATKIN_LIBS pointmatcher nabo ${Boost_FILESYSTEM_LIBRARY} yaml-cpp)
 
-cs_add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
-target_link_libraries(pointCloudToVtk ${NON_CATKIN_LIBS} )
+include_directories(${catkin_INCLUDE_DIRS})
 
-cs_add_executable(vtkToPointCloud src/vtkToPointCloud.cpp)
-target_link_libraries(vtkToPointCloud ${NON_CATKIN_LIBS})
+message(STATUS "catkin libs ${catkin_LIBRARIES}")
+
+add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
+target_link_libraries(pointCloudToVtk ${catkin_LIBRARIES} ${NON_CATKIN_LIBS} )
+
+add_executable(vtkToPointCloud src/vtkToPointCloud.cpp)
+target_link_libraries(vtkToPointCloud ${catkin_LIBRARIES} ${NON_CATKIN_LIBS})
 
 
