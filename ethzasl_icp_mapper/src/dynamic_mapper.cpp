@@ -56,7 +56,7 @@ class Mapper
 	
 	// Publishers
 	ros::Publisher mapPub;
-	ros::Publisher outlierPub;
+	ros::Publisher debugPub;
 	ros::Publisher odomPub;
 	ros::Publisher odomErrorPub;
 	
@@ -291,7 +291,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	if (getParam<bool>("subscribe_cloud", true))
 		cloudSub = n.subscribe("cloud_in", inputQueueSize, &Mapper::gotCloud, this);
 	mapPub = n.advertise<sensor_msgs::PointCloud2>("point_map", 2, true);
-	outlierPub = n.advertise<sensor_msgs::PointCloud2>("outliers", 2, true);
+	debugPub = n.advertise<sensor_msgs::PointCloud2>("debugPointCloud", 2, true);
 	odomPub = n.advertise<nav_msgs::Odometry>("icp_odom", 50, true);
 	odomErrorPub = n.advertise<nav_msgs::Odometry>("icp_error_odom", 50, true);
 	getPointMapSrv = n.advertiseService("dynamic_point_map", &Mapper::getPointMap, this);
@@ -364,19 +364,20 @@ protected:
 	bool& target;
 };
 
+// IMPORTANT:  We need to receive the point clouds in local coordinates (scanner or robot)
 void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scannerFrame, const ros::Time& stamp, uint32_t seq)
 {
-	processingNewCloud = true;
-	BoolSetter stopProcessingSetter(processingNewCloud, false);
+
+	
 
 	// if the future has completed, use the new map
-	processNewMapIfAvailable();
+	processNewMapIfAvailable(); // This call lock the tf publication
 	cerr << "received new map" << endl;
 	
-	// IMPORTANT:  We need to receive the point clouds in local coordinates (scanner or robot)
 	timer t;
 
-
+  processingNewCloud = true;
+	BoolSetter stopProcessingSetter(processingNewCloud, false);
 	
 	
 	// Convert point cloud
@@ -413,7 +414,8 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		
 		// Apply filters to incoming cloud, in scanner coordinates
 		inputFilters.apply(*newPointCloud);
-		
+    
+    
 		ROS_INFO_STREAM("Input filters took " << t.elapsed() << " [s]");
 	}
 	
@@ -539,7 +541,10 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		if (odomErrorPub.getNumSubscribers())
 			odomErrorPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(TOdomToMap, mapFrame, stamp));
 
-		
+		// ***Debug:
+    //debugPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(transformation->compute(*newPointCloud, Ticp), mapFrame, mapCreationTime));
+		// ***
+
 
 		// check if news points should be added to the map
 		if (
@@ -594,7 +599,8 @@ void Mapper::setMap(DP* newPointCloud)
 	// set new map
 	mapPointCloud = newPointCloud;
 	cerr << "copying map to ICP" << endl;
-	icp.setMap(*mapPointCloud);
+  //FIXME: this is taking the all map instead of the small part we need
+	icp.setMap(*mapPointCloud); // This do a full copy...
 	
 	
 	cerr << "publishing map" << endl;
@@ -841,11 +847,7 @@ Mapper::DP* Mapper::updateMap(DP* newMap, const PM::TransformationParameters Tic
 	
 	kdtree2->knn(newMap->features, matches_overlap.ids, matches_overlap.dists, 1, 0, NNS::ALLOW_SELF_MATCH, maxDistNewPoint);
 	
-	
   //-------------- New point cloud ------------------------------
-  bool hasSensorNoise = mapLocalROI.descriptorExists("simpleSensorNoise") && newMap->descriptorExists("simpleSensorNoise");
-  DP::View viewOn_noise_mapLocal = mapLocalROI.getDescriptorViewByName("simpleSensorNoise");
-  DP::View viewOn_noise_newMap = newMap->getDescriptorViewByName("simpleSensorNoise");
 
 	DP newMapOverlap(newMap->createSimilarEmpty());// Not used for now
   PM::Matrix minDist = PM::Matrix::Constant(1,mapLocalROIPts, std::numeric_limits<float>::max());
@@ -853,20 +855,25 @@ Mapper::DP* Mapper::updateMap(DP* newMap, const PM::TransformationParameters Tic
   // Reduce newMap to its none overlapping part
 	int ptsOut = 0;
 	int ptsIn = 0;
-	for (int i = 0; i < newMapPts; ++i)
-	{
-    const int localMapId = matches_overlap.ids(i);
 
-		if (matches_overlap.dists(i) == numeric_limits<float>::infinity())
-		{
-			newMap->setColFrom(ptsOut, *newMap, i);
-			ptsOut++;
-		}
-		else // Overlapping points
-		{
-      if(hasSensorNoise)
+  bool hasSensorNoise = mapLocalROI.descriptorExists("simpleSensorNoise") && newMap->descriptorExists("simpleSensorNoise");
+  if(hasSensorNoise) // Split and update point with lower noise
+  {
+    DP::View viewOn_noise_mapLocal = mapLocalROI.getDescriptorViewByName("simpleSensorNoise");
+    DP::View viewOn_noise_newMap = newMap->getDescriptorViewByName("simpleSensorNoise");
+
+    for (int i = 0; i < newMapPts; ++i)
+    {
+      const int localMapId = matches_overlap.ids(i);
+
+      if (matches_overlap.dists(i) == numeric_limits<float>::infinity())
       {
-        // Update point
+        newMap->setColFrom(ptsOut, *newMap, i);
+        ptsOut++;
+      }
+      else // Overlapping points
+      {
+        // Update point with lower sensor noise
         if(viewOn_noise_newMap(0,i) < viewOn_noise_mapLocal(0,localMapId))
         {
           if(matches_overlap.dists(i) < minDist(localMapId))
@@ -880,15 +887,30 @@ Mapper::DP* Mapper::updateMap(DP* newMap, const PM::TransformationParameters Tic
             viewDebug(0, localMapId) = 2;  
             viewOnProbabilityDynamic(0, localMapId) = probDyn;
             viewOnProbabilityStatic(0, localMapId) = probStatic;
-            //TODO: add dynamic static values
           }
         }
-      }
 
-			newMapOverlap.setColFrom(ptsIn, *newMap, i);
-			ptsIn++;
-		}
-	}
+        newMapOverlap.setColFrom(ptsIn, *newMap, i);
+        ptsIn++;
+      }
+    }
+  }
+  else // Only split newMap
+  {
+    for (int i = 0; i < newMapPts; ++i)
+    {
+      if (matches_overlap.dists(i) == numeric_limits<float>::infinity())
+      {
+        newMap->setColFrom(ptsOut, *newMap, i);
+        ptsOut++;
+      }
+      else // Overlapping points
+      {
+        newMapOverlap.setColFrom(ptsIn, *newMap, i);
+        ptsIn++;
+      }
+    }
+  }
 
 	// shrink the newMap to the new information
 	newMap->conservativeResize(ptsOut);
@@ -896,10 +918,10 @@ Mapper::DP* Mapper::updateMap(DP* newMap, const PM::TransformationParameters Tic
 
 	cout << "ptsOut=" << ptsOut << ", ptsIn=" << ptsIn << endl;
 
-	// Publish outliers
-	//if (outlierPub.getNumSubscribers())
+	// Publish debug
+	//if (debugPub.getNumSubscribers())
 	//{
-		outlierPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*newMap, mapFrame, mapCreationTime));
+  //    debugPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*newMap, mapFrame, mapCreationTime));
 	//}
 
   //no_overlap.addDescriptor("debug", PM::Matrix::Zero(1, no_overlap.features.cols()));
@@ -957,6 +979,10 @@ void Mapper::publishTransform()
 		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, ros::Time::now()));
 		publishLock.unlock();
 	}
+  else
+  {
+    cerr << "NOT PUBLISHING: " << processingNewCloud << endl;
+  }
 }
 
 bool Mapper::getPointMap(map_msgs::GetPointMap::Request &req, map_msgs::GetPointMap::Response &res)
@@ -1002,8 +1028,25 @@ bool Mapper::loadMap(ethzasl_icp_mapper::LoadMap::Request &req, ethzasl_icp_mapp
 	TOdomToMap = PM::TransformationParameters::Identity(dim,dim);
 	
 	//ISER
-	TOdomToMap(2,3) = mapElevation;
+	//TOdomToMap(2,3) = mapElevation;
+
 	publishLock.unlock();
+
+  // Prepare descriptor if not existing
+  if(cloud->descriptorExists("probabilityStatic") == false)
+	{
+		cloud->addDescriptor("probabilityStatic", PM::Matrix::Constant(1, cloud->features.cols(), priorStatic));
+	}
+	
+	if(cloud->descriptorExists("probabilityDynamic") == false)
+	{
+		cloud->addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, cloud->features.cols(), priorDyn));
+	}
+	
+	if(cloud->descriptorExists("debug") == false)
+	{
+		cloud->addDescriptor("debug", PM::Matrix::Zero(1, cloud->features.cols()));
+	}
 
 	setMap(cloud);
 	
@@ -1030,15 +1073,15 @@ bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req, ethzasl_
 	TOdomToMap = PointMatcher_ros::odomMsgToEigenMatrix<float>(req.odom);
 	
 	//ISER
-	{
-	// remove roll and pitch
-	TOdomToMap(2,0) = 0; 
-	TOdomToMap(2,1) = 0; 
-	TOdomToMap(2,2) = 1; 
-	TOdomToMap(0,2) = 0; 
-	TOdomToMap(1,2) = 0;
-	TOdomToMap(2,3) = mapElevation; //z
-	}
+	//{
+	//// remove roll and pitch
+	//TOdomToMap(2,0) = 0; 
+	//TOdomToMap(2,1) = 0; 
+	//TOdomToMap(2,2) = 1; 
+	//TOdomToMap(0,2) = 0; 
+	//TOdomToMap(1,2) = 0;
+	//TOdomToMap(2,3) = mapElevation; //z
+	//}
 
 	tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, ros::Time::now()));
 	publishLock.unlock();

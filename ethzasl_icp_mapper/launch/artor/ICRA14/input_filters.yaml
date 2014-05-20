@@ -1,9 +1,9 @@
 - FixStepSamplingDataPointsFilter:
-    startStep: 12
+    startStep: 15
 #- RandomSamplingDataPointsFilter:
 #    prob: 0.2
 - SurfaceNormalDataPointsFilter:
-    knn: 10
+    knn: 20
     epsilon: 3.33
     keepNormals: 1
     keepDensities: 1

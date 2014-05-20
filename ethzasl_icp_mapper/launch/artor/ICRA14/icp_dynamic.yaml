@@ -1,14 +1,16 @@
 readingDataPointsFilters:
-- MaxDensityDataPointsFilter:
-    maxDensity: 20.0
+  - MaxDensityDataPointsFilter:
+      maxDensity: 1.0
 #  - RandomSamplingDataPointsFilter:
 #      prob: 0.1
 
 referenceDataPointsFilters:
 #  - MaxDistDataPointsFilter:
 #      maxDist: 20.0
-  - RandomSamplingDataPointsFilter:
-      prob: 0.01
+  - MaxDensityDataPointsFilter:
+      maxDensity: 1.0
+#  - RandomSamplingDataPointsFilter:
+#        prob: 0.01
 
 matcher:
   KDTreeMatcher:

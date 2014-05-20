@@ -1,12 +1,10 @@
 readingDataPointsFilters:
-- MaxDensityDataPointsFilter:
-    maxDensity: 20.0
-#  - RandomSamplingDataPointsFilter:
-#      prob: 0.1
+  - RandomSamplingDataPointsFilter:
+      prob: 0.2
 
 referenceDataPointsFilters:
-#  - MaxDistDataPointsFilter:
-#      maxDist: 20.0
+  - MaxDistDataPointsFilter:
+      maxDist: 50.0
   - RandomSamplingDataPointsFilter:
       prob: 0.01
 
@@ -14,16 +12,13 @@ matcher:
   KDTreeMatcher:
     knn: 3
     maxDist: 10.0
-    epsilon: 0
+    epsilon: 3.33
 
 outlierFilters:
   - TrimmedDistOutlierFilter:
-     ratio: 0.75
+     ratio: 0.9
   - SurfaceNormalOutlierFilter:
      maxAngle: 1.57
-  - GenericDescriptorOutlierFilter:
-     source: reference
-     descName: probabilityStatic
 
 errorMinimizer:
   PointToPlaneErrorMinimizer
@@ -32,7 +27,7 @@ transformationCheckers:
   - DifferentialTransformationChecker:
       minDiffRotErr: 0.001
       minDiffTransErr: 0.01
-      smoothLength: 2
+      smoothLength: 4
   - CounterTransformationChecker:
       maxIterationCount: 40
   - BoundTransformationChecker:

@@ -1,7 +1,7 @@
 - VoxelGridDataPointsFilter:
-    vSizeX: 0.15
-    vSizeY: 0.15
-    vSizeZ: 0.15
+    vSizeX: 0.25
+    vSizeY: 0.25
+    vSizeZ: 0.25
 #- RandomSamplingDataPointsFilter:
 #    prob: 0.75
 - SurfaceNormalDataPointsFilter:
