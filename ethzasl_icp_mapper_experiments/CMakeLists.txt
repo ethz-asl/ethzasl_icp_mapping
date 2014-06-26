@@ -28,10 +28,10 @@ tf_conversions
 libpointmatcher_ros
 DEPENDS
 libpointmatcher
-libnabo
-libargtable2-dev
-yaml-cpp
-eigen
+# libnabo
+# libargtable2-dev
+# yaml-cpp
+# eigen
 )
 
 
@@ -69,9 +69,9 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-find_package(Boost REQUIRED)
-include_directories(${BOOST_INCLUDE_DIRECTORIES})
+find_package(libpointmatcher REQUIRED)
+include_directories(${catkin_INCLUDE_DIRS} ${POINTMATCHER_INCLUDE_DIRS})
 
 # Note: disabled until tf2 supports C++0x
-#add_executable(matcher_bag src/matcher_bag.cpp)
-#target_link_libraries(matcher_bag  ${EXTRA_LIBS} pointmatcher nabo argtable2 rt yaml-cpp)
+# add_executable(matcher_bag src/matcher_bag.cpp)
+# target_link_libraries(matcher_bag  ${catkin_LIBRARIES} ${POINTMATCHER_LIBRARIES})

@@ -48,8 +48,6 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 add_definitions(-DHAVE_YAML_CPP)
 
-#find_package(Boost REQUIRED COMPONENTS thread filesystem system program_options date_time)
-#include_directories(include ${Eigen_INCLUDE_DIRS})
 include_directories(include)
 
 add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)

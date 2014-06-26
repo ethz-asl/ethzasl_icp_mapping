@@ -21,7 +21,8 @@ catkin_package (
 	CATKIN_DEPENDS roscpp rospy rosbag std_msgs geometry_msgs nav_msgs
 tf tf2 tf_conversions message_filters map_msgs libpointmatcher_ros ethzasl_gridmap_2d visualization_msgs interactive_markers 
 message_runtime
-	DEPENDS libnabo libpointmatcher eigen yaml-cpp libargtable2-dev
+	#DEPENDS libnabo libpointmatcher yaml-cpp
+	DEPENDS libpointmatcher
 )
 
 # Set the build type.  Options are:
@@ -58,10 +59,11 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 add_definitions(-DHAVE_YAML_CPP)
 
-find_package(Boost REQUIRED COMPONENTS thread filesystem system program_options date_time REQUIRED)
-include_directories(include ${Boost_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
+find_package(libpointmatcher REQUIRED)
 
-set(NON_CATKIN_LIBS ${Boost_FILESYSTEM_LIBRARY} yaml-cpp pointmatcher nabo)
+include_directories(include ${catkin_INCLUDE_DIRS})
+
+set(NON_CATKIN_LIBS ${POINTMATCHER_LIBRARIES})
 
 add_executable(matcher_service src/matcher_service.cpp)
 add_dependencies(matcher_service ${PROJECT_NAME}_gencpp)

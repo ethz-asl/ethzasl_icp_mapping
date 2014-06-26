@@ -16,7 +16,7 @@ libpointmatcher_ros)
 catkin_package(
 CATKIN_DEPENDS roscpp rospy rosbag std_msgs geometry_msgs sensor_msgs nav_msgs
 tf tf_conversions libpointmatcher_ros
-DEPENDS libpointmatcher libnabo boost yaml-cpp
+DEPENDS libpointmatcher
 )
 
 # Set the build type.  Options are:
@@ -51,22 +51,14 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-find_package(Boost REQUIRED COMPONENTS filesystem)
+find_package(libpointmatcher REQUIRED)
 
-# find_library(POINTMATCHER_LIBRARY NAMES libpointmatcher.a pointmatcher PATHS
-# 	/usr/local/lib
-# )
-
-# find_library(NABO_LIBRARY NAMES libnabo.a nabo)
-
-set (NON_CATKIN_LIBS pointmatcher nabo ${Boost_FILESYSTEM_LIBRARY} yaml-cpp)
+set (NON_CATKIN_LIBS ${POINTMATCHER_LIBRARIES})
 
 include_directories(${catkin_INCLUDE_DIRS})
 
-message(STATUS "catkin libs ${catkin_LIBRARIES}")
-
 add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
-target_link_libraries(pointCloudToVtk ${catkin_LIBRARIES} ${NON_CATKIN_LIBS} )
+target_link_libraries(pointCloudToVtk ${catkin_LIBRARIES} ${NON_CATKIN_LIBS})
 
 add_executable(vtkToPointCloud src/vtkToPointCloud.cpp)
 target_link_libraries(vtkToPointCloud ${catkin_LIBRARIES} ${NON_CATKIN_LIBS})
