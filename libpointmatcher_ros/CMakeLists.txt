@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 
 project(libpointmatcher_ros)
 
-find_package(catkin REQUIRED
+find_package(catkin REQUIRED 
 roscpp
 sensor_msgs
 nav_msgs
@@ -46,12 +46,11 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-find_package(Eigen REQUIRED)
-
 add_definitions(-DHAVE_YAML_CPP)
 
-find_package(Boost REQUIRED COMPONENTS thread filesystem system program_options date_time)
-include_directories(include ${Eigen_INCLUDE_DIRS})
+#find_package(Boost REQUIRED COMPONENTS thread filesystem system program_options date_time)
+#include_directories(include ${Eigen_INCLUDE_DIRS})
+include_directories(include)
 
 add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)
 target_link_libraries(pointmatcher_ros ${catkin_LIBRARIES})

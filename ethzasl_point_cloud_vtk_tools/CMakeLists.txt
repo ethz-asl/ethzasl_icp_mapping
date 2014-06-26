@@ -16,7 +16,7 @@ libpointmatcher_ros)
 catkin_package(
 CATKIN_DEPENDS roscpp rospy rosbag std_msgs geometry_msgs sensor_msgs nav_msgs
 tf tf_conversions libpointmatcher_ros
-DEPENDS libpointmatcher libnabo libargtable2-dev yaml-cpp eigen
+DEPENDS libpointmatcher libnabo boost yaml-cpp
 )
 
 # Set the build type.  Options are:

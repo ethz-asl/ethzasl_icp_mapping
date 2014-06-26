@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(ethzasl_extrinsic_calibration)
 
-find_package(catkin REQUIRED COMPONENTS roscpp rospy tf)
+find_package(catkin REQUIRED COMPONENTS cmake_modules roscpp rospy tf)
+find_package(Eigen REQUIRED)
 
 catkin_package(
 	CATKIN_DEPENDS roscpp rospy tf
@@ -18,7 +19,6 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 #uncomment if you have defined services
 #rosbuild_gensrv()
 
-find_package(Eigen REQUIRED)
 include_directories(${Eigen_INCLUDE_DIRS})
 
 add_executable(tf_logger src/tf_logger.cpp)
