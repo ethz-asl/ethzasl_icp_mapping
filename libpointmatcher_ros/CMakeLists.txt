@@ -21,6 +21,8 @@ nav_msgs
 tf
 tf_conversions
 eigen_conversions
+DEPENDS 
+libpointmatcher
 )
 
 # c++ 0x
@@ -47,8 +49,8 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 add_definitions(-DHAVE_YAML_CPP)
-
-include_directories(include)
+find_package(libpointmatcher REQUIRED)
+include_directories(include ${libpointmatcher_INCLUDE_DIRS})
 
 add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)
-target_link_libraries(pointmatcher_ros ${catkin_LIBRARIES})
+target_link_libraries(pointmatcher_ros ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})

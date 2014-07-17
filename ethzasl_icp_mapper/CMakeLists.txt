@@ -61,7 +61,7 @@ add_definitions(-DHAVE_YAML_CPP)
 
 find_package(libpointmatcher REQUIRED)
 
-include_directories(include ${catkin_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS} ${libpointmatcher_INCLUDE_DIRS})
 
 set(NON_CATKIN_LIBS ${libpointmatcher_LIBRARIES})
 
