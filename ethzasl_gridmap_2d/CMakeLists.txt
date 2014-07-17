@@ -13,8 +13,6 @@ catkin_package(
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-find_package(eigen REQUIRED)
-
-include_directories(include eigen_INCLUDE_DIRS)
+include_directories(include)
 
 add_library(ethzasl_gridmap_2d src/grid-map.cpp)
