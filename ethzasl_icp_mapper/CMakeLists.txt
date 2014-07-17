@@ -63,7 +63,7 @@ find_package(libpointmatcher REQUIRED)
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-set(NON_CATKIN_LIBS ${POINTMATCHER_LIBRARIES})
+set(NON_CATKIN_LIBS ${libpointmatcher_LIBRARIES})
 
 add_executable(matcher_service src/matcher_service.cpp)
 add_dependencies(matcher_service ${PROJECT_NAME}_gencpp)
