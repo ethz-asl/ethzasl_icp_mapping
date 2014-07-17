@@ -11,12 +11,12 @@ sensor_msgs
 nav_msgs
 tf
 tf_conversions
+libpointmatcher
 libpointmatcher_ros)
 
 catkin_package(
 CATKIN_DEPENDS roscpp rospy rosbag std_msgs geometry_msgs sensor_msgs nav_msgs
-tf tf_conversions libpointmatcher_ros
-DEPENDS libpointmatcher
+tf tf_conversions libpointmatcher libpointmatcher_ros
 )
 
 # Set the build type.  Options are:
@@ -51,16 +51,12 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-find_package(libpointmatcher REQUIRED)
-
-set (NON_CATKIN_LIBS ${POINTMATCHER_LIBRARIES})
-
 include_directories(${catkin_INCLUDE_DIRS})
 
 add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
-target_link_libraries(pointCloudToVtk ${catkin_LIBRARIES} ${NON_CATKIN_LIBS})
+target_link_libraries(pointCloudToVtk ${catkin_LIBRARIES})
 
 add_executable(vtkToPointCloud src/vtkToPointCloud.cpp)
-target_link_libraries(vtkToPointCloud ${catkin_LIBRARIES} ${NON_CATKIN_LIBS})
+target_link_libraries(vtkToPointCloud ${catkin_LIBRARIES})
 
 

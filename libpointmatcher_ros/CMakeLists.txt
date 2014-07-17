@@ -2,13 +2,14 @@ cmake_minimum_required(VERSION 2.8.3)
 
 project(libpointmatcher_ros)
 
-find_package(catkin REQUIRED 
+find_package(catkin REQUIRED COMPONENTS
 roscpp
 sensor_msgs
 nav_msgs
 tf
 tf_conversions
 eigen_conversions
+libpointmatcher
 )
 
 catkin_package(
@@ -21,7 +22,6 @@ nav_msgs
 tf
 tf_conversions
 eigen_conversions
-DEPENDS 
 libpointmatcher
 )
 
@@ -49,8 +49,8 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 add_definitions(-DHAVE_YAML_CPP)
-find_package(libpointmatcher REQUIRED)
-include_directories(include ${libpointmatcher_INCLUDE_DIRS})
+include_directories(include)
 
 add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)
-target_link_libraries(pointmatcher_ros ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
+include_directories(${catkin_INCLUDE_DIRS})
+target_link_libraries(pointmatcher_ros ${catkin_LIBRARIES})
