@@ -384,7 +384,10 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		return;
 	}
 
-
+	//Correct TOdomToMap to fit dimp1 (dimension of input data)
+	//We need to do this because we could have called 'CorrectPose' which always returns a [4][4] matrix
+	TOdomToMap = PointMatcher_ros::eigenMatrixToDim<float>(TOdomToMap, dimp1);
+	
 	ROS_DEBUG_STREAM("TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << TOdomToScanner);
 	ROS_DEBUG_STREAM("TOdomToMap(" << odomFrame<< " to " << mapFrame << "):\n" << TOdomToMap);
 		
