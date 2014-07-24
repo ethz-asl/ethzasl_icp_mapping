@@ -17,7 +17,6 @@ SetMode.srv
 generate_messages(DEPENDENCIES sensor_msgs nav_msgs std_msgs geometry_msgs actionlib_msgs)
 
 catkin_package (
-	LIBRARIES ${PROJECT_NAME}
 	CATKIN_DEPENDS roscpp rospy rosbag std_msgs geometry_msgs nav_msgs
 tf tf2 tf_conversions message_filters map_msgs libpointmatcher_ros ethzasl_gridmap_2d visualization_msgs interactive_markers 
 message_runtime libpointmatcher
