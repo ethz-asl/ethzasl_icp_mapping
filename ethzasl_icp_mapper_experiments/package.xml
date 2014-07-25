@@ -7,7 +7,7 @@
   <license>new BSD</license>
   <url type="website">http://ros.org/wiki/ethzasl_icp_mapper_experiments</url>
 
-  <version>0.0.1</version>
+  <version>0.9.5</version>
 
   <maintainer email="f.pomerleau@gmail.com">Francois Pomerleau</maintainer>
 

@@ -1,6 +1,6 @@
 <package>
   <name>ethzasl_icp_mapping</name>
-  <version>0.0.1</version>
+  <version>0.9.5</version>
   <description>
     3d mapping tools for robotic applications
   </description>
