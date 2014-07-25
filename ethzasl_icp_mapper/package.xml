@@ -9,7 +9,7 @@
   
   <maintainer email="f.pomerleau@gmail.com">Francois Pomerleau</maintainer>
 
-  <version>0.9.5</version>
+  <version>0.9.6</version>
 
   <buildtool_depend>catkin</buildtool_depend>
 

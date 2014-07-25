@@ -3,7 +3,7 @@
   <description>
      Bridge between libpointmatcher and ROS.
   </description>
-  <version>0.9.5</version>
+  <version>0.9.6</version>
   <maintainer email="f.pomerleau@gmail.com">Francois Pomerleau</maintainer>
   <author>Stéphane Magnenat</author>
   <license>new BSD</license>
