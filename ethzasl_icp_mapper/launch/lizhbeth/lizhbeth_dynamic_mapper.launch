@@ -19,7 +19,7 @@ FP: 3 Feb. 2014
 		<param name="tfRefreshPeriod" value="0.005" />
 		<param name="minOverlap" value="0.6" /> 
 		<param name="maxOverlapToMerge" value="0.99" /> 
-		<param name="minReadingPointCount" value="500" /> 
+		<param name="minReadingPointCount" value="300" /> 
 		<param name="minMapPointCount" value="10000" /> 
 
 		<!-- Parameters for dynamic elements -->
@@ -35,7 +35,7 @@ FP: 3 Feb. 2014
 
 		<!--param name="mapElevation" value=" 0.00"/--> <!-- mapping_1, ... ,9-->
 		<!--param name="mapElevation" value="-0.14"/--> <!-- mapping_10,11,12-->
-		<param name="mapElevation" value="-0.28"/> <!-- mapping_13-->
+		<!--param name="mapElevation" value="-0.28"/--> <!-- mapping_13-->
 	</node>
 
 	<node name="point_cloud_converter" type="point_cloud_converter" pkg="point_cloud_converter">

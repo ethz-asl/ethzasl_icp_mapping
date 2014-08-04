@@ -18,13 +18,14 @@ outlierFilters:
 #  - SurfaceNormalOutlierFilter:
 #     maxAngle: 1.57
 #TODO: put that back!
-#  - GenericDescriptorOutlierFilter:
-#     source: reference
-#     descName: probabilityStatic
+  - GenericDescriptorOutlierFilter:
+     source: reference
+     descName: probabilityStatic
+     threshold: 0.35
 
 errorMinimizer:
-  PointToPointErrorMinimizer:
-  #PointToPlaneErrorMinimizer:
+  #PointToPointErrorMinimizer:
+  PointToPlaneErrorMinimizer:
   #   force2D: 0
 
 transformationCheckers:

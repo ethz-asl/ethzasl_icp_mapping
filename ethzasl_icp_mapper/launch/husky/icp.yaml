@@ -1,0 +1,43 @@
+readingDataPointsFilters:
+#  - VoxelGridDataPointsFilter:
+#      vSizeX: 0.1
+#      vSizeY: 0.1
+#      vSizeZ: 0.1
+
+matcher:
+  KDTreeMatcher:
+    maxDist: 6.0
+    knn: 3
+    epsilon: 1.0
+
+outlierFilters:
+  - TrimmedDistOutlierFilter:
+     ratio: 0.80
+#  - SurfaceNormalOutlierFilter:
+#     maxAngle: 0.42
+  - GenericDescriptorOutlierFilter:
+     source: reference
+     descName: probabilityStatic
+     useSoftThreshold: 0
+     threshold: 0.40
+  
+errorMinimizer:
+  PointToPlaneErrorMinimizer
+
+transformationCheckers:
+  - DifferentialTransformationChecker:
+      minDiffRotErr: 0.001
+      minDiffTransErr: 0.01
+      smoothLength: 4
+  - CounterTransformationChecker:
+      maxIterationCount: 40
+  - BoundTransformationChecker:
+      maxRotationNorm: 0.80
+      maxTranslationNorm: 15.00
+
+inspector:
+# VTKFileInspector
+ NullInspector
+
+logger:
+  FileLogger

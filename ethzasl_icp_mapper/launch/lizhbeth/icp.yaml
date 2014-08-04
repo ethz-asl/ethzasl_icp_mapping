@@ -11,14 +11,15 @@ referenceDataPointsFilters:
 matcher:
   KDTreeMatcher:
     knn: 3
-    maxDist: 5.0
-    epsilon: 3.33
+    maxDist: 10.0
+    epsilon: 0.0
 
 outlierFilters:
   - TrimmedDistOutlierFilter:
      ratio: 0.9
   - SurfaceNormalOutlierFilter:
      maxAngle: 1.57
+
 
 errorMinimizer:
   PointToPlaneErrorMinimizer
