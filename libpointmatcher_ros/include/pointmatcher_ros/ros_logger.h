@@ -51,8 +51,9 @@ namespace PointMatcherSupport
 	void ROSLogger::writeRosLog(ros::console::Level level, const char* file, int line, const char *func, const std::string& text)
 	{
 		ROSCONSOLE_DEFINE_LOCATION(true, level, ROSCONSOLE_DEFAULT_NAME);
-        //if (enabled)
-			ros::console::print(0, loc.logger_, loc.level_, file, line, func, "%s", text.c_str());
+        if (__rosconsole_define_location__enabled)
+			ros::console::print(0, __rosconsole_define_location__loc.logger_, 
+				__rosconsole_define_location__loc.level_, file, line, func, "%s", text.c_str());
 	}
 }
 
