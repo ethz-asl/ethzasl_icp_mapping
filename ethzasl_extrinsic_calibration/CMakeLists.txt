@@ -5,8 +5,10 @@ find_package(catkin REQUIRED COMPONENTS roscpp rospy tf)
 
 catkin_package(
 	CATKIN_DEPENDS roscpp rospy tf
+	DEPENDS eigen
 )
 
+find_package(cmake_modules REQUIRED)
 find_package(Eigen REQUIRED)
 
 include_directories(${Eigen_INCLUDE_DIRS})
