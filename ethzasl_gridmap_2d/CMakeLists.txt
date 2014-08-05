@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 2.8.3)
 project(ethzasl_gridmap_2d)
 
 find_package(catkin REQUIRED COMPONENTS roscpp nav_msgs)
+
+# required in Indigo
 find_package(cmake_modules REQUIRED)
 find_package(Eigen REQUIRED)
 
