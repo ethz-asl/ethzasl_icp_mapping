@@ -91,7 +91,6 @@ class Mapper
 	bool processingNewCloud; 
 	bool localizing;
 	bool mapping;
-	bool correctedPose;
 	int minReadingPointCount;
 	int minMapPointCount;
 	int inputQueueSize; 
@@ -362,8 +361,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	}
 	
 	string reason;
-	// Initialize the transformation to identity if there is no map and we havent corrected pose
-	// If we have no map but we have corrected pose then the transformation must not be the identity
+	// Initialize the transformation to identity if empty
  	if(!icp.hasMap())
  	{
 		// we need to know the dimensionality of the point cloud to initialize properly
@@ -394,7 +392,12 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	//Correct TOdomToMap to fit dimp1 (dimension of input data)
 	//We need to do this because we could have called 'CorrectPose' which always returns a [4][4] matrix
 	TOdomToMap = PointMatcher_ros::eigenMatrixToDim<float>(TOdomToMap, dimp1);
-	const PM::TransformationParameters TscannerToMap = transformation->correctParameters(TOdomToMap * TOdomToScanner.inverse());
+
+	ROS_DEBUG_STREAM("TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << TOdomToScanner);
+	ROS_DEBUG_STREAM("TOdomToMap(" << odomFrame<< " to " << mapFrame << "):\n" << TOdomToMap);
+		
+ 	const PM::TransformationParameters TscannerToMap = transformation->correctParameters(TOdomToMap * TOdomToScanner.inverse());
+	ROS_DEBUG_STREAM("TscannerToMap (" << scannerFrame << " to " << mapFrame << "):\n" << TscannerToMap);
 	
 	// Ensure a minimum amount of point after filtering
 	const int ptsCount = newPointCloud->features.cols();
@@ -450,8 +453,10 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, stamp));
 		publishLock.unlock();
 		processingNewCloud = false;
-		
-		// Publish odometry
+ 		
+		ROS_DEBUG_STREAM("TOdomToMap:\n" << TOdomToMap);
+
+ 		// Publish odometry
 		if (odomPub.getNumSubscribers())
 			odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(Ticp, mapFrame, stamp));
 	
@@ -507,61 +512,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 
 	lastPoinCloudTime = stamp;
 }
-
-void Mapper::debugFeaturesDescriptors()
-{
-	if(newPointCloud->features.rows() != icp.getInternalMap().features.rows())
-    {
-        std::cout << "[DEBUG] Feature Rows arent the same" << std::endl;
-        std::cout << "[DEBUG] Feature Rows of newPointCloud is " << newPointCloud->features.rows() << std::endl;
-    	std::cout << "[DEBUG] Feature Rows of internalMap is " << icp.getInternalMap().features.rows() << std::endl;
-    }else if(newPointCloud->features.cols() != icp.getInternalMap().features.cols())
-    {
-        std::cout << "[DEBUG] Feature Cols arent the same" << std::endl;
-    }else if(newPointCloud->featureLabels.size() != icp.getInternalMap().featureLabels.size())
-    {
-        std::cout << "[DEBUG] Feature Labels arent the same" << std::endl;
-        for(int i=0; i < newPointCloud->featureLabels.size(); i++){
-			std::cout << "[DEBUG] Field " << i << " of featureLabels of newpointcloud = " << newPointCloud->featureLabels[i].text <<
-				"[" << newPointCloud->featureLabels[i].span << "]" << std::endl;
-		}
-
-		for(int i=0; i < icp.getInternalMap().featureLabels.size(); i++){
-			std::cout << "[DEBUG] Field " << i << " of featureLabels of internalMap = " << icp.getInternalMap().featureLabels[i].text <<
-				"[" << icp.getInternalMap().featureLabels[i].span << "]" << std::endl;
-		}
-    }else if(newPointCloud->descriptors.rows() != icp.getInternalMap().descriptors.rows())
-    {
-        std::cout << "[DEBUG] Descriptor Rows arent the same" << std::endl;
-        std::cout << "[DEBUG] Descriptor Rows of newPointCloud is " << newPointCloud->descriptors.rows() << std::endl;
-    	std::cout << "[DEBUG] Descriptor Rows of internalMap is " << icp.getInternalMap().descriptors.rows() << std::endl;
-    	for(int i=0; i < newPointCloud->descriptorLabels.size(); i++){
-			std::cout << "[DEBUG] Field " << i << " of descriptorLabels of newpointcloud = " << newPointCloud->descriptorLabels[i].text <<
-				"[" << newPointCloud->descriptorLabels[i].span << "]" << std::endl;
-		}
-
-		for(int i=0; i < icp.getInternalMap().descriptorLabels.size(); i++){
-			std::cout << "[DEBUG] Field " << i << " of descriptorLabels of internalMap = " << icp.getInternalMap().descriptorLabels[i].text <<
-				"[" << icp.getInternalMap().descriptorLabels[i].span << "]" << std::endl;
-		}
-    }else if(newPointCloud->descriptors.cols() != icp.getInternalMap().descriptors.cols())
-    {
-        std::cout << "[DEBUG] Descriptor Cols arent the same" << std::endl;
-    }else if(newPointCloud->descriptorLabels.size() != icp.getInternalMap().descriptorLabels.size())
-    {
-        std::cout << "[DEBUG] Descriptor Labels arent the same" << std::endl;
-        for(int i=0; i < newPointCloud->descriptorLabels.size(); i++){
-			std::cout << "[DEBUG] Field " << i << " of descriptorLabels of newpointcloud = " << newPointCloud->descriptorLabels[i].text <<
-				"[" << newPointCloud->descriptorLabels[i].span << "]" << std::endl;
-		}
-
-		for(int i=0; i < icp.getInternalMap().descriptorLabels.size(); i++){
-			std::cout << "[DEBUG] Field " << i << " of descriptorLabels of internalMap = " << icp.getInternalMap().descriptorLabels[i].text <<
-				"[" << icp.getInternalMap().descriptorLabels[i].span << "]" << std::endl;
-		}
-    }
-}
-
 
 void Mapper::processNewMapIfAvailable()
 {
@@ -854,6 +804,60 @@ bool Mapper::getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethz
 	// Send the resulting point cloud in ROS format
 	res.boundedMap = PointMatcher_ros::pointMatcherCloudToRosMsg<float>(cutPointCloud, mapFrame, ros::Time::now());
 	return true;
+}
+
+void Mapper::debugFeaturesDescriptors()
+{
+	if(newPointCloud->features.rows() != icp.getInternalMap().features.rows())
+    {
+        std::cout << "[DEBUG] Feature Rows arent the same" << std::endl;
+        std::cout << "[DEBUG] Feature Rows of newPointCloud is " << newPointCloud->features.rows() << std::endl;
+    	std::cout << "[DEBUG] Feature Rows of internalMap is " << icp.getInternalMap().features.rows() << std::endl;
+    }else if(newPointCloud->features.cols() != icp.getInternalMap().features.cols())
+    {
+        std::cout << "[DEBUG] Feature Cols arent the same" << std::endl;
+    }else if(newPointCloud->featureLabels.size() != icp.getInternalMap().featureLabels.size())
+    {
+        std::cout << "[DEBUG] Feature Labels arent the same" << std::endl;
+        for(int i=0; i < newPointCloud->featureLabels.size(); i++){
+			std::cout << "[DEBUG] Field " << i << " of featureLabels of newpointcloud = " << newPointCloud->featureLabels[i].text <<
+				"[" << newPointCloud->featureLabels[i].span << "]" << std::endl;
+		}
+
+		for(int i=0; i < icp.getInternalMap().featureLabels.size(); i++){
+			std::cout << "[DEBUG] Field " << i << " of featureLabels of internalMap = " << icp.getInternalMap().featureLabels[i].text <<
+				"[" << icp.getInternalMap().featureLabels[i].span << "]" << std::endl;
+		}
+    }else if(newPointCloud->descriptors.rows() != icp.getInternalMap().descriptors.rows())
+    {
+        std::cout << "[DEBUG] Descriptor Rows arent the same" << std::endl;
+        std::cout << "[DEBUG] Descriptor Rows of newPointCloud is " << newPointCloud->descriptors.rows() << std::endl;
+    	std::cout << "[DEBUG] Descriptor Rows of internalMap is " << icp.getInternalMap().descriptors.rows() << std::endl;
+    	for(int i=0; i < newPointCloud->descriptorLabels.size(); i++){
+			std::cout << "[DEBUG] Field " << i << " of descriptorLabels of newpointcloud = " << newPointCloud->descriptorLabels[i].text <<
+				"[" << newPointCloud->descriptorLabels[i].span << "]" << std::endl;
+		}
+
+		for(int i=0; i < icp.getInternalMap().descriptorLabels.size(); i++){
+			std::cout << "[DEBUG] Field " << i << " of descriptorLabels of internalMap = " << icp.getInternalMap().descriptorLabels[i].text <<
+				"[" << icp.getInternalMap().descriptorLabels[i].span << "]" << std::endl;
+		}
+    }else if(newPointCloud->descriptors.cols() != icp.getInternalMap().descriptors.cols())
+    {
+        std::cout << "[DEBUG] Descriptor Cols arent the same" << std::endl;
+    }else if(newPointCloud->descriptorLabels.size() != icp.getInternalMap().descriptorLabels.size())
+    {
+        std::cout << "[DEBUG] Descriptor Labels arent the same" << std::endl;
+        for(int i=0; i < newPointCloud->descriptorLabels.size(); i++){
+			std::cout << "[DEBUG] Field " << i << " of descriptorLabels of newpointcloud = " << newPointCloud->descriptorLabels[i].text <<
+				"[" << newPointCloud->descriptorLabels[i].span << "]" << std::endl;
+		}
+
+		for(int i=0; i < icp.getInternalMap().descriptorLabels.size(); i++){
+			std::cout << "[DEBUG] Field " << i << " of descriptorLabels of internalMap = " << icp.getInternalMap().descriptorLabels[i].text <<
+				"[" << icp.getInternalMap().descriptorLabels[i].span << "]" << std::endl;
+		}
+    }
 }
 
 // Main function supporting the Mapper class
