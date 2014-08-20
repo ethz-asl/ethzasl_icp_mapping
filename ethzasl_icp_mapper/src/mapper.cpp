@@ -122,6 +122,7 @@ protected:
 	void setMap(DP* newPointCloud);
 	DP* updateMap(DP* newPointCloud, const PM::TransformationParameters Ticp, bool updateExisting);
 	void waitForMapBuildingCompleted();
+	void debugFeaturesDescriptors();
 	
 	void publishLoop(double publishPeriod);
 	void publishTransform();
