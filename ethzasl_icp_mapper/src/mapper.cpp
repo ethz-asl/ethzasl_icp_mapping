@@ -22,8 +22,6 @@
 #include "tf/transform_listener.h"
 #include "eigen_conversions/eigen_msg.h"
 
-#include <Eigen/Core>
-
 // Services
 #include "std_msgs/String.h"
 #include "std_srvs/Empty.h"
