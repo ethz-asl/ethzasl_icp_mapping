@@ -32,9 +32,13 @@ class ExportVtk
     const string mapFrame;
     const bool recordOnce;
     const string outputPath;
+    string outputPrefix;
+    string outputExtension;
 
     tf::TransformListener tf_listener;
     std::shared_ptr<PM::Transformation> transformation;
+
+    void validateOutputExtension();
 
 public:
     ExportVtk(ros::NodeHandle& n);
@@ -47,12 +51,42 @@ ExportVtk::ExportVtk(ros::NodeHandle& n):
     mapFrame(getParam<string>("mapFrameId", "/map")),
     recordOnce(getParam<bool>("recordOnce", "false")),
     outputPath(getParam<string>("outputPath", "")),
+    outputPrefix(getParam<string>("outputPrefix", "")),
+    outputExtension(getParam<string>("outputExtension", ".vtk")),
     transformation(PM::get().TransformationRegistrar.create("RigidTransformation"))
 {
+    if(outputPrefix.empty())
+    {
+        outputPrefix = cloudTopic;
+    }
+    validateOutputExtension();
+
     // ROS initialization
     cloudSub = n.subscribe(cloudTopic, 100, &ExportVtk::gotCloud, this);
 
     // Parameters for 3D map
+}
+
+void ExportVtk::validateOutputExtension()
+{
+    if(!outputExtension.empty() && outputExtension.at(0) != '.')
+    {
+        outputExtension = "." + outputExtension;
+    }
+
+    std::locale loc;
+    for(std::string::size_type i=0; i < outputExtension.length(); ++i)
+    {
+        outputExtension[i] = std::tolower(outputExtension[i], loc);
+    }
+
+    if(outputExtension.compare(".csv") != 0 &&
+            outputExtension.compare(".vtk") != 0 &&
+            outputExtension.compare(".ply") != 0 &&
+            outputExtension.compare(".pcd") != 0)
+    {
+        outputExtension = ".vtk";
+    }
 }
 
 
@@ -85,7 +119,7 @@ void ExportVtk::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
         {
             nameStream << outputPath;
         }
-        nameStream << cloudTopic << "_" << cloudMsgIn.header.seq << ".vtk";
+        nameStream << outputPrefix << "_" << cloudMsgIn.header.seq << outputExtension;
 
         outCloud.save(nameStream.str());
         if(recordOnce)
