@@ -1,4 +1,6 @@
 #include <fstream>
+#include <iostream>
+#include <fstream>
 
 #include <boost/version.hpp>
 #include <boost/thread.hpp>
@@ -123,7 +125,8 @@ class Mapper
 	const float sensorMaxRange; //!< in meter. Radius in which the global map needs to be updated when a new scan arrived.
 
 
-	
+	std::vector<PM::TransformationParameters> path; //!< vector of poses representing the path after ICP correction.
+	std::vector<PM::TransformationParameters> errors; //!< vector of poses representing the correction applied by ICP.
 
 	PM::TransformationParameters TOdomToMap;
 	boost::thread publishThread;
@@ -150,6 +153,10 @@ protected:
 	
 	void publishLoop(double publishPeriod);
 	void publishTransform();
+
+  string getTransParamCsvHeader(const PM::TransformationParameters T, const string prefix);
+  string serializeTransParamCSV(const PM::TransformationParameters T, const bool getHeader = false, const string prefix = "");
+  void savePathToCsv(string fileName);
 	
 	// Services
 	bool getPointMap(map_msgs::GetPointMap::Request &req, map_msgs::GetPointMap::Response &res);
@@ -161,6 +168,64 @@ protected:
 	bool getMode(ethzasl_icp_mapper::GetMode::Request &req, ethzasl_icp_mapper::GetMode::Response &res);
 	bool getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethzasl_icp_mapper::GetBoundedMap::Response &res);
 };
+
+string Mapper::getTransParamCsvHeader(const PM::TransformationParameters T, const string prefix)
+{
+  return serializeTransParamCSV(T, true, prefix);
+  
+}
+
+string Mapper::serializeTransParamCSV(const PM::TransformationParameters T, const bool getHeader, const string prefix)
+{
+
+  std::stringstream stream;
+  for(int col=0; col < T.cols(); col++)
+  {
+    for(int row=0; row < T.rows(); row++)
+    {
+      if(getHeader)
+      {
+        stream << prefix << row << col;
+      }
+      else
+      {
+        stream << T(row,col);
+      }
+
+      if((col != (T.cols()-1)) || (row != (T.rows()-1)))
+      {
+        stream << ", ";
+      }
+    } 
+  }
+
+  return stream.str();
+}
+
+
+
+//TODO: move that at the end
+void Mapper::savePathToCsv(string fileName)
+{
+  assert(path.size() == errors.size());
+  assert(path[0].cols() == errors[0].cols());
+
+  ofstream file;
+  file.open (fileName);
+  
+  // Save header
+  file << getTransParamCsvHeader(path[0], "T") << ", ";
+  file << getTransParamCsvHeader(errors[0], "Delta") << "\n";
+
+  for(size_t k=0; k < path.size(); ++k)
+  {
+    file << serializeTransParamCSV(path[k]) << ", ";
+    file << serializeTransParamCSV(errors[k]) << "\n";
+  }
+
+  file.close();
+
+}
 
 Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	n(n),
@@ -310,6 +375,8 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 
 Mapper::~Mapper()
 {
+  savePathToCsv("path.csv");
+
 	#if BOOST_VERSION >= 104100
 	// wait for map-building thread
 	if (mapBuildingInProgress)
@@ -327,6 +394,8 @@ Mapper::~Mapper()
 		mapPointCloud->save(vtkFinalMapName);
 		delete mapPointCloud;
 	}
+
+
 }
 
 void Mapper::gotScan(const sensor_msgs::LaserScan& scanMsgIn)
@@ -517,11 +586,20 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 			ROS_ERROR_STREAM("Estimated overlap too small, ignoring ICP correction!");
 			return;
 		}
-		
-		// Compute tf
+
+    // Compute tf
 		publishStamp = stamp;
 		publishLock.lock();
 		TOdomToMap = Ticp * TOdomToScanner;
+
+    PM::TransformationParameters Terror = TscannerToMap.inverse() * Ticp;
+
+    cerr << "Correcting translation error of " << Terror.block(0,3, 3,1).norm() << " m" << endl;
+
+    // Add transformation to path
+    path.push_back(Ticp);
+    errors.push_back(Terror);
+
 		// Publish tf
 		if(publishMapTf == true)
 		{
@@ -537,6 +615,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		if (odomPub.getNumSubscribers())
 			odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(Tdelta, mapFrame, stamp));
 	
+    // TODO: check that, might be wrong....
 		// Publish error on odometry
 		if (odomErrorPub.getNumSubscribers())
 			odomErrorPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(TOdomToMap, mapFrame, stamp));
@@ -981,7 +1060,7 @@ void Mapper::publishTransform()
 	}
   else
   {
-    cerr << "NOT PUBLISHING: " << processingNewCloud << endl;
+    //cerr << "NOT PUBLISHING: " << processingNewCloud << endl;
   }
 }
 
@@ -999,9 +1078,13 @@ bool Mapper::saveMap(map_msgs::SaveMap::Request &req, map_msgs::SaveMap::Respons
 {
 	if (!mapPointCloud)
 		return false;
+
+  int lastindex = req.filename.data.find_last_of("."); 
+  string rawname = req.filename.data.substr(0, lastindex);
 	
-	try
+  try
 	{
+    savePathToCsv(rawname+"_path.csv");
 		mapPointCloud->save(req.filename.data);
 	}
 	catch (const std::runtime_error& e)
