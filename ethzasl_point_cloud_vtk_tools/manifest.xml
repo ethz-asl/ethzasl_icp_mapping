@@ -22,7 +22,7 @@
   <depend package="libpointmatcher"/>
   <depend package="libpointmatcher_ros"/>
   <rosdep name="libargtable2-dev"/>
-  <rosdep name="yaml-cpp"/>
+  <!--rosdep name="yaml-cpp"/-->
   <rosdep name="eigen"/>
 
 </package>

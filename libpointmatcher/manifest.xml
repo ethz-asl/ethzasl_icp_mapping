@@ -11,7 +11,7 @@
   <rosdep name="doxygen"/>
   <rosdep name="boost"/>
   <rosdep name="eigen"/>
-  <rosdep name="yaml-cpp"/>
+  <!--rosdep name="yaml-cpp"/-->
   <depend package="libnabo"/>
   <export>
     <cpp cflags="-I${prefix}/include" lflags="-L${prefix}/lib -lpointmatcher" />
