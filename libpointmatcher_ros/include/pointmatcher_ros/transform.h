@@ -3,7 +3,7 @@
 
 #include "pointmatcher/PointMatcher.h"
 #include "nav_msgs/Odometry.h"
-#include "Eigen/Eigen"
+#include <Eigen/Dense>
 
 namespace ros
 {
