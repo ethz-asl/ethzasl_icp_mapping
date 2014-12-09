@@ -523,9 +523,9 @@ namespace PointMatcher_ros
     for(auto it(pmCloud.timeLabels.begin()); it != pmCloud.timeLabels.end(); ++it)
     {
       PF pointField;
-      if (it->text == "stamps")
+      if (it->text == "stamp")
       {
-        pointField.datatype = PF::UINT32;
+        pointField.datatype = PF::FLOAT32;
         pointField.name = "stamps";
         pointField.offset = offset;
         pointField.count = 1;
@@ -594,8 +594,10 @@ namespace PointMatcher_ros
 				}
 			}
 			if (hasTime) {
-
-			  //memcpy(fPtr, reinterpret_cast<const uint32_t*>(&pmCloud.times(0, pt)), 4 * timeDim);
+			  // PointCloud2 can not contain uint64_t variables
+			  // uint32_t are used for publishing, pmCloud.times(0, pt)/1000 (time in micro seconds)
+			  uint32_t temp = pmCloud.times(0, pt)/1000;
+			  memcpy(fPtr, reinterpret_cast<const uint8_t*>(&temp), 4 * timeDim);
 			}
 		}
 
