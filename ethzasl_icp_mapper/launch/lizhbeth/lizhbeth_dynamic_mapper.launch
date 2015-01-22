@@ -19,7 +19,7 @@ FP: 3 Feb. 2014
 		<param name="tfRefreshPeriod" value="0.005" />
 		<param name="minOverlap" value="0.6" /> 
 		<param name="maxOverlapToMerge" value="0.99" /> 
-		<param name="minReadingPointCount" value="300" /> 
+		<param name="minReadingPointCount" value="100" /> 
 		<param name="minMapPointCount" value="10000" /> 
 
 		<!-- Parameters for dynamic elements -->
@@ -30,7 +30,7 @@ FP: 3 Feb. 2014
 		<param name="eps_d" value="0.02"/>
 		<param name="alpha" value="0.99"/>
 		<param name="beta" value="0.99"/>
-		<param name="maxDyn" value="0.99"/>
+		<param name="maxDyn" value="2.0"/><!--value larger than 1 means no threshold-->
 		<param name="maxDistNewPoint" value="0.1"/>
 
 		<!--param name="mapElevation" value=" 0.00"/--> <!-- mapping_1, ... ,9-->

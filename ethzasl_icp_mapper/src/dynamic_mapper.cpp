@@ -125,8 +125,19 @@ class Mapper
 	const float sensorMaxRange; //!< in meter. Radius in which the global map needs to be updated when a new scan arrived.
 
 
-	std::vector<PM::TransformationParameters> path; //!< vector of poses representing the path after ICP correction.
-	std::vector<PM::TransformationParameters> errors; //!< vector of poses representing the correction applied by ICP.
+  // Path information
+  // FIXME: this would be better in a structure
+  struct ScanInfo
+  {
+    PM::TransformationParameters pose; //!< pose after ICP correction
+    PM::TransformationParameters error; //!< error corrected by point cloud alignment
+    ros::Time timeStamp; //!< time at which the point cloud was created
+  };
+
+  std::vector<ScanInfo> path; //!< vector representing a path
+
+	//std::vector<PM::TransformationParameters> path; //!< vector of poses representing the path after ICP correction.
+	//std::vector<PM::TransformationParameters> errors; //!< vector of poses representing the correction applied by ICP.
 
 	PM::TransformationParameters TOdomToMap;
 	boost::thread publishThread;
@@ -207,20 +218,19 @@ string Mapper::serializeTransParamCSV(const PM::TransformationParameters T, cons
 //TODO: move that at the end
 void Mapper::savePathToCsv(string fileName)
 {
-  assert(path.size() == errors.size());
-  assert(path[0].cols() == errors[0].cols());
-
   ofstream file;
   file.open (fileName);
   
   // Save header
-  file << getTransParamCsvHeader(path[0], "T") << ", ";
-  file << getTransParamCsvHeader(errors[0], "Delta") << "\n";
+  file << getTransParamCsvHeader(path[0].pose, "T") << ", ";
+  file << getTransParamCsvHeader(path[0].error, "Delta") << ", ";
+  file << "secs, nsecs\n";
 
   for(size_t k=0; k < path.size(); ++k)
   {
-    file << serializeTransParamCSV(path[k]) << ", ";
-    file << serializeTransParamCSV(errors[k]) << "\n";
+    file << serializeTransParamCSV(path[k].pose) << ", ";
+    file << serializeTransParamCSV(path[k].error) << ", ";
+    file << path[k].timeStamp.sec << ", " << path[k].timeStamp.nsec << "\n";
   }
 
   file.close();
@@ -597,8 +607,15 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
     cerr << "Correcting translation error of " << Terror.block(0,3, 3,1).norm() << " m" << endl;
 
     // Add transformation to path
-    path.push_back(Ticp);
-    errors.push_back(Terror);
+    ScanInfo info;
+    info.pose = Ticp;
+    info.error = Terror;
+    info.timeStamp = stamp;
+
+    path.push_back(info);
+
+    //path.push_back(Ticp);
+    //errors.push_back(Terror);
 
 		// Publish tf
 		if(publishMapTf == true)
