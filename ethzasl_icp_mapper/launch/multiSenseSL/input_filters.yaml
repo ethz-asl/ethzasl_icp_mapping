@@ -1,0 +1,12 @@
+- RandomSamplingDataPointsFilter:
+    prob: 0.25
+- SimpleSensorNoiseDataPointsFilter:
+    sensorType: 2
+- SurfaceNormalDataPointsFilter:
+    knn: 40
+    keepNormals: 1
+    keepDensities: 1
+- MaxDensityDataPointsFilter:
+    maxDensity: 100
+- ObservationDirectionDataPointsFilter
+- OrientNormalsDataPointsFilter 
