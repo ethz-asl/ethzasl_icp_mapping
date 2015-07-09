@@ -261,8 +261,8 @@ namespace PointMatcher_ros
         {
       
           listener->transformPoint(
-            fixedFrame,
-            curTime,
+            rosMsg.header.frame_id,
+            rosMsg.header.stamp,
             pin,
             fixedFrame,
             pout
