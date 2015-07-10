@@ -18,7 +18,7 @@ generate_messages(DEPENDENCIES sensor_msgs nav_msgs std_msgs geometry_msgs actio
 
 catkin_package (
 	CATKIN_DEPENDS roscpp rospy rosbag std_msgs geometry_msgs nav_msgs
-tf tf2 tf_conversions message_filters map_msgs libpointmatcher_ros ethzasl_gridmap_2d visualization_msgs interactive_markers 
+tf tf2 tf_conversions message_filters map_msgs libpointmatcher_ros ethzasl_gridmap_2d visualization_msgs interactive_markers
 message_runtime libpointmatcher
 )
 
@@ -31,25 +31,8 @@ message_runtime libpointmatcher
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
 # c++ 0x
-#if("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang") 
-#	set(CMAKE_COMPILER_IS_CLANGXX)
-#endif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang")
-if(CMAKE_COMPILER_IS_GNUCXX)
-	execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
-	if (GCC_VERSION VERSION_GREATER 4.4 OR GCC_VERSION VERSION_EQUAL 4.4)
-		add_definitions(-std=gnu++0x)
-	else (GCC_VERSION VERSION_GREATER 4.4 OR GCC_VERSION VERSION_EQUAL 4.4)
-		message(SEND_ERROR "You need GCC version 4.4 or greater to compile this library")
-	endif (GCC_VERSION VERSION_GREATER 4.4 OR GCC_VERSION VERSION_EQUAL 4.4)
-else(CMAKE_COMPILER_IS_GNUCXX)
-	message(SEND_ERROR "You need partial C++0x support for N2351, N2672, N1984. Currently this build toolchain supports only GCC >= 4.4. If your compiler supports these specifications, please send us a patch.")
-endif(CMAKE_COMPILER_IS_GNUCXX)
-# well, this breaks libpointmatcher on non-unix platform,
-# please contribute the define for your favorite compiler
-# It must support (compiler support in parenthesis):
-# - N2351: shared pointers in standard
-# - N2672: Initializer lists (gcc)
-# - N1984: auto-typed variables (gcc, clang)
+execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+add_definitions(-std=gnu++0x)
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
@@ -85,5 +68,3 @@ target_link_libraries(dynamic_mapper ${catkin_LIBRARIES})
 add_executable(dynamic_trails src/dynamic_trails.cpp )
 add_dependencies(dynamic_trails ${PROJECT_NAME}_gencpp)
 target_link_libraries(dynamic_trails ${catkin_LIBRARIES})
-
-

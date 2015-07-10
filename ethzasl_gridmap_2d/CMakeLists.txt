@@ -20,3 +20,5 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 include_directories(include ${Eigen_INCLUDE_DIRS})
 
 add_library(ethzasl_gridmap_2d src/grid-map.cpp)
+add_dependencies(${PROJECT_NAME} ethzasl_gridmap_2d)
+target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
