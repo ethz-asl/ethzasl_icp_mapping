@@ -3,6 +3,7 @@
 
 #include "pointmatcher/PointMatcher.h"
 #include "nav_msgs/Odometry.h"
+#include "geometry_msgs/PoseStamped.h"
 #include "Eigen/Eigen"
 
 namespace ros
@@ -21,16 +22,22 @@ namespace PointMatcher_ros
 	// from tf/ROS
 	
 	template<typename T>
-	typename PointMatcher<T>::TransformationParameters transformListenerToEigenMatrix(const tf::TransformListener &listener, const std::string& target, const std::string& source, const ros::Time& stamp);
+	typename PointMatcher<T>::TransformationParameters transformListenerToEigenMatrix(const tf::TransformListener &listener, const std::string& target, const std::string& source, const ros::Time& stamp, const ros::Duration& timeout = ros::Duration(0.25));
 	
 	template<typename T>
 	typename PointMatcher<T>::TransformationParameters odomMsgToEigenMatrix(const nav_msgs::Odometry& odom);
 	
+	template<typename T>
+	typename PointMatcher<T>::TransformationParameters poseMsgToEigenMatrix(const geometry_msgs::Pose& pose);
+
 	// to tf/ROS
 	
 	template<typename T>
 	nav_msgs::Odometry eigenMatrixToOdomMsg(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& frame_id, const ros::Time& stamp);
 	
+	template<typename T>
+	geometry_msgs::PoseStamped eigenMatrixToPoseStampedMsg(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& frame_id, const ros::Time& stamp);
+
 	template<typename T>
 	tf::Transform eigenMatrixToTransform(const typename PointMatcher<T>::TransformationParameters& inTr);
 	
