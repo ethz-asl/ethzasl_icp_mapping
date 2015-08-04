@@ -1,5 +1,26 @@
-cmake_minimum_required(VERSION 2.4.6)
-include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
+cmake_minimum_required(VERSION 2.8.3)
+project(ethzasl_icp_mapper)
+
+find_package(catkin REQUIRED roscpp rospy rosbag std_msgs geometry_msgs nav_msgs
+tf tf2 tf_conversions message_filters map_msgs libpointmatcher_ros visualization_msgs
+interactive_markers ethzasl_gridmap_2d message_generation libpointmatcher)
+
+add_service_files( FILES
+CorrectPose.srv
+GetBoundedMap.srv
+GetMode.srv
+LoadMap.srv
+MatchClouds.srv
+SetMode.srv
+)
+
+generate_messages(DEPENDENCIES sensor_msgs nav_msgs std_msgs geometry_msgs actionlib_msgs)
+
+catkin_package (
+	CATKIN_DEPENDS roscpp rospy rosbag std_msgs geometry_msgs nav_msgs
+tf tf2 tf_conversions message_filters map_msgs libpointmatcher_ros ethzasl_gridmap_2d visualization_msgs interactive_markers 
+message_runtime libpointmatcher
+)
 
 # Set the build type.  Options are:
 #  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage
@@ -7,12 +28,7 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  Release        : w/o debug symbols, w/ optimization
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
-set(ROS_BUILD_TYPE RelWithDebInfo)
-
-rosbuild_init()
-
-rosbuild_genmsg()
-rosbuild_gensrv()
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
 # c++ 0x
 #if("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang") 
@@ -40,33 +56,34 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 add_definitions(-DHAVE_YAML_CPP)
 
-rosbuild_add_boost_directories()
+include_directories(include ${catkin_INCLUDE_DIRS})
 
-rosbuild_add_executable(matcher_service src/matcher_service.cpp)
-target_link_libraries(matcher_service ${EXTRA_LIBS} rt yaml-cpp)
+add_executable(matcher_service src/matcher_service.cpp)
+add_dependencies(matcher_service ${PROJECT_NAME}_gencpp)
+target_link_libraries(matcher_service ${catkin_LIBRARIES})
 
-rosbuild_add_executable(occupancy_grid_builder src/occupancy_grid_builder.cpp)
-target_link_libraries(occupancy_grid_builder ${EXTRA_LIBS} yaml-cpp)
+add_executable(occupancy_grid_builder src/occupancy_grid_builder.cpp)
+add_dependencies(occupancy_grid_builder ${PROJECT_NAME}_gencpp)
+target_link_libraries(occupancy_grid_builder ${catkin_LIBRARIES} ${EXTRA_LIBS})
 
-rosbuild_add_executable(mapper src/mapper.cpp)
-rosbuild_link_boost(mapper filesystem system)
-target_link_libraries(mapper ${EXTRA_LIBS} argtable2 rt yaml-cpp)
+add_executable(mapper src/mapper.cpp)
+add_dependencies(mapper ${PROJECT_NAME}_gencpp)
+target_link_libraries(mapper ${catkin_LIBRARIES})
 
+add_executable(map_maintainer src/map_maintainer.cpp )
+add_dependencies(map_maintainer ${PROJECT_NAME}_gencpp)
+target_link_libraries(map_maintainer ${catkin_LIBRARIES})
 
-rosbuild_add_executable(map_maintainer src/map_maintainer.cpp)
-rosbuild_link_boost(map_maintainer filesystem system signals)
-target_link_libraries(map_maintainer ${EXTRA_LIBS} argtable2 rt yaml-cpp)
+add_executable(interact_mapper src/interact_mapper.cpp )
+add_dependencies(interact_mapper ${PROJECT_NAME}_gencpp)
+target_link_libraries(interact_mapper ${catkin_LIBRARIES})
 
-rosbuild_add_executable(interact_mapper src/interact_mapper.cpp)
-rosbuild_link_boost(interact_mapper filesystem system signals)
-target_link_libraries(interact_mapper ${EXTRA_LIBS} argtable2 rt yaml-cpp)
+add_executable(dynamic_mapper src/dynamic_mapper.cpp )
+add_dependencies(dynamic_mapper ${PROJECT_NAME}_gencpp)
+target_link_libraries(dynamic_mapper ${catkin_LIBRARIES})
 
-rosbuild_add_executable(dynamic_mapper src/dynamic_mapper.cpp)
-rosbuild_link_boost(dynamic_mapper filesystem system)
-target_link_libraries(dynamic_mapper ${EXTRA_LIBS} argtable2 rt yaml-cpp)
-
-rosbuild_add_executable(dynamic_trails src/dynamic_trails.cpp)
-rosbuild_link_boost(dynamic_trails filesystem system signals)
-target_link_libraries(dynamic_trails ${EXTRA_LIBS} argtable2 rt yaml-cpp)
+add_executable(dynamic_trails src/dynamic_trails.cpp )
+add_dependencies(dynamic_trails ${PROJECT_NAME}_gencpp)
+target_link_libraries(dynamic_trails ${catkin_LIBRARIES})
 
 
