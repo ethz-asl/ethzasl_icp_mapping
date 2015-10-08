@@ -15,16 +15,17 @@ matcher:
 outlierFilters:
   - TrimmedDistOutlierFilter:
      ratio: 0.8
-#  - SurfaceNormalOutlierFilter:
-#     maxAngle: 1.57
-#TODO: put that back!
-#  - GenericDescriptorOutlierFilter:
-#     source: reference
-#     descName: probabilityStatic
+  - SurfaceNormalOutlierFilter:
+     maxAngle: 1.57
+  - GenericDescriptorOutlierFilter:
+     source: reference
+     descName: probabilityStatic
+     #useSoftThreshold: 1
+     threshold: 0.35
 
 errorMinimizer:
-  PointToPointErrorMinimizer:
-  #PointToPlaneErrorMinimizer:
+  #PointToPointErrorMinimizer:
+  PointToPlaneErrorMinimizer:
   #   force2D: 0
 
 transformationCheckers:
@@ -35,7 +36,7 @@ transformationCheckers:
   - CounterTransformationChecker:
       maxIterationCount: 40
   - BoundTransformationChecker:
-      maxRotationNorm: 0.20
+      maxRotationNorm: 0.50
       maxTranslationNorm: 7.00
 
 inspector:

@@ -1,0 +1,32 @@
+<launch>
+	<node name="dynamic_mapper" type="dynamic_mapper" pkg="ethzasl_icp_mapper" output="screen">
+		<remap from="cloud_in" to="/cloud" />
+		<param name="subscribe_scan" value="false" />
+		<param name="icpConfig" value="$(find ethzasl_icp_mapper)/launch/husky/icp.yaml" />
+		<param name="inputFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/husky/input_filters.yaml" />
+		<param name="mapPostFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/husky/dyn_map_post_filters.yaml" />
+		<param name="odom_frame" value="/odom" />
+		<param name="map_frame" value="/map" />
+		<param name="useROSLogger" value="true" />
+		<param name="minOverlap" value="0.1" /> 
+		<param name="maxOverlapToMerge" value="0.99" /> 
+		<param name="minReadingPointCount" value="1000" /> 
+		<param name="minMapPointCount" value="1000" /> 
+		<param name="localizing" value="true" /> 
+		<param name="mapping" value="true" /> 
+
+    <!-- Parameters for dynamic elements -->
+		<param name="priorStatic" value="0.45"/>
+		<param name="priorDyn" value="0.55"/>
+		<param name="maxAngle" value="0.1"/>
+		<param name="eps_a" value="0.020"/><!--1 deg = 0.017rad-->
+		<param name="eps_d" value="0.1"/>
+		<param name="alpha" value="0.99"/>
+		<param name="beta" value="0.90"/>
+		<param name="maxDyn" value="0.90"/>
+		<param name="maxDistNewPoint" value="0.5"/>
+		<param name="sensorMaxRange" value="40.0"/>
+
+
+	</node>
+</launch>

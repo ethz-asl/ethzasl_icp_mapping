@@ -1,25 +1,24 @@
-#readingDataPointsFilters:
-#  - RandomSamplingDataPointsFilter:
-#      prob: 0.25
+readingDataPointsFilters:
+  - RandomSamplingDataPointsFilter:
+      prob: 0.2
 
 referenceDataPointsFilters:
   - MaxDistDataPointsFilter:
-      maxDist: 70.0
-#  - RandomSamplingDataPointsFilter:
-#      prob: 0.1
+      maxDist: 50.0
+  - RandomSamplingDataPointsFilter:
+      prob: 0.01
 
 matcher:
   KDTreeMatcher:
     knn: 3
     maxDist: 10.0
-    epsilon: 0.0
+    epsilon: 3.33
 
 outlierFilters:
   - TrimmedDistOutlierFilter:
      ratio: 0.9
   - SurfaceNormalOutlierFilter:
      maxAngle: 1.57
-
 
 errorMinimizer:
   PointToPlaneErrorMinimizer
@@ -33,7 +32,7 @@ transformationCheckers:
       maxIterationCount: 40
   - BoundTransformationChecker:
       maxRotationNorm: 0.80
-      maxTranslationNorm: 6.00
+      maxTranslationNorm: 30.00
 
 inspector:
 #  VTKFileInspector
