@@ -5,7 +5,7 @@
   </description>
   <version>0.9.6</version>
   <maintainer email="f.pomerleau@gmail.com">Francois Pomerleau</maintainer>
-  <author>Stéphane Magnenat</author>
+  <author>Stéphane Magnenat, Francois Pomerleau</author>
   <license>new BSD</license>
   <url>http://ros.org/wiki/libpointmatcher_ros</url>
 
