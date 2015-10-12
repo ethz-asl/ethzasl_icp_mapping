@@ -161,7 +161,7 @@ namespace PointMatcher_ros
 	
 	
 	template<typename T>
-	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame, const bool force3D, const bool addTimestamps)
+	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame, const bool force3D, const bool addTimestamps, const bool addObservationDirection)
 	{
 		typedef PointMatcher<T> PM;
 		typedef typename PM::DataPoints DataPoints;
@@ -184,11 +184,18 @@ namespace PointMatcher_ros
 			descLabels.push_back(Label("intensity", 1));
 			assert(rosMsg.intensities.size() == rosMsg.ranges.size());
 		}
+    
+    int id_obs = 0;
+    if(addObservationDirection)
+    {
+			descLabels.push_back(Label("observationDirections", 3));
+    }
+		
+    //TODO: change that once the time_support branch is merge in libpointmatcher
     if(addTimestamps)
     {
 			descLabels.push_back(Label("timestamp", 3));
     }
-		
 		// filter points based on range
     std::vector<size_t> ids(rosMsg.ranges.size());
     std::vector<double> ranges(rosMsg.ranges.size());
@@ -219,6 +226,11 @@ namespace PointMatcher_ros
 
 		DataPoints cloud(featLabels, descLabels, goodCount);
 		cloud.getFeatureViewByName("pad").setConstant(1);
+      
+    if(addObservationDirection)
+    {
+      id_obs = cloud.getDescriptorStartingRow("observationDirections");
+    }
 		
 		// fill features
 		const ros::Time& startTime(rosMsg.header.stamp);
@@ -231,16 +243,18 @@ namespace PointMatcher_ros
       const T x = cos(angle) * range;
       const T y = sin(angle) * range;
 
+      // the turn ratio correct for the fact that not all sensor scan
+      // continuously during 360 deg 
+      const float turnRatio = (rosMsg.angle_max - rosMsg.angle_min)/(2*M_PI);
+      // dt_point should be more precise than rosMsg.time_increment
+      const float dt_point = (rosMsg.scan_time*turnRatio)/rosMsg.ranges.size();
+
       if (listener)
       {
-        /* Note:
-          We do an approximation, as some filters like
-          ObservationDirectionDataPointsFilter should be applied per 
-          point *before* correcting them using the tf transform, but
-          as we expect the scan to be fast with respect to the speed 
-          of the robot, we consider this approximation as being ok.
-        */
-        const ros::Time curTime(rosMsg.header.stamp + ros::Duration(ids[i] * rosMsg.time_increment));
+        
+        const ros::Time curTime(rosMsg.header.stamp + ros::Duration(ids[i] * dt_point));
+        //TODO: correct curTime to handle the fact that do not cover 360 deg
+
         // wait for transform
         listener->waitForTransform(
           rosMsg.header.frame_id,
@@ -249,13 +263,21 @@ namespace PointMatcher_ros
           ros::Duration(0.1)
         );
 
-        // transform data
-        geometry_msgs::PointStamped pin, pout;
+        // transform point
+        geometry_msgs::PointStamped pin, p_out;
         pin.header.stamp = curTime;
         pin.header.frame_id = rosMsg.header.frame_id;
         pin.point.x = x;
         pin.point.y = y;
         pin.point.z = 0;
+        
+        // transform sensor center
+        geometry_msgs::PointStamped s_in, s_out;
+        s_in.header.stamp = curTime;
+        s_in.header.frame_id = rosMsg.header.frame_id;
+        s_in.point.x = 0;
+        s_in.point.y = 0;
+        s_in.point.z = 0;
 
         try
         {
@@ -265,8 +287,19 @@ namespace PointMatcher_ros
             curTime,
             pin,
             fixedFrame,
-            pout
+            p_out
           );
+
+          if(addObservationDirection)
+          {
+            listener->transformPoint(
+                fixedFrame,
+                curTime,
+                s_in,
+                fixedFrame,
+                s_out
+                );
+          }
         }
         catch (const tf::ExtrapolationException& e)
         {
@@ -275,14 +308,20 @@ namespace PointMatcher_ros
         }
 
         //cout << "pin: " << pin.point.x << ", " << pin.point.y << ", " << pin.point.z << endl;
-        //cout << "pout: " << pout.point.x << ", " << pout.point.y << ", " << pout.point.z << endl;
+        //cout << "p_out: " << p_out.point.x << ", " << p_out.point.y << ", " << p_out.point.z << endl;
 
         // write back
-        cloud.features(0,i) = pout.point.x;
-        cloud.features(1,i) = pout.point.y;
+        cloud.features(0,i) = p_out.point.x;
+        cloud.features(1,i) = p_out.point.y;
         if(force3D)
-          cloud.features(2,i) = pout.point.z;
+          cloud.features(2,i) = p_out.point.z;
 				
+        if(addObservationDirection)
+        {
+          cloud.descriptors(id_obs  , i) = s_out.point.x - p_out.point.x;
+          cloud.descriptors(id_obs+1, i) = s_out.point.y - p_out.point.y;
+          cloud.descriptors(id_obs+2, i) = s_out.point.z - p_out.point.z;
+        }
 			}
 		}
 
@@ -320,9 +359,9 @@ namespace PointMatcher_ros
 	}
 	
 	template
-	PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame, const bool force3D, const bool addTimestamps);
+	PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame, const bool force3D, const bool addTimestamps, const bool addObservationDirection);
 	template
-	PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame, const bool force3D, const bool addTimestamps);
+	PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame, const bool force3D, const bool addTimestamps, const bool addObservationDirection);
 
 
 	template<typename T>

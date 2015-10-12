@@ -566,6 +566,9 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		// Apply ICP
 		PM::TransformationParameters Ticp;
 		Ticp = icp(*newPointCloud, TscannerToMap);
+    //TODO TEST finish here....
+    //Ticp = PM::TransformationParameters::Identity(4,4); 
+    //END TEST
     Ticp = transformation->correctParameters(Ticp);
 
     // extract corrections
@@ -979,7 +982,7 @@ Mapper::DP* Mapper::updateMap(DP* newMap, const PM::TransformationParameters Tic
             const float probDyn = viewOnProbabilityDynamic(0, localMapId);
             const float probStatic = viewOnProbabilityStatic(0, localMapId);
 
-            mapLocalROI.setColFrom(localMapId, *newMap, i);
+            mapLocalROI.setColFrom(localMapId, *newMap, i); //TODO: check if descriptor follow...
             viewDebug(0, localMapId) = 2;  
             viewOnProbabilityDynamic(0, localMapId) = probDyn;
             viewOnProbabilityStatic(0, localMapId) = probStatic;
@@ -1056,7 +1059,7 @@ void Mapper::waitForMapBuildingCompleted()
 
 void Mapper::publishLoop(double publishPeriod)
 {
-	if(publishPeriod == 0)
+	if(publishPeriod == 0) //FIXME: just don't start the thread if 0
 		return;
 	ros::Rate r(1.0 / publishPeriod);
 	while(ros::ok())
@@ -1068,7 +1071,10 @@ void Mapper::publishLoop(double publishPeriod)
 
 void Mapper::publishTransform()
 {
-	if(processingNewCloud == false && publishMapTf == true)
+
+  // TODO: test for TREX video, put that back
+	//if(processingNewCloud == false && publishMapTf == true)
+	if(publishMapTf == true)
 	{
 		publishLock.lock();
 		// Note: we use now as timestamp to refresh the tf and avoid other buffer to be empty
