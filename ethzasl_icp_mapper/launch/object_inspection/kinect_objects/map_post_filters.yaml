@@ -9,4 +9,3 @@
 #    maxDensity: 1000000000 # For face
 - MaxPointCountDataPointsFilter:
     maxCount: 500000
-    prob: 0.75

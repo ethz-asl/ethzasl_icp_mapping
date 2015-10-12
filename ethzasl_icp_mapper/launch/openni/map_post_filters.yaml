@@ -7,4 +7,3 @@
     maxDensity: 10000
 - MaxPointCountDataPointsFilter:
     maxCount: 500000
-    prob: 0.5
