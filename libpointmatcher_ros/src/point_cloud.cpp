@@ -253,7 +253,6 @@ namespace PointMatcher_ros
       {
         
         const ros::Time curTime(rosMsg.header.stamp + ros::Duration(ids[i] * dt_point));
-        //TODO: correct curTime to handle the fact that do not cover 360 deg
 
         // wait for transform
         listener->waitForTransform(
@@ -283,7 +282,7 @@ namespace PointMatcher_ros
         {
       
           listener->transformPoint(
-            rosMsg.header.frame_id,
+						fixedFrame,
             rosMsg.header.stamp,
             pin,
             fixedFrame,
