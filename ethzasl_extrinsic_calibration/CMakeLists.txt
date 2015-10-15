@@ -9,11 +9,13 @@ find_package(Eigen3 QUIET)
 if(NOT EIGEN3_FOUND)
 	# Fallback to cmake_modules
 	find_package(Eigen REQUIRED)
-	set(EIGEN3_INCLUDE_DIRS ${EIGEN_INCLUDE_DIRS})
-	set(EIGEN_NAME "EIGEN")
+	set(EIGEN3_INCLUDE_DIRS ${Eigen_INCLUDE_DIRS})
+	set(EIGEN_NAME "Eigen")
 else()
+	SET(EIGEN3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
 	set(EIGEN_NAME "EIGEN3")
 endif()
+MESSAGE(STATUS "Found Eigen3 in ${EIGEN3_INCLUDE_DIRS}.")
 
 catkin_package(
 	CATKIN_DEPENDS roscpp rospy tf 
