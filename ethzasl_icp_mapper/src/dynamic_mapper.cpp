@@ -422,7 +422,8 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		// we need to know the dimensionality of the point cloud to initialize properly
 		publishLock.lock();
 		TOdomToMap = PM::TransformationParameters::Identity(dimp1, dimp1);
-		TOdomToMap(2,3) = mapElevation;
+		//ISER
+		//TOdomToMap(2,3) = mapElevation;
 		publishLock.unlock();
 	}
 
@@ -486,7 +487,8 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		Ticp = icp(*newPointCloud, TscannerToMap);
 
 		// ISER
-		{
+		// TODO: generalize that
+		/*{
 		// extract corrections
 		PM::TransformationParameters Tdelta = Ticp * TscannerToMap.inverse();
 		
@@ -501,7 +503,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 
 		Ticp = Tdelta*TscannerToMap;
 
-		}
+		}*/
 
 		ROS_DEBUG_STREAM("Ticp:\n" << Ticp);
 		
@@ -1045,7 +1047,7 @@ bool Mapper::loadMap(ethzasl_icp_mapper::LoadMap::Request &req, ethzasl_icp_mapp
 	TOdomToMap = PM::TransformationParameters::Identity(dim,dim);
 	
 	//ISER
-	TOdomToMap(2,3) = mapElevation;
+	//TOdomToMap(2,3) = mapElevation;
 	publishLock.unlock();
 
 	setMap(cloud);
@@ -1073,6 +1075,7 @@ bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req, ethzasl_
 	TOdomToMap = PointMatcher_ros::odomMsgToEigenMatrix<float>(req.odom);
 	
 	//ISER
+	/*
 	{
 	// remove roll and pitch
 	TOdomToMap(2,0) = 0; 
@@ -1081,7 +1084,7 @@ bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req, ethzasl_
 	TOdomToMap(0,2) = 0; 
 	TOdomToMap(1,2) = 0;
 	TOdomToMap(2,3) = mapElevation; //z
-	}
+	}*/
 
 	tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(TOdomToMap, mapFrame, odomFrame, ros::Time::now()));
 	publishLock.unlock();
