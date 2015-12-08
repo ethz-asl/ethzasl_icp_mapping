@@ -120,6 +120,7 @@ class Mapper
 	const float beta; //!< ratio. Propability of staying dynamic given that the point was static
 	const float maxDyn; //!< ratio. Threshold for which a point will stay dynamic
 	const float maxDistNewPoint; //!< in meter. Distance at which a new point will be added in the global map.
+	const float sensorMaxRange; //!< in meter. Maximum reading distance of the laser. Used to cut the global map before matching.
 
 
 	
@@ -193,6 +194,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	beta(getParam<double>("beta", 0.99)),
 	maxDyn(getParam<double>("maxDyn", 0.95)),
 	maxDistNewPoint(pow(getParam<double>("maxDistNewPoint", 0.1),2)),
+	sensorMaxRange(getParam<double>("sensorMaxRange", 80.0)),
 	TOdomToMap(PM::TransformationParameters::Identity(4, 4)),
 	publishStamp(ros::Time::now()),
   tfListener(ros::Duration(30)),
@@ -369,7 +371,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 
 	// if the future has completed, use the new map
 	processNewMapIfAvailable();
-	cerr << "received new map" << endl;
+	//cerr << "received new map" << endl;
 	
 	// IMPORTANT:  We need to receive the point clouds in local coordinates (scanner or robot)
 	timer t;
@@ -401,7 +403,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		newPointCloud->addDescriptor("stamps_sec", desc_sec);
 		newPointCloud->addDescriptor("stamps_nsec", desc_nsec);
 
-		cout << "Adding time" << endl;
+		//cout << "Adding time" << endl;
 		
 	}
 
@@ -427,7 +429,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		publishLock.unlock();
 	}
 
-	cout << "TOdomToMap" << endl << TOdomToMap << endl;
+	//cout << "TOdomToMap" << endl << TOdomToMap << endl;
 
 	// Fetch transformation from scanner to odom
 	// Note: we don't need to wait for transform. It is already called in transformListenerToEigenMatrix()
@@ -604,7 +606,7 @@ void Mapper::setMap(DP* newPointCloud)
 	
 	// set new map
 	mapPointCloud = newPointCloud;
-	cerr << "copying map to ICP" << endl;
+	//cerr << "copying map to ICP" << endl;
 	icp.setMap(*mapPointCloud);
 	
 	
@@ -682,8 +684,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	DP mapLocalFrame = transformation->compute(*mapPointCloud, Ticp.inverse());
 
 	// Remove points out of sensor range
-	// FIXME: this is a parameter
-	const float sensorMaxRange = 80.0;
 	PM::Matrix globalId(1, mapPtsCount); 
 
 	int mapCutPtsCount = 0;
@@ -699,12 +699,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	}
 
 	mapLocalFrameCut.conservativeResize(mapCutPtsCount);
-	//PM::Parameters params({{"maxDist", toParam(sensorMaxRange)}});
-	//PM::DataPointsFilter* maxDistFilter = 
-	//		PM::get().DataPointsFilterRegistrar.create("MaxDistDataPointsFilter", params);
-
-	//mapLocalFrame = maxDistFilter->filter(mapLocalFrame);
-
 
 	
 	PM::Matrix radius_map = mapLocalFrameCut.features.topRows(3).colwise().norm();
@@ -726,19 +720,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	// Look for NN in spherical coordinates
 	Matches::Dists dists(1,mapCutPtsCount);
 	Matches::Ids ids(1,mapCutPtsCount);
-	
-	// FIXME: those are parameters
-	// note: 0.08 rad is 5 deg
-	//const float maxAngle = 0.04; // in rad (ICRA 14)
-	//const float eps_a = 0.2; // ratio of distance (ICRA 14)
-	//const float eps_d = 0.1; // in meters (ICRA 14)
-	//const float maxAngle = 0.02; // in rad (ISER 14)
-	//const float eps_a = 0.05; // ratio of distance (ISER 14)
-	//const float eps_d = 0.02; // in meters (ISER 14)
-	//const float alpha = 0.99;
-	//const float beta = 0.99;
-
-	
 	
 	featureNNS->knn(angles_map, ids, dists, 1, 0, NNS::ALLOW_SELF_MATCH, maxAngle);
 
@@ -880,18 +861,11 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 
 
 
-	// Correct new points using ICP result
-	//*newPointCloud = transformation->compute(*newPointCloud, Ticp); 
-
 	// Generate temporary map for density computation
-	//DP tmp_map = (*mapPointCloud); // FIXME: this should be on mapLocalFrameCut
-	DP tmp_map = mapLocalFrameCut; // FIXME: this should be on mapLocalFrameCut
+	DP tmp_map = mapLocalFrameCut; 
 	tmp_map.concatenate(*newPointCloud);
 
-	// Compute density
-	//std::shared_ptr<NNS> featureNNS;
 
-	cout << "build first kdtree with " << tmp_map.features.cols() << endl;
 	// build and populate NNS
 	featureNNS.reset( NNS::create(tmp_map.features, tmp_map.features.rows() - 1, NNS::KDTREE_LINEAR_HEAP, NNS::TOUCH_STATISTICS));
 	
@@ -906,12 +880,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	DP overlap(newPointCloud->createSimilarEmpty());
 	DP no_overlap(newPointCloud->createSimilarEmpty());
 	
-	
-
-	// FIXME: this is a parameter
-  //const float maxDist = pow(0.3, 2); // ICRA 2014
-	//const float maxDist = pow(0.1, 2); // ISER 2014
-	//const float maxDist = pow(0.1, 2);
 
 	int ptsOut = 0;
 	int ptsIn = 0;
@@ -932,7 +900,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	no_overlap.conservativeResize(ptsOut);
 	overlap.conservativeResize(ptsIn);
 
-	cout << "ptsOut=" << ptsOut << ", ptsIn=" << ptsIn << endl;
 
 	// Publish outliers
 	//if (outlierPub.getNumSubscribers())
@@ -963,7 +930,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	newPointCloud->concatenate(*mapPointCloud);
 	mapPostFilters.apply(*newPointCloud);
 
-	cout << "... end map creation" << endl;
 	ROS_INFO_STREAM("[TIME] New map available (" << newPointCloud->features.cols() << " pts), update took " << t.elapsed() << " [s]");
 	
 	return newPointCloud;
@@ -1042,6 +1008,12 @@ bool Mapper::loadMap(ethzasl_icp_mapper::LoadMap::Request &req, ethzasl_icp_mapp
 	const int dim = cloud->features.rows();
 	const int nbPts = cloud->features.cols();
 	ROS_INFO_STREAM("Loading " << dim-1 << "D point cloud (" << req.filename.data << ") with " << nbPts << " points.");
+
+	ROS_INFO_STREAM("With descriptors:");
+	for(int i=0; i< cloud->descriptorLabels.size(); i++)
+	{
+		ROS_INFO_STREAM("    - " << cloud->descriptorLabels[i].text); 
+	}
 
 	publishLock.lock();
 	TOdomToMap = PM::TransformationParameters::Identity(dim,dim);
