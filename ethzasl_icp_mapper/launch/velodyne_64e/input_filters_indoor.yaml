@@ -1,0 +1,19 @@
+- MaxDistDataPointsFilter:
+    maxDist: 60.0
+- FixStepSamplingDataPointsFilter:
+    startStep: 8
+- MinDistDataPointsFilter:
+    minDist: 1.0
+#- RandomSamplingDataPointsFilter:
+#    prob: 0.2
+- SurfaceNormalDataPointsFilter:
+    knn: 15
+    epsilon: 1.33
+    keepNormals: 1
+    keepDensities: 1
+- MaxDensityDataPointsFilter:
+    maxDensity: 300.0
+- SimpleSensorNoiseDataPointsFilter:
+    sensorType: 0
+- ObservationDirectionDataPointsFilter
+- OrientNormalsDataPointsFilter 

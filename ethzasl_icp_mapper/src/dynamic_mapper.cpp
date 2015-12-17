@@ -383,7 +383,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	const size_t goodCount(newPointCloud->features.cols());
 	if (goodCount == 0)
 	{
-		ROS_ERROR("I found no good points in the cloud");
+		ROS_ERROR("[ICP] I found no good points in the cloud");
 		return;
 	}
 	
@@ -407,14 +407,13 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		
 	}
 
-	ROS_INFO("Processing new point cloud");
 	{
 		timer t; // Print how long take the algo
 		
 		// Apply filters to incoming cloud, in scanner coordinates
 		inputFilters.apply(*newPointCloud);
 		
-		ROS_INFO_STREAM("Input filters took " << t.elapsed() << " [s]");
+		ROS_INFO_STREAM("[ICP] Input filters took " << t.elapsed() << " [s]");
 	}
 	
 	string reason;
@@ -451,24 +450,24 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	}
 
 
-	ROS_DEBUG_STREAM("TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << TOdomToScanner);
-	ROS_DEBUG_STREAM("TOdomToMap(" << odomFrame<< " to " << mapFrame << "):\n" << TOdomToMap);
+	ROS_DEBUG_STREAM("[ICP] TOdomToScanner(" << odomFrame<< " to " << scannerFrame << "):\n" << TOdomToScanner);
+	ROS_DEBUG_STREAM("[ICP] TOdomToMap(" << odomFrame<< " to " << mapFrame << "):\n" << TOdomToMap);
 		
 	const PM::TransformationParameters TscannerToMap = TOdomToMap * TOdomToScanner.inverse();
-	ROS_DEBUG_STREAM("TscannerToMap (" << scannerFrame << " to " << mapFrame << "):\n" << TscannerToMap);
+	ROS_DEBUG_STREAM("[ICP] TscannerToMap (" << scannerFrame << " to " << mapFrame << "):\n" << TscannerToMap);
 	
 	// Ensure a minimum amount of point after filtering
-	const int ptsCount = newPointCloud->features.cols();
+	const int ptsCount = newPointCloud->getNbPoints();
 	if(ptsCount < minReadingPointCount)
 	{
-		ROS_ERROR_STREAM("Not enough points in newPointCloud: only " << ptsCount << " pts.");
+		ROS_ERROR_STREAM("[ICP] Not enough points in newPointCloud: only " << ptsCount << " pts.");
 		return;
 	}
 
 	// Initialize the map if empty
  	if(!icp.hasMap())
  	{
-		ROS_INFO_STREAM("Creating an initial map");
+		ROS_INFO_STREAM("[MAP] Creating an initial map");
 		mapCreationTime = stamp;
 		setMap(updateMap(newPointCloud.release(), TscannerToMap, false));
 		// we must not delete newPointCloud because we just stored it in the mapPointCloud
@@ -476,9 +475,9 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	}
 	
 	// Check dimension
-	if (newPointCloud->features.rows() != icp.getInternalMap().features.rows())
+	if (newPointCloud->getEuclideanDim() != icp.getInternalMap().getEuclideanDim())
 	{
-		ROS_ERROR_STREAM("Dimensionality missmatch: incoming cloud is " << newPointCloud->features.rows()-1 << " while map is " << icp.getInternalMap().features.rows()-1);
+		ROS_ERROR_STREAM("[ICP] Dimensionality missmatch: incoming cloud is " << newPointCloud->getEuclideanDim() << " while map is " << icp.getInternalMap().getEuclideanDim());
 		return;
 	}
 	
@@ -486,6 +485,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	{
 		// Apply ICP
 		PM::TransformationParameters Ticp;
+		ROS_INFO_STREAM("[ICP] Computing - reading: " << newPointCloud->getNbPoints() << ", reference: " << icp.getInternalMap().getNbPoints() );
 		Ticp = icp(*newPointCloud, TscannerToMap);
 
 		// ISER
@@ -507,14 +507,14 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 
 		}*/
 
-		ROS_DEBUG_STREAM("Ticp:\n" << Ticp);
+		ROS_DEBUG_STREAM("[ICP] Ticp:\n" << Ticp);
 		
 		// Ensure minimum overlap between scans
 		const double estimatedOverlap = icp.errorMinimizer->getOverlap();
-		ROS_INFO_STREAM("Overlap: " << estimatedOverlap);
+		ROS_INFO_STREAM("[ICP] Overlap: " << estimatedOverlap);
 		if (estimatedOverlap < minOverlap)
 		{
-			ROS_ERROR_STREAM("Estimated overlap too small, ignoring ICP correction!");
+			ROS_ERROR_STREAM("[ICP] Estimated overlap too small, ignoring ICP correction!");
 			return;
 		}
 		
@@ -531,12 +531,13 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		publishLock.unlock();
 		processingNewCloud = false;
 		
-		ROS_DEBUG_STREAM("TOdomToMap:\n" << TOdomToMap);
+		ROS_DEBUG_STREAM("[ICP] TOdomToMap:\n" << TOdomToMap);
 
 		// Publish odometry
 		if (odomPub.getNumSubscribers())
+		{
 			odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(Ticp, mapFrame, stamp));
-	
+		}
 		// Publish error on odometry
 		if (odomErrorPub.getNumSubscribers())
 			odomErrorPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(TOdomToMap, mapFrame, stamp));
@@ -547,31 +548,22 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		if (
 			mapping &&
 			((estimatedOverlap < maxOverlapToMerge) || (icp.getInternalMap().features.cols() < minMapPointCount)) &&
-			#if BOOST_VERSION >= 104100
 			(!mapBuildingInProgress)
-			#else // BOOST_VERSION >= 104100
-			true
-			#endif // BOOST_VERSION >= 104100
 		)
 		{
-			cout << "map Creation..." << endl;
 			// make sure we process the last available map
 			mapCreationTime = stamp;
-			#if BOOST_VERSION >= 104100
-			ROS_INFO("Adding new points to the map in background");
+
+			ROS_INFO("[MAP] Adding new points in a separate thread");
 			mapBuildingTask = MapBuildingTask(boost::bind(&Mapper::updateMap, this, newPointCloud.release(), Ticp, true));
 			mapBuildingFuture = mapBuildingTask.get_future();
 			mapBuildingThread = boost::thread(boost::move(boost::ref(mapBuildingTask)));
 			mapBuildingInProgress = true;
-			#else // BOOST_VERSION >= 104100
-			ROS_INFO("Adding new points to the map");
-			setMap(updateMap( newPointCloud.release(), Ticp, true));
-			#endif // BOOST_VERSION >= 104100
 		}
 	}
 	catch (PM::ConvergenceError error)
 	{
-		ROS_ERROR_STREAM("ICP failed to converge: " << error.what());
+		ROS_ERROR_STREAM("[ICP] failed to converge: " << error.what());
 		return;
 	}
 	
@@ -591,7 +583,7 @@ void Mapper::processNewMapIfAvailable()
 	#if BOOST_VERSION >= 104100
 	if (mapBuildingInProgress && mapBuildingFuture.has_value())
 	{
-		ROS_INFO_STREAM("New map available");
+		ROS_INFO_STREAM("[MAP] Computation in thread done");
 		setMap(mapBuildingFuture.get());
 		mapBuildingInProgress = false;
 	}
@@ -610,22 +602,18 @@ void Mapper::setMap(DP* newPointCloud)
 	icp.setMap(*mapPointCloud);
 	
 	
-	cerr << "publishing map" << endl;
 	// Publish map point cloud
 	// FIXME this crash when used without descriptor
 	if (mapPub.getNumSubscribers())
+	{
+		ROS_INFO_STREAM("[MAP] publishing " << mapPointCloud->getNbPoints() << " points");
 		mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud, mapFrame, mapCreationTime));
+	}
 }
 
 Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParameters Ticp, bool updateExisting)
 {
 	timer t;
-
-	// FIXME: those are parameters
-	//const float priorStatic = 0.8; // ICRA 2014
-	//const float priorDyn = 0.2; // ICRA 2014
-	//const float priorStatic = 0.4; // ISER 2014
-	//const float priorDyn = 0.6; // ISER 2014
 
 
 	// Prepare empty field if not existing
@@ -646,10 +634,9 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 		newPointCloud->addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, newPointCloud->features.cols()));
 	}
 
-	if (!updateExisting)
+	if (!updateExisting) //TODO change to initialMap
 	{
-		// FIXME: correct that, ugly
-		cout << "Jumping map creation" << endl;
+		ROS_INFO_STREAM( "[MAP] Initial map, only filtering points");
 		*newPointCloud = transformation->compute(*newPointCloud, Ticp); 
 		mapPostFilters.apply(*newPointCloud);
 		return newPointCloud;
@@ -669,8 +656,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	for(int i=0; i<readPtsCount; i++)
 	{
 		const float ratio = newPointCloud->features(2,i)/radius_reading(0,i);
-		//if(ratio < -1 || ratio > 1)
-			//cout << "Error angle!" << endl;
 
 		angles_reading(0,i) = acos(ratio);
 		angles_reading(1,i) = atan2(newPointCloud->features(1,i), newPointCloud->features(0,i));
@@ -709,8 +694,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	for(int i=0; i<mapCutPtsCount; i++)
 	{
 		const float ratio = mapLocalFrameCut.features(2,i)/radius_map(0,i);
-		//if(ratio < -1 || ratio > 1)
-			//cout << "Error angle!" << endl;
 
 		angles_map(0,i) = acos(ratio);
 
@@ -724,8 +707,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	featureNNS->knn(angles_map, ids, dists, 1, 0, NNS::ALLOW_SELF_MATCH, maxAngle);
 
 	// Define views on descriptors
-	//DP::View viewOn_normals_overlap = newPointCloud->getDescriptorViewByName("normals");
-	//DP::View viewOn_obsDir_overlap = newPointCloud->getDescriptorViewByName("observationDirections");
 	DP::View viewOn_Msec_overlap = newPointCloud->getDescriptorViewByName("stamps_Msec");
 	DP::View viewOn_sec_overlap = newPointCloud->getDescriptorViewByName("stamps_sec");
 	DP::View viewOn_nsec_overlap = newPointCloud->getDescriptorViewByName("stamps_nsec");
@@ -756,19 +737,10 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 			const float delta = (readPt - mapPt).norm();
 			const float d_max = eps_a * readPt.norm();
 
-			//const double timeMap = viewOn_Msec_map(0,mapId)*10e5 + viewOn_sec_map(0,mapId) + viewOn_nsec_map(0,mapId)*10e-10;
-			//const double timeRead = viewOn_Msec_overlap(0,readId)*10e5 + viewOn_sec_overlap(0,readId) + viewOn_nsec_overlap(0,readId)*10e-10;
-			//const double deltaTime = timeRead - timeMap;
-
 			const Eigen::Vector3f normal_map = viewOn_normals_map.col(mapId);
-			//const Eigen::Vector3f normal_read = viewOn_normals_overlap.col(readId);
-			//const Eigen::Vector3f obsDir = viewOn_obsDir_overlap.col(readId);
-			//const float viewAngle = acos(normal_map.normalized().dot(obsDir.normalized()));
-			//const float normalAngle = acos(normal_map.normalized().dot(normal_read.normalized()));
 			
 			// Weight for dynamic elements
 			const float w_v = eps + (1 - eps)*fabs(normal_map.dot(mapPt_n));
-			//const float w_d1 = 1 + eps - acos(readPt.normalized().dot(mapPt_n))/maxAngle;
 			const float w_d1 =  eps + (1 - eps)*(1 - sqrt(dists(i))/maxAngle);
 			
 			
@@ -799,8 +771,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 				}
 			}
 
-			//cerr << "readPt.norm(): "<< readPt.norm()  << "mapPt.norm(): "<< mapPt.norm() << ", w_p2: " << w_p2 << ", w_d2: " << w_d2 << endl;
-		
 
 			// We don't update point behind the reading
 			if((readPt.norm() + eps_d + d_max) >= mapPt.norm())
@@ -811,16 +781,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 				const float c1 = (1 - (w_v*(1 - w_d1)));
 				const float c2 = w_v*(1 - w_d1);
 				
-
-				//viewOnProbabilityDynamic(0,mapId) += (w_v + w_d2) * w_d1/2;
-				//viewOnProbabilityDynamic(0,mapId) += (w_v * w_d2);
-				
-				//viewOnProbabilityStatic(0, mapId) += (w_p2) * w_d1;
-				//viewOnProbabilityStatic(0, mapId) += w_p2;
-
-				// FIXME: this is a parameter
-				//const float maxDyn = 0.9; // ICRA 14
-				//const float maxDyn = 0.98; // ISER 14
 
 				//Lock dynamic point to stay dynamic under a threshold
 				if(lastDyn < maxDyn)
@@ -843,11 +803,10 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 				viewOnProbabilityDynamic(0,mapId) /= sumZ;
 				viewOnProbabilityStatic(0,mapId) /= sumZ;
 				
-				//viewOnDynamicRatio(0,mapId) =viewOnProbabilityDynamic(0, mapId);
 				viewOnDynamicRatio(0,mapId) = w_d2;
 
-				//viewOnDynamicRatio(0,mapId) =	w_d2;
 
+				//TODO use the new time structure
 				// Refresh time
 				viewOn_Msec_map(0,mapId) = viewOn_Msec_overlap(0,readId);	
 				viewOn_sec_map(0,mapId) = viewOn_sec_overlap(0,readId);	
@@ -857,8 +816,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 
 		}
 	}
-
-
 
 
 	// Generate temporary map for density computation
@@ -908,23 +865,15 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	//}
 
 	// Initialize descriptors
-	//no_overlap.addDescriptor("probabilityStatic", PM::Matrix::Zero(1, no_overlap.features.cols()));
 	no_overlap.addDescriptor("probabilityStatic", PM::Matrix::Constant(1, no_overlap.features.cols(), priorStatic));
-	//no_overlap.addDescriptor("probabilityDynamic", PM::Matrix::Zero(1, no_overlap.features.cols()));
 	no_overlap.addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, no_overlap.features.cols(), priorDyn));
-
 	no_overlap.addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, no_overlap.features.cols()));
 
 	// shrink the newPointCloud to the new information
 	*newPointCloud = no_overlap;
 	
-
-	
 	// Correct new points using ICP result
 	*newPointCloud = transformation->compute(*newPointCloud, Ticp);
-	
-	
-	
 	
 	// Merge point clouds to map
 	newPointCloud->concatenate(*mapPointCloud);
@@ -995,7 +944,7 @@ bool Mapper::saveMap(map_msgs::SaveMap::Request &req, map_msgs::SaveMap::Respons
 		return false;
 	}
 	
-	ROS_INFO_STREAM("Map saved at " <<  req.filename.data << " with " << mapPointCloud->features.cols() << " points.");
+	ROS_INFO_STREAM("[MAP] saved at " <<  req.filename.data << " with " << mapPointCloud->features.cols() << " points.");
 	return true;
 }
 
@@ -1005,16 +954,18 @@ bool Mapper::loadMap(ethzasl_icp_mapper::LoadMap::Request &req, ethzasl_icp_mapp
 	
 	DP* cloud(new DP(DP::load(req.filename.data)));
 
+	// Print new map information
 	const int dim = cloud->features.rows();
 	const int nbPts = cloud->features.cols();
-	ROS_INFO_STREAM("Loading " << dim-1 << "D point cloud (" << req.filename.data << ") with " << nbPts << " points.");
+	ROS_INFO_STREAM("[MAP] Loading " << dim-1 << "D point cloud (" << req.filename.data << ") with " << nbPts << " points.");
 
-	ROS_INFO_STREAM("With descriptors:");
+	ROS_INFO_STREAM("  With descriptors:");
 	for(int i=0; i< cloud->descriptorLabels.size(); i++)
 	{
 		ROS_INFO_STREAM("    - " << cloud->descriptorLabels[i].text); 
 	}
 
+	//reset transformation
 	publishLock.lock();
 	TOdomToMap = PM::TransformationParameters::Identity(dim,dim);
 	
@@ -1137,7 +1088,7 @@ bool Mapper::getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethz
 		}
 	}
 
-	cerr << "Extract " << newPtCount << " points from the map" << endl;
+	ROS_INFO_STREAM("Extract " << newPtCount << " points from the map");
 	
 	cutPointCloud.conservativeResize(newPtCount);
 	cutPointCloud = transformation->compute(cutPointCloud, T.inverse()); 
