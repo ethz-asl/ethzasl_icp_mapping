@@ -26,6 +26,7 @@
 
 // Services
 #include "std_msgs/String.h"
+#include "std_msgs/Header.h"
 #include "std_srvs/Empty.h"
 #include "map_msgs/GetPointMap.h"
 #include "map_msgs/SaveMap.h"
@@ -69,10 +70,12 @@ class Mapper
 	ros::ServiceServer setModeSrv;
 	ros::ServiceServer getModeSrv;
 	ros::ServiceServer getBoundedMapSrv;
+	ros::ServiceServer reloadAllYamlSrv;
 
 	// Time
 	ros::Time mapCreationTime;
 	ros::Time lastPoinCloudTime;
+	int lastPointCloudSeq;
 
 	// libpointmatcher
 	PM::DataPointsFilters inputFilters;
@@ -150,6 +153,7 @@ protected:
 	
 	void publishLoop(double publishPeriod);
 	void publishTransform();
+	void loadExternalParameters();
 	
 	// Services
 	bool getPointMap(map_msgs::GetPointMap::Request &req, map_msgs::GetPointMap::Response &res);
@@ -160,6 +164,7 @@ protected:
 	bool setMode(ethzasl_icp_mapper::SetMode::Request &req, ethzasl_icp_mapper::SetMode::Response &res);
 	bool getMode(ethzasl_icp_mapper::GetMode::Request &req, ethzasl_icp_mapper::GetMode::Response &res);
 	bool getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethzasl_icp_mapper::GetBoundedMap::Response &res);
+	bool reloadallYaml(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 };
 
 Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
@@ -206,94 +211,26 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 		mapping = false;
 	if(mapping == true)
 		localizing = true;
-
+	
 	// set logger
 	if (getParam<bool>("useROSLogger", false))
 		PointMatcherSupport::setLogger(new PointMatcherSupport::ROSLogger);
 
-	// load configs
-	string configFileName;
-	if (ros::param::get("~icpConfig", configFileName))
-	{
-		ifstream ifs(configFileName.c_str());
-		if (ifs.good())
-		{
-			icp.loadFromYaml(ifs);
-		}
-		else
-		{
-			ROS_ERROR_STREAM("Cannot load ICP config from YAML file " << configFileName);
-			icp.setDefault();
-		}
-	}
-	else
-	{
-		ROS_INFO_STREAM("No ICP config file given, using default");
-		icp.setDefault();
-	}
-	if (getParam<bool>("useROSLogger", false))
-		PointMatcherSupport::setLogger(new PointMatcherSupport::ROSLogger);
-	
-	if (ros::param::get("~inputFiltersConfig", configFileName))
-	{
-		ifstream ifs(configFileName.c_str());
-		if (ifs.good())
-		{
-			inputFilters = PM::DataPointsFilters(ifs);
-		}
-		else
-		{
-			ROS_ERROR_STREAM("Cannot load input filters config from YAML file " << configFileName);
-		}
-	}
-	else
-	{
-		ROS_INFO_STREAM("No input filters config file given, not using these filters");
-	}
-	
-	if (ros::param::get("~mapPreFiltersConfig", configFileName))
-	{
-		ifstream ifs(configFileName.c_str());
-		if (ifs.good())
-		{
-			mapPreFilters = PM::DataPointsFilters(ifs);
-		}
-		else
-		{
-			ROS_ERROR_STREAM("Cannot load map pre-filters config from YAML file " << configFileName);
-		}
-	}
-	else
-	{
-		ROS_INFO_STREAM("No map pre-filters config file given, not using these filters");
-	}
-	
-	if (ros::param::get("~mapPostFiltersConfig", configFileName))
-	{
-		ifstream ifs(configFileName.c_str());
-		if (ifs.good())
-		{
-			mapPostFilters = PM::DataPointsFilters(ifs);
-		}
-		else
-		{
-			ROS_ERROR_STREAM("Cannot load map post-filters config from YAML file " << configFileName);
-		}
-	}
-	else
-	{
-		ROS_INFO_STREAM("No map post-filters config file given, not using these filters");
-	}
+	// Load all parameters stored in external files
+	loadExternalParameters();
 
-	// topics and services initialization
+	// topic initializations
 	if (getParam<bool>("subscribe_scan", true))
 		scanSub = n.subscribe("scan", inputQueueSize, &Mapper::gotScan, this);
 	if (getParam<bool>("subscribe_cloud", true))
 		cloudSub = n.subscribe("cloud_in", inputQueueSize, &Mapper::gotCloud, this);
+
 	mapPub = n.advertise<sensor_msgs::PointCloud2>("point_map", 2, true);
 	outlierPub = n.advertise<sensor_msgs::PointCloud2>("outliers", 2, true);
 	odomPub = n.advertise<nav_msgs::Odometry>("icp_odom", 50, true);
 	odomErrorPub = n.advertise<nav_msgs::Odometry>("icp_error_odom", 50, true);
+	
+	// service initializations
 	getPointMapSrv = n.advertiseService("dynamic_point_map", &Mapper::getPointMap, this);
 	saveMapSrv = pn.advertiseService("save_map", &Mapper::saveMap, this);
 	loadMapSrv = pn.advertiseService("load_map", &Mapper::loadMap, this);
@@ -302,6 +239,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	setModeSrv = pn.advertiseService("set_mode", &Mapper::setMode, this);
 	getModeSrv = pn.advertiseService("get_mode", &Mapper::getMode, this);
 	getBoundedMapSrv = pn.advertiseService("get_bounded_map", &Mapper::getBoundedMap, this);
+	reloadAllYamlSrv= pn.advertiseService("reload_all_yaml", &Mapper::reloadallYaml, this);
 
 	// refreshing tf transform thread
 	publishThread = boost::thread(boost::bind(&Mapper::publishLoop, this, tfRefreshPeriod));
@@ -344,6 +282,14 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 	if(localizing)
 	{
 		unique_ptr<DP> cloud(new DP(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloudMsgIn)));
+
+		// TEST for UTIAS work on velodyne
+		// TODO: move that to a libpointmatcher filter
+		if(cloud->getNbPoints() >= 60000)
+		{
+			cloud->features = cloud->features.leftCols(38000);
+			cloud->descriptors= cloud->descriptors.leftCols(38000);
+		}
 		processCloud(move(cloud), cloudMsgIn.header.frame_id, cloudMsgIn.header.stamp, cloudMsgIn.header.seq);
 	}
 }
@@ -569,6 +515,8 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	
 	//Statistics about time and real-time capability
 	int realTimeRatio = 100*t.elapsed() / (stamp.toSec()-lastPoinCloudTime.toSec());
+	realTimeRatio *= seq - lastPointCloudSeq;
+
 	ROS_INFO_STREAM("[TIME] Total ICP took: " << t.elapsed() << " [s]");
 	if(realTimeRatio < 80)
 		ROS_INFO_STREAM("[TIME] Real-time capability: " << realTimeRatio << "%");
@@ -576,6 +524,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		ROS_WARN_STREAM("[TIME] Real-time capability: " << realTimeRatio << "%");
 
 	lastPoinCloudTime = stamp;
+	lastPointCloudSeq = seq;
 }
 
 void Mapper::processNewMapIfAvailable()
@@ -1096,6 +1045,90 @@ bool Mapper::getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethz
 	
 	// Send the resulting point cloud in ROS format
 	res.boundedMap = PointMatcher_ros::pointMatcherCloudToRosMsg<float>(cutPointCloud, mapFrame, ros::Time::now());
+	return true;
+}
+
+void Mapper::loadExternalParameters()
+{
+	
+	// load configs
+	string configFileName;
+	if (ros::param::get("~icpConfig", configFileName))
+	{
+		ifstream ifs(configFileName.c_str());
+		if (ifs.good())
+		{
+			icp.loadFromYaml(ifs);
+		}
+		else
+		{
+			ROS_ERROR_STREAM("Cannot load ICP config from YAML file " << configFileName);
+			icp.setDefault();
+		}
+	}
+	else
+	{
+		ROS_INFO_STREAM("No ICP config file given, using default");
+		icp.setDefault();
+	}
+	
+	if (ros::param::get("~inputFiltersConfig", configFileName))
+	{
+		ifstream ifs(configFileName.c_str());
+		if (ifs.good())
+		{
+			inputFilters = PM::DataPointsFilters(ifs);
+		}
+		else
+		{
+			ROS_ERROR_STREAM("Cannot load input filters config from YAML file " << configFileName);
+		}
+	}
+	else
+	{
+		ROS_INFO_STREAM("No input filters config file given, not using these filters");
+	}
+	
+	if (ros::param::get("~mapPreFiltersConfig", configFileName))
+	{
+		ifstream ifs(configFileName.c_str());
+		if (ifs.good())
+		{
+			mapPreFilters = PM::DataPointsFilters(ifs);
+		}
+		else
+		{
+			ROS_ERROR_STREAM("Cannot load map pre-filters config from YAML file " << configFileName);
+		}
+	}
+	else
+	{
+		ROS_INFO_STREAM("No map pre-filters config file given, not using these filters");
+	}
+	
+	if (ros::param::get("~mapPostFiltersConfig", configFileName))
+	{
+		ifstream ifs(configFileName.c_str());
+		if (ifs.good())
+		{
+			mapPostFilters = PM::DataPointsFilters(ifs);
+		}
+		else
+		{
+			ROS_ERROR_STREAM("Cannot load map post-filters config from YAML file " << configFileName);
+		}
+	}
+	else
+	{
+		ROS_INFO_STREAM("No map post-filters config file given, not using these filters");
+	}
+}
+
+bool Mapper::reloadallYaml(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+{
+	loadExternalParameters();	
+	ROS_INFO_STREAM("Parameters reloaded");
+
 	return true;
 }
 

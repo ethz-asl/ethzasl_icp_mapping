@@ -1,5 +1,5 @@
 - FixStepSamplingDataPointsFilter:
-    startStep: 12
+    startStep: 3
 #- RandomSamplingDataPointsFilter:
 #    prob: 0.2
 - SurfaceNormalDataPointsFilter:
@@ -8,7 +8,7 @@
     keepNormals: 1
     keepDensities: 1
 - MaxDensityDataPointsFilter:
-    maxDensity: 80.0
+    maxDensity: 50.0
 - SimpleSensorNoiseDataPointsFilter:
     sensorType: 0
 - ObservationDirectionDataPointsFilter

@@ -17,7 +17,7 @@ referenceDataPointsFilters:
 matcher:
   KDTreeMatcher:
     knn: 3
-    maxDist: 10.0
+    maxDist: 2.0
     epsilon: 1
 
 outlierFilters:

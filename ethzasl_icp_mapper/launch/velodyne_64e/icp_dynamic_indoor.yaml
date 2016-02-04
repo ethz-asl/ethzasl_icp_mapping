@@ -20,7 +20,7 @@ referenceDataPointsFilters:
 
 matcher:
   KDTreeMatcher:
-    knn: 1
+    knn: 3
     maxDist: 50.0
     epsilon: 1
 
@@ -29,14 +29,15 @@ outlierFilters:
      ratio: 0.9
   - SurfaceNormalOutlierFilter:
      maxAngle: 0.75
-  - GenericDescriptorOutlierFilter:
-     source: reference
-     descName: probabilityStatic
-     threshold: 0.4
+#  - GenericDescriptorOutlierFilter:
+#     source: reference
+#     descName: probabilityStatic
+#     threshold: 0.4
 #     useSoftThreshold: 1
 
 errorMinimizer:
-  PointToPlaneErrorMinimizer
+  PointToPlaneErrorMinimizer:
+    force2D: 1
 
 transformationCheckers:
   - DifferentialTransformationChecker:
