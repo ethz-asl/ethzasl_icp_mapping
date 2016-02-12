@@ -16,7 +16,7 @@
 		<param name="inputQueueSize" value="1" />
 		<param name="tfRefreshPeriod" value="0.005" />
 		<param name="minOverlap" value="0.2" /> 
-		<param name="maxOverlapToMerge" value="0.95" /> <!--0.78 or 0.90-->
+		<param name="maxOverlapToMerge" value="0.90" /> <!--0.78 or 0.95-->
 		<param name="minReadingPointCount" value="1000" /> 
 		<param name="minMapPointCount" value="500" /> <!-- quick fix to have map published each time -->
 		<param name="localizing" value="true" /> 
@@ -32,9 +32,8 @@
 		<param name="alpha" value="0.99"/>
 		<param name="beta" value="0.90"/>
 		<param name="maxDyn" value="0.90"/>
-		<param name="maxDistNewPoint" value="0.2"/> <!--0.4 Good for outside-->
-		<!--param name="maxDistNewPoint" value="0.05"/--> <!--Good for inside-->
-		<param name="sensorMaxRange" value="50.0"/>
+		<param name="maxDistNewPoint" value="0.2"/> <!--0.2 Good for outside-->
+		<param name="sensorMaxRange" value="100.0"/>
 
 	</node>
 	

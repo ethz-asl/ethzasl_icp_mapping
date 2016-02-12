@@ -21,7 +21,7 @@ referenceDataPointsFilters:
 matcher:
   KDTreeMatcher:
     knn: 3
-    maxDist: 50.0
+    maxDist: 2.0
     epsilon: 1
 
 outlierFilters:
@@ -37,7 +37,7 @@ outlierFilters:
 
 errorMinimizer:
   PointToPlaneErrorMinimizer:
-    force2D: 1
+    force2D: 1 
 
 transformationCheckers:
   - DifferentialTransformationChecker:
