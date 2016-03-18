@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>ethzasl_icp_mapper</name>
+  <version>0.0.1</version>
+  <description>
+     2D/3D mapper based on libpointmatcher (http://github.com/ethz-asl/libpointmatcher)
+  </description>
+  <maintainer email="duboisf@ethz.ch">fabio dubois</maintainer>
+  <author>François Pomerleau and Stéphane Magnenat</author>
+  <license>BSD</license>
+  <url>http://ros.org/wiki/ethzasl_icp_mapper</url>
+  
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>catkin_simple</buildtool_depend>
+  
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
+  <depend>rosbag</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>tf</depend>
+  <depend>tf_conversions</depend>
+  <depend>message_filters</depend>
+  <depend>map_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>interactive_markers</depend>
+  <depend>yaml_cpp_catkin</depend>
+  <depend>eigen_catkin</depend>
+  
+  <depend>libnabo</depend>
+  <depend>libpointmatcher</depend>
+  <depend>libpointmatcher_ros</depend>
+  <depend>ethzasl_gridmap_2d</depend>
+  
+  <!-- <rosdep name="libargtable2-dev"/> -->
+  
+</package>

@@ -48,12 +48,20 @@ namespace PointMatcherSupport
 		writeRosLog(ros::console::levels::Warn, file, line, func, _warningStream.str());
 	}
 	
+//	void ROSLogger::writeRosLog(ros::console::Level level, const char* file, int line, const char *func, const std::string& text)
+//	{
+//		ROSCONSOLE_DEFINE_LOCATION(true, level, ROSCONSOLE_DEFAULT_NAME);
+//		if (enabled)
+//			ros::console::print(0, loc.logger_, loc.level_, file, line, func, "%s", text.c_str());
+//	}
 	void ROSLogger::writeRosLog(ros::console::Level level, const char* file, int line, const char *func, const std::string& text)
-	{
-		ROSCONSOLE_DEFINE_LOCATION(true, level, ROSCONSOLE_DEFAULT_NAME);
-		if (enabled)
-			ros::console::print(0, loc.logger_, loc.level_, file, line, func, "%s", text.c_str());
-	}
+	  {
+	    ROSCONSOLE_DEFINE_LOCATION(true, level, ROSCONSOLE_DEFAULT_NAME);
+	        if (__rosconsole_define_location__enabled)
+	      ros::console::print(0, __rosconsole_define_location__loc.logger_,
+	        __rosconsole_define_location__loc.level_, file, line, func, "%s", text.c_str());
+	  }
+
 };
 
 #endif // __ROS_LOGGER_H

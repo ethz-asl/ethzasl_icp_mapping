@@ -1,0 +1,19 @@
+<!-- 
+-->
+
+<launch>
+  <node name="dynamic_trails" type="dynamic_trails" pkg="ethzasl_icp_mapper" output="screen" > 
+		<remap from="cloud_in" to="/obstacle_cloud2" />
+		<param name="map_frame" value="/map" />
+		<param name="inputFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/artor/input_trail_filters.yaml" />
+    <param name="min_dynamic_ratio" value="0.90"/>
+    <param name="normal_space_factor" value="1.0"/>
+    <param name="max_velocity" value="12.0"/>
+    <param name="input_rate" value="-1"/><!--if -1, take all--><!--1.5-->
+    <param name="window_size" value="3"/>
+    <param name="trail_filename" value="trailMap.vtk"/>
+    <param name="accumulate_markers" value="true"/>
+    <param name="max_global_map_dist" value="0.75"/><!--0.5-->
+ </node>
+  
+</launch>

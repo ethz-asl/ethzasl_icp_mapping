@@ -1,4 +1,8 @@
 cmake_minimum_required(VERSION 2.4.6)
+project(ethzasl_icp_mapping)
+find_package(catkin REQUIRED)
+catkin_metapackage()
+
 include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 # Append to CPACK_SOURCE_IGNORE_FILES a semicolon-separated list of
@@ -13,5 +17,3 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 # properly.  CMake 2.4 seems to have unpredictable scoping rules for such
 # variables.
 #list(APPEND CPACK_SOURCE_IGNORE_FILES /core/experimental)
-
-rosbuild_make_distribution(0.9.5)

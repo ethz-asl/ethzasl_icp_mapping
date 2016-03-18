@@ -1,4 +1,11 @@
 cmake_minimum_required(VERSION 2.4.6)
+project(ethzasl_icp_mapper)
+
+find_package(catkin_simple REQUIRED)
+catkin_simple(ALL_DEPS_REQUIRED)
+
+add_definitions(-DHAVE_YAML_CPP)
+
 include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 # Set the build type.  Options are:
@@ -9,10 +16,7 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
 set(ROS_BUILD_TYPE RelWithDebInfo)
 
-rosbuild_init()
-
-rosbuild_genmsg()
-rosbuild_gensrv()
+#generate_messages()
 
 # c++ 0x
 #if("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang") 
@@ -35,38 +39,58 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 # - N2672: Initializer lists (gcc)
 # - N1984: auto-typed variables (gcc, clang)
 
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
-set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-add_definitions(-DHAVE_YAML_CPP)
+#############
+# LIBRARIES #
+#############
 
-rosbuild_add_boost_directories()
 
-rosbuild_add_executable(matcher_service src/matcher_service.cpp)
+############
+# BINARIES #
+############
+cs_add_executable(matcher_service
+  src/matcher_service.cpp
+)
 target_link_libraries(matcher_service ${EXTRA_LIBS} rt yaml-cpp)
 
-rosbuild_add_executable(occupancy_grid_builder src/occupancy_grid_builder.cpp)
+cs_add_executable(occupancy_grid_builder
+  src/occupancy_grid_builder.cpp
+)
 target_link_libraries(occupancy_grid_builder ${EXTRA_LIBS} yaml-cpp)
 
-rosbuild_add_executable(mapper src/mapper.cpp)
-rosbuild_link_boost(mapper filesystem system)
-target_link_libraries(mapper ${EXTRA_LIBS} argtable2 rt yaml-cpp)
+
+#include_directories(${Boost_INCLUDE_DIRS}); 
+
+cs_add_executable(mapper
+  src/mapper.cpp
+)
+target_link_libraries(mapper ${catkin_LIBRARIES})
+
+cs_add_executable(map_maintainer
+  src/map_maintainer.cpp
+)
+target_link_libraries(map_maintainer ${catkin_LIBRARIES})
+
+#cs_add_executable(interact_mapper
+#  src/interact_mapper.cpp
+#)
+#target_link_libraries(interact_mapper ${catkin_LIBRARIES})
+
+cs_add_executable(dynamic_mapper
+  src/dynamic_mapper.cpp
+)
+target_link_libraries(dynamic_mapper ${catkin_LIBRARIES})
+
+cs_add_executable(dynamic_trails
+  src/dynamic_trails.cpp
+)
+target_link_libraries(dynamic_trails ${catkin_LIBRARIES})
 
 
-rosbuild_add_executable(map_maintainer src/map_maintainer.cpp)
-rosbuild_link_boost(map_maintainer filesystem system signals)
-target_link_libraries(map_maintainer ${EXTRA_LIBS} argtable2 rt yaml-cpp)
 
-rosbuild_add_executable(interact_mapper src/interact_mapper.cpp)
-rosbuild_link_boost(interact_mapper filesystem system signals)
-target_link_libraries(interact_mapper ${EXTRA_LIBS} argtable2 rt yaml-cpp)
-
-rosbuild_add_executable(dynamic_mapper src/dynamic_mapper.cpp)
-rosbuild_link_boost(dynamic_mapper filesystem system)
-target_link_libraries(dynamic_mapper ${EXTRA_LIBS} argtable2 rt yaml-cpp)
-
-rosbuild_add_executable(dynamic_trails src/dynamic_trails.cpp)
-rosbuild_link_boost(dynamic_trails filesystem system signals)
-target_link_libraries(dynamic_trails ${EXTRA_LIBS} argtable2 rt yaml-cpp)
-
+##########
+# EXPORT #
+##########
+cs_install()
+cs_export()
 

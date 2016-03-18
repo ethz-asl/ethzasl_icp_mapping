@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>libpointmatcher_ros</name>
+  <version>0.0.1</version>
+  <description>
+  	Bridge between libpointmatcher and ROS.
+  </description>
+  <maintainer email="duboisf@ethz.ch">fabio dubois</maintainer>
+  <author>Stéphane Magnenat</author>
+  <license>BSD</license>
+  <url>http://ros.org/wiki/libpointmatcher_ros</url>
+    
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>catkin_simple</buildtool_depend>
+  
+  <depend>roscpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>tf</depend>
+  <depend>tf_conversions</depend>
+  <depend>eigen_conversions</depend>
+  <depend>libpointmatcher</depend>
+  <depend>libnabo</depend>
+  <!--<depend>yaml_cpp_catkin</depend>-->
+  <depend>eigen_catkin</depend>
+  
+  <export>
+    <cpp cflags="-I${prefix}/include" lflags="-L${prefix}/lib -Wl,-rpath,${prefix}/lib -llibpointmatcher_ros" />
+  </export>
+</package>

@@ -525,7 +525,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	}
 	catch(tf::ExtrapolationException e)
 	{
-		ROS_ERROR_STREAM("Extrapolation Exception. stamp = "<< stamp << " now = " << ros::Time::now() << " delta = " << ros::Time::now() - stamp << endl << e.what() );
+		ROS_ERROR_STREAM("Extrapolation Exception. sf=" << scannerFrame << ", stamp = "<< stamp << " now = " << ros::Time::now() << " delta = " << ros::Time::now() - stamp << endl << e.what() );
 		return;
 	}
 

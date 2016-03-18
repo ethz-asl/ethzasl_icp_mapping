@@ -1,0 +1,9 @@
+<launch>
+
+	<node pkg="rosbag" type="play" name="player" output="screen" args="/home/fabio/Documents/ASL-Lidar/data/velodyne/2016-03-11/2016-03-11-12-11-53.bag" />
+
+	<node pkg="rviz" type="rviz" name="visualization" output="screen" respawn="true" args="-d /home/fabio/Documents/ASL-Lidar/data/velodyne/rvis/velodyne16.rviz" />
+
+	<node name="mapper" type="matcher_service" pkg="ethzasl_icp_mapper" output="screen" />
+	
+</launch>

@@ -1,4 +1,11 @@
 cmake_minimum_required(VERSION 2.4.6)
+project(libpointmatcher_ros)
+
+find_package(catkin_simple REQUIRED)
+catkin_simple(ALL_DEPS_REQUIRED)
+
+add_definitions(-DHAVE_YAML_CPP)
+
 include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 # Set the build type.  Options are:
@@ -8,8 +15,6 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
 set(ROS_BUILD_TYPE RelWithDebInfo)
-
-rosbuild_init()
 
 # c++ 0x
 #if("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang") 
@@ -30,15 +35,23 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 # It must support (compiler support in parenthesis):
 # - N1984: auto-typed variables (gcc, clang)
 
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
-set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-find_package(roscpp)
+#############
+# LIBRARIES #
+#############
+cs_add_library(pointmatcher_ros
+  src/point_cloud.cpp
+  src/transform.cpp
+)
+target_link_libraries(pointmatcher_ros ${catkin_LIBRARIES})
 
-find_package(Eigen REQUIRED)
-include_directories(${Eigen_INCLUDE_DIRS})
+############
+# BINARIES #
+############
 
-add_definitions(-DHAVE_YAML_CPP)
 
-rosbuild_add_boost_directories()
-rosbuild_add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)
+##########
+# EXPORT #
+##########
+cs_install()
+cs_export()

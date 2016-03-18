@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>ethzasl_icp_mapping</name>
+  <version>0.0.1</version>
+  <description>
+    3d mapping tools for robotic applications
+  </description>
+  <maintainer email="duboisf@ethz.ch">fabio dubois</maintainer>
+  <author>françois pomerleau and stéphane magnenat</author>
+  <license>bsd</license>  
+  <url>http://ros.org/wiki/ethzasl_mapping</url>
+  
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>catkin_simple</buildtool_depend>
+
+    
+  <export>
+    <metapackage/>
+  </export>
+</package>
