@@ -17,10 +17,10 @@ and for libpointmatcher commit e048c4d1180b1de005af072bf137ea4d8cf2b826
 	<!--
 	<node pkg="rviz" type="rviz" name="visualization" output="screen" respawn="true" args="-d /home/fabio/Documents/ASL-Lidar/data/velodyne/rvis/velodyne16.rviz" />
 	-->
-
-    <node pkg="tf" type="static_transform_publisher" name="link1_broadcaster" args="0 0 0 0 0 0 1 odom velodyne 100" />
-
 <!--
+    <node pkg="tf" type="static_transform_publisher" name="link1_broadcaster" args="0 0 0 0 0 0 1 odom velodyne 100" />
+-->
+
 	<node name="mapper" type="dynamic_mapper" pkg="ethzasl_icp_mapper" output="screen" >
 		
 		<param name="subscribe_scan" value="false"/>
@@ -33,7 +33,7 @@ and for libpointmatcher commit e048c4d1180b1de005af072bf137ea4d8cf2b826
 		<param name="mapPostFiltersConfig" value="$(find ethzasl_icp_mapper)/cfg/map_post_filters.yaml" />
 		
 
-		<param name="odom_frame" value="/odom"/>
+		<param name="odom_frame" value="/velodyne"/>
 		<param name="map_frame" value="/map" />
 
 		<param name="useROSLogger" value="false" />
@@ -57,5 +57,5 @@ and for libpointmatcher commit e048c4d1180b1de005af072bf137ea4d8cf2b826
 		<param name="maxDistNewPoint" value="0.7"/>
 		<param name="sensorMaxRange" value="60.0"/>
 	</node>
--->
+
 </launch>
