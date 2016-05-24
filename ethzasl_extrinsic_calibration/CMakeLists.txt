@@ -42,3 +42,9 @@ target_link_libraries(tf_logger ${catkin_LIBRARIES})
 add_executable(optimize src/optimize.cpp)
 target_link_libraries(tf_logger ${catkin_LIBRARIES})
 
+# Mark executables and/or libraries for installation
+install(TARGETS tf_logger optimize
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
