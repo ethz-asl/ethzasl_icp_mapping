@@ -54,3 +54,17 @@ include_directories(include)
 add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)
 include_directories(${catkin_INCLUDE_DIRS})
 target_link_libraries(pointmatcher_ros ${catkin_LIBRARIES})
+
+# Mark executables and/or libraries for installation
+install(TARGETS pointmatcher_ros
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+# Mark cpp header files for installation
+install(DIRECTORY include/pointmatcher_ros/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.h"
+  PATTERN ".svn" EXCLUDE
+)
