@@ -1,0 +1,5 @@
+- CutAtDescriptorThresholdDataPointsFilter:
+    descName: probabilityStatic
+    useLargerThan: 0
+    threshold: 0.2
+

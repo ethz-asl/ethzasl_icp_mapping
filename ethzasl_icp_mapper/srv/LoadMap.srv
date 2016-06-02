@@ -1,5 +1,2 @@
 std_msgs/String filename
-std_msgs/Bool use2DMap
-std_msgs/Bool useTOdomToMap
-nav_msgs/Odometry odom
 ---
