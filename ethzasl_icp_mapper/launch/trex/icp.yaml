@@ -7,12 +7,12 @@ readingDataPointsFilters:
 matcher:
   KDTreeMatcher:
     maxDist: 4.0
-    knn: 1
-    epsilon: 1.0
+    knn: 3
+    epsilon: 0.0
 
 outlierFilters:
   - TrimmedDistOutlierFilter:
-     ratio: 0.95
+     ratio: 0.8
   - SurfaceNormalOutlierFilter:
      maxAngle: 0.42
 #  - GenericDescriptorOutlierFilter:
@@ -36,7 +36,11 @@ transformationCheckers:
       maxTranslationNorm: 15.00
 
 inspector:
-# VTKFileInspector
+# VTKFileInspector:
+#   dumpIterationInfo: 1
+#   dumpDataLinks: 1
+#   dumpReading: 1
+#   dumpReference: 1
  NullInspector
 
 logger:

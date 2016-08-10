@@ -49,6 +49,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 add_definitions(-DHAVE_YAML_CPP)
+add_definitions(-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG)
 include_directories(include)
 
 add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)

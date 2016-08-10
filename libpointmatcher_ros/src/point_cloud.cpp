@@ -28,8 +28,6 @@ namespace PointMatcher_ros
 		if (rosMsg.fields.empty())
 			return DataPoints();
 		
-		ROS_INFO("!!!!!!!!!!!! rosMsgToPointMatcherCloud called !!!!!!!!!!!!!!!!");
-
 
 		// fill labels
 		// conversions of descriptor fields from pcl
@@ -351,6 +349,7 @@ namespace PointMatcher_ros
 
       // the turn ratio correct for the fact that not all sensor scan
       // continuously during 360 deg 
+			//TODO: check that. FP
       const float turnRatio = (rosMsg.angle_max - rosMsg.angle_min)/(2*M_PI);
       // dt_point should be more precise than rosMsg.time_increment
       const float dt_point = (rosMsg.scan_time*turnRatio)/rosMsg.ranges.size();
@@ -440,6 +439,7 @@ namespace PointMatcher_ros
 			}
 		}
 
+		// Fill time
     if(addTimestamps)
     {
 			auto is(cloud.getTimeViewByName("time"));
@@ -447,8 +447,24 @@ namespace PointMatcher_ros
 			for (size_t i = 0; i < ranges.size(); ++i)
       {
         const ros::Time curTime(rosMsg.header.stamp + ros::Duration(ids[i] * rosMsg.time_increment));
+				//const boost::posix_time::ptime t = curTime.toBoost();
+				//const boost::posix_time::ptime epoch = boost::posix_time::from_time_t(0);
+				//const boost::posix_time::time_duration duration = t - epoch;
+				const boost::posix_time::time_duration duration = boost::posix_time::seconds(curTime.sec) + boost::posix_time::nanoseconds(curTime.nsec);
 
-				is(0,i) = (((boost::int64_t) curTime.sec) << 32) | ((boost::int64_t) curTime.nsec);
+				//if(i == 0)
+				//{
+				//	ROS_INFO_STREAM("sec: " << curTime.sec << " nsec: " << curTime.nsec);
+				//	ROS_INFO_STREAM("time:  " << duration.ticks());
+				//	const uint32_t high32 = (uint32_t) (duration.ticks() >> 32);
+				//	const uint32_t low32  = (uint32_t) duration.ticks();
+				//	ROS_INFO_STREAM("high32: " <<  high32 <<  " low32: " << low32);
+				//	const boost::int64_t newTime = (((boost::int64_t) high32) << 32) | ((boost::int64_t) low32);
+				//	ROS_INFO_STREAM("reconstructed: " << newTime);
+				//}
+
+				is(0,i) = duration.ticks();
+				//is(0,i) = (((boost::int64_t) curTime.sec) << 32) | ((boost::int64_t) curTime.nsec);
 
 				// reverse conversion
 				//const uint32_t nsec = (uint32_t) is(0,i);
