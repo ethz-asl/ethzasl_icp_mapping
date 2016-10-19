@@ -51,6 +51,8 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
+add_definitions(-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG)
+
 include_directories(${catkin_INCLUDE_DIRS})
 
 add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)

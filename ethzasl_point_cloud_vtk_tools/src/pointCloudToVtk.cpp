@@ -27,6 +27,7 @@ class ExportVtk
 
     ros::NodeHandle& n;
 
+		// Parameters
     ros::Subscriber cloudSub;
     const string cloudTopic;
     const string mapFrame;
@@ -34,6 +35,8 @@ class ExportVtk
     const string outputPath;
     string outputPrefix;
     string outputExtension;
+		const bool usedAsGlobalShutter;
+		const bool outputSuffixTimestamp;
 
     tf::TransformListener tf_listener;
     std::shared_ptr<PM::Transformation> transformation;
@@ -53,6 +56,8 @@ ExportVtk::ExportVtk(ros::NodeHandle& n):
     outputPath(getParam<string>("outputPath", "")),
     outputPrefix(getParam<string>("outputPrefix", "")),
     outputExtension(getParam<string>("outputExtension", ".vtk")),
+    usedAsGlobalShutter(getParam<bool>("usedAsGlobalShutter", "false")),
+    outputSuffixTimestamp(getParam<bool>("outputSuffixTimestamp", "false")),
     transformation(PM::get().TransformationRegistrar.create("RigidTransformation"))
 {
     if(outputPrefix.empty())
@@ -92,7 +97,27 @@ void ExportVtk::validateOutputExtension()
 
 void ExportVtk::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 {
-    const DP inCloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloudMsgIn));
+		const boost::posix_time::time_duration duration = boost::posix_time::seconds(cloudMsgIn.header.stamp.sec) + boost::posix_time::nanoseconds(cloudMsgIn.header.stamp.nsec);
+
+    DP inCloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloudMsgIn));
+
+		// Assumes the frame_id to be in sensor frame and that all points were recorded at the same time
+		if(usedAsGlobalShutter)
+		{
+			const int nbPts = inCloud.getNbPoints();
+
+			// assumes that the origine is at (0,0,0)
+			PM::Matrix observationDirections = -inCloud.features.topRows(3);
+
+			// Time
+
+			PM::Int64Matrix time = PM::Int64Matrix::Constant(1, nbPts, duration.ticks());
+
+			// Add new field to current point cloud
+			inCloud.addDescriptor("observationDirections", observationDirections);
+			inCloud.addTime("time", time);
+
+		}
 
     try
     {
@@ -105,10 +130,7 @@ void ExportVtk::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
             ROS_ERROR("I found no good points in the cloud");
             return;
         }
-        else
-        {
-            ROS_INFO("Saving cloud");
-        }
+        
 
         stringstream nameStream;
         if(outputPath.empty())
@@ -119,9 +141,19 @@ void ExportVtk::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
         {
             nameStream << outputPath;
         }
-        nameStream << outputPrefix << "_" << cloudMsgIn.header.seq << outputExtension;
+
+				if(outputSuffixTimestamp)
+				{
+        	nameStream << outputPrefix << "_" << duration.ticks() << outputExtension;
+				}
+				else
+				{
+        	nameStream << outputPrefix << "_" << cloudMsgIn.header.seq << outputExtension;
+				}
 
         outCloud.save(nameStream.str());
+				ROS_INFO_STREAM("Point cloud saved: " << nameStream.str());
+
         if(recordOnce)
         {
             ros::shutdown();
