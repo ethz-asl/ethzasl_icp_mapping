@@ -1,9 +1,28 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(ethzasl_icp_mapper)
 
-find_package(catkin REQUIRED roscpp rospy rosbag std_msgs geometry_msgs nav_msgs
-tf tf2 tf_conversions message_filters map_msgs libpointmatcher_ros visualization_msgs
-interactive_markers ethzasl_gridmap_2d message_generation libpointmatcher)
+find_package(catkin REQUIRED 
+roscpp 
+rospy 
+rosbag 
+std_msgs 
+geometry_msgs 
+nav_msgs
+tf 
+tf2 
+tf_conversions 
+message_filters 
+map_msgs 
+libpointmatcher_ros 
+visualization_msgs
+interactive_markers 
+ethzasl_gridmap_2d 
+message_generation 
+libpointmatcher
+)
+
+# This was tested for a system install of libpointmatcher
+find_package(libpointmatcher CONFIG)
 
 add_service_files( FILES
 CorrectPose.srv
@@ -56,34 +75,34 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 add_definitions(-DHAVE_YAML_CPP)
 
-include_directories(include ${catkin_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS} ${libpointmatcher_INCLUDE_DIRS})
 
 add_executable(matcher_service src/matcher_service.cpp)
 add_dependencies(matcher_service ${PROJECT_NAME}_gencpp)
-target_link_libraries(matcher_service ${catkin_LIBRARIES})
+target_link_libraries(matcher_service ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
 
 add_executable(occupancy_grid_builder src/occupancy_grid_builder.cpp)
 add_dependencies(occupancy_grid_builder ${PROJECT_NAME}_gencpp)
-target_link_libraries(occupancy_grid_builder ${catkin_LIBRARIES} ${EXTRA_LIBS})
+target_link_libraries(occupancy_grid_builder ${catkin_LIBRARIES} ${EXTRA_LIBS} ${libpointmatcher_LIBRARIES})
 
 add_executable(mapper src/mapper.cpp)
 add_dependencies(mapper ${PROJECT_NAME}_gencpp)
-target_link_libraries(mapper ${catkin_LIBRARIES})
+target_link_libraries(mapper ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
 
 add_executable(map_maintainer src/map_maintainer.cpp )
 add_dependencies(map_maintainer ${PROJECT_NAME}_gencpp)
-target_link_libraries(map_maintainer ${catkin_LIBRARIES})
+target_link_libraries(map_maintainer ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
 
 add_executable(interact_mapper src/interact_mapper.cpp )
 add_dependencies(interact_mapper ${PROJECT_NAME}_gencpp)
-target_link_libraries(interact_mapper ${catkin_LIBRARIES})
+target_link_libraries(interact_mapper ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
 
 add_executable(dynamic_mapper src/dynamic_mapper.cpp )
 add_dependencies(dynamic_mapper ${PROJECT_NAME}_gencpp)
-target_link_libraries(dynamic_mapper ${catkin_LIBRARIES})
+target_link_libraries(dynamic_mapper ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
 
 add_executable(dynamic_trails src/dynamic_trails.cpp )
 add_dependencies(dynamic_trails ${PROJECT_NAME}_gencpp)
-target_link_libraries(dynamic_trails ${catkin_LIBRARIES})
+target_link_libraries(dynamic_trails ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
 
 

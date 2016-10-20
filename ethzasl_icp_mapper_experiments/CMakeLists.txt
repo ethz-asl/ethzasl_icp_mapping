@@ -69,7 +69,7 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-find_package(libpointmatcher REQUIRED)
+find_package(libpointmatcher CONFIG REQUIRED)
 include_directories(${catkin_INCLUDE_DIRS} ${POINTMATCHER_INCLUDE_DIRS})
 
 # Note: disabled until tf2 supports C++0x

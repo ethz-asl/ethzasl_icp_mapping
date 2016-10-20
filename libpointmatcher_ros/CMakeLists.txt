@@ -9,8 +9,11 @@ nav_msgs
 tf
 tf_conversions
 eigen_conversions
-libpointmatcher
 )
+
+# This was tested for a system install of libpointmatcher
+find_package(libpointmatcher CONFIG)
+
 
 catkin_package(
 INCLUDE_DIRS include
@@ -24,6 +27,7 @@ tf_conversions
 eigen_conversions
 libpointmatcher
 )
+
 
 # c++ 0x
 #if("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang") 
@@ -53,5 +57,5 @@ add_definitions(-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG)
 include_directories(include)
 
 add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)
-include_directories(${catkin_INCLUDE_DIRS})
-target_link_libraries(pointmatcher_ros ${catkin_LIBRARIES})
+include_directories(${catkin_INCLUDE_DIRS} ${libpointmatcher_INCLUDE_DIRS})
+target_link_libraries(pointmatcher_ros ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
