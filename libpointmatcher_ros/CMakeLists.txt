@@ -26,10 +26,9 @@ libpointmatcher
 )
 
 # c++ 0x
-#if("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang") 
-#	set(CMAKE_COMPILER_IS_CLANGXX)
-#endif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang")
-if(CMAKE_COMPILER_IS_GNUCXX)
+if("${CMAKE_CXX_COMPILER_ID}" MATCHES "[cC]lang")
+	set(CMAKE_COMPILER_IS_CLANGXX)
+elseif(CMAKE_COMPILER_IS_GNUCXX)
 	execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
 	if (GCC_VERSION VERSION_GREATER 4.4 OR GCC_VERSION VERSION_EQUAL 4.4)
 		add_definitions(-std=gnu++0x)
@@ -38,7 +37,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 	endif (GCC_VERSION VERSION_GREATER 4.4 OR GCC_VERSION VERSION_EQUAL 4.4)
 else(CMAKE_COMPILER_IS_GNUCXX)
 	message(SEND_ERROR "You need partial C++0x support for N2351, N2672, N1984. Currently this build toolchain supports only GCC >= 4.4. If your compiler supports these specifications, please send us a patch.")
-endif(CMAKE_COMPILER_IS_GNUCXX)
+endif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "[cC]lang")
 
 # well, this breaks libpointmatcher on non-unix platform,
 # please contribute the define for your favorite compiler
