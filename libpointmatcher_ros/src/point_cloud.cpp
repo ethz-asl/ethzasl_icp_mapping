@@ -504,8 +504,10 @@ namespace PointMatcher_ros
 				if (hasColor)
 				{
 					// before color
-					memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(0, pt)), scalarSize * colorPos);
-					fPtr += scalarSize * colorPos;
+					if (colorPos > 0) {
+						memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(0, pt)), scalarSize * colorPos);
+						fPtr += scalarSize * colorPos;
+					}
 					// compact color
 					uint32_t rgba;
 					unsigned colorR(unsigned(pmCloud.descriptors(colorPos+0, pt) * 255.) & 0xFF);
@@ -514,11 +516,13 @@ namespace PointMatcher_ros
 					unsigned colorA(0);
 					if (colorCount == 4)
 						colorA = unsigned(pmCloud.descriptors(colorPos+3, pt) * 255.) & 0xFF;
-					rgba = colorA << 24 | colorR << 16 | colorG << 8 | colorB;
+					rgba = (uint32_t)colorA << 24 | (uint32_t)colorR << 16 | (uint32_t)colorG << 8 | (uint32_t)colorB;
 					memcpy(fPtr, reinterpret_cast<const uint8_t*>(&rgba), 4);
 					fPtr += 4;
 					// after color
-					memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(postColorPos, pt)), scalarSize * postColorCount);
+					if (postColorCount > 0) {
+						memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(postColorPos, pt)), scalarSize * postColorCount);
+					}
 				}
 				else
 				{

@@ -5,6 +5,7 @@ project(libpointmatcher_ros)
 find_package(catkin REQUIRED COMPONENTS
 roscpp
 sensor_msgs
+geometry_msgs
 nav_msgs
 tf
 tf_conversions
@@ -18,6 +19,7 @@ LIBRARIES pointmatcher_ros
 CATKIN_DEPENDS
 roscpp
 sensor_msgs
+geometry_msgs
 nav_msgs
 tf
 tf_conversions
