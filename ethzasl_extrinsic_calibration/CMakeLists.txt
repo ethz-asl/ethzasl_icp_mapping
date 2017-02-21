@@ -11,7 +11,7 @@ catkin_package(
 find_package(cmake_modules REQUIRED)
 find_package(Eigen REQUIRED)
 
-include_directories(${Eigen_INCLUDE_DIRS})
+include_directories(${Eigen_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
 
 #set the default path for built executables to the "bin" directory
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
