@@ -8,7 +8,7 @@ rosbuild_init()
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-find_package(Eigen REQUIRED)
-include_directories(${Eigen_INCLUDE_DIRS})
+find_package(Eigen3 REQUIRED)
+include_directories(${Eigen3_INCLUDE_DIR})
 
 rosbuild_add_library(ethzasl_gridmap_2d src/grid-map.cpp)
