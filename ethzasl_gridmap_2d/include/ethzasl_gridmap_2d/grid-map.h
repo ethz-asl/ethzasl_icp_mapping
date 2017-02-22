@@ -6,7 +6,7 @@
 #include <cassert>
 #include <stdexcept>
 #include <boost/tuple/tuple.hpp>
-#include <Eigen/Eigen>
+#include <Eigen/Dense>
 #include "nav_msgs/OccupancyGrid.h"
 
 class GridMap

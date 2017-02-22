@@ -3,7 +3,7 @@
 
 #define EIGEN_DONT_VECTORIZE
 #define EIGEN_DISABLE_UNALIGNED_ARRAY_ASSERT
-#include <Eigen/Eigen>
+#include <Eigen/Dense>
 #include <Eigen/LU>
 #include <iostream>
 #include <fstream>
