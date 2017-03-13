@@ -400,8 +400,8 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		T_odom_to_scanner = PointMatcher_ros::eigenMatrixToDim<float>(
 				PointMatcher_ros::transformListenerToEigenMatrix<float>(
 				tfListener,
-				scannerFrame,
-				odomFrame,
+				scannerFrame, // to
+				odomFrame, // from
 				stamp
 			), dimp1);
 	}
@@ -591,6 +591,8 @@ void Mapper::setMap(DP* newMapPointCloud)
 
 void Mapper::updateIcpMap(const DP* newMapPointCloud)
 {
+	ros::Time time_current = ros::Time::now();
+	tfListener.waitForTransform(sensorFrame, odomFrame, time_current, ros::Duration(3.0));
 
 	// Fetching current transformation to the sensor
 	const PM::TransformationParameters T_odom_to_scanner = 
@@ -599,7 +601,7 @@ void Mapper::updateIcpMap(const DP* newMapPointCloud)
 				tfListener,
 				sensorFrame, 
 				odomFrame,
-				ros::Time::now()
+				time_current
 			), mapPointCloud->getHomogeneousDim());
 
 	const PM::TransformationParameters T_scanner_to_map = this->T_odom_to_map * T_odom_to_scanner.inverse();
