@@ -1,0 +1,12 @@
+- VoxelGridDataPointsFilter:
+      vSizeX: 0.008
+      vSizeY: 0.008
+      vSizeZ: 0.008
+- MaxDistDataPointsFilter:
+   maxDist: 1.0
+#- SurfaceNormalDataPointsFilter:
+#    knn: 20
+#    keepNormals: 1
+#    keepDensities: 1
+#- ObservationDirectionDataPointsFilter
+#- OrientNormalsDataPointsFilter 
