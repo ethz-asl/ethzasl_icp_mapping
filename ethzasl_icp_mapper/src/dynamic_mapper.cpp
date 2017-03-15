@@ -286,6 +286,7 @@ void Mapper::gotScan(const sensor_msgs::LaserScan& scanMsgIn)
 	{
 		const ros::Time endScanTime(scanMsgIn.header.stamp + ros::Duration(scanMsgIn.time_increment * (scanMsgIn.ranges.size() - 1)));
 		unique_ptr<DP> cloud(new DP(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(scanMsgIn, &tfListener, odomFrame)));
+
 		processCloud(move(cloud), scanMsgIn.header.frame_id, endScanTime, scanMsgIn.header.seq);
 	}
 }
@@ -295,7 +296,8 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 	if(localizing)
 	{
 		unique_ptr<DP> cloud(new DP(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloudMsgIn)));
-
+		
+		
 		// TEST for UTIAS work on velodyne
 		// TODO: move that to a libpointmatcher filter
 		//const int maxNbPoints = 38000; // 70000 or 38000
@@ -339,7 +341,9 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	timer t;
 
 
-	
+	cerr << "newPointCloud->getNbPoints()" << newPointCloud->getNbPoints() << endl;
+	cerr << "newPointCloud->times.cols()" << newPointCloud->times.cols() << endl;
+
 	
 	// Convert point cloud
 	const size_t goodCount(newPointCloud->features.cols());
@@ -377,7 +381,9 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		
 		ROS_INFO_STREAM("[ICP] Input filters took " << t.elapsed() << " [s]");
 	}
-	
+	cerr << "newPointCloud->getNbPoints()" << newPointCloud->getNbPoints() << endl;
+	cerr << "newPointCloud->times.cols()" << newPointCloud->times.cols() << endl;
+
 	string reason;
 	// Initialize the transformation to identity if empty
  	if(!icp.hasMap())
@@ -532,6 +538,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 			mapBuildingThread = boost::thread(boost::move(boost::ref(mapBuildingTask)));
 			mapBuildingInProgress = true;
 		}
+		
 	}
 	catch (PM::ConvergenceError error)
 	{
@@ -620,282 +627,283 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 {
 	timer t;
 
-
-	// Prepare empty field if not existing
-	if(newPointCloud->descriptorExists("probabilityStatic") == false)
+	try
 	{
-		//newPointCloud->addDescriptor("probabilityStatic", PM::Matrix::Zero(1, newPointCloud->features.cols()));
-		newPointCloud->addDescriptor("probabilityStatic", PM::Matrix::Constant(1, newPointCloud->features.cols(), priorStatic));
-	}
-	
-	if(newPointCloud->descriptorExists("probabilityDynamic") == false)
-	{
-		//newPointCloud->addDescriptor("probabilityDynamic", PM::Matrix::Zero(1, newPointCloud->features.cols()));
-		newPointCloud->addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, newPointCloud->features.cols(), priorDyn));
-	}
-	
-	if(newPointCloud->descriptorExists("dynamic_ratio") == false)
-	{
-		newPointCloud->addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, newPointCloud->features.cols()));
-	}
-
-	
-
-	if (!mapExists) 
-	{
-		ROS_INFO_STREAM( "[MAP] Initial map, only filtering points");
-		*newPointCloud = transformation->compute(*newPointCloud, T_updatedScanner_to_map); 
-		mapPostFilters.apply(*newPointCloud);
-
-
-		return newPointCloud;
-	}
-
-
-	// Early out if no map modification is wanted
-	if(!mapping)
-	{
-		ROS_INFO_STREAM("[MAP] Skipping modification of the map");
-		return mapPointCloud;
-	}
-	
-	
-	const int mapPtsCount(mapPointCloud->getNbPoints());
-	const int readPtsCount(newPointCloud->getNbPoints());
-	
-	// Build a range image of the reading point cloud (local coordinates)
-	PM::Matrix radius_reading = newPointCloud->features.topRows(3).colwise().norm();
-
-	PM::Matrix angles_reading(2, readPtsCount); // 0=inclination, 1=azimuth
-
-	// No atan in Eigen, so we are for to loop through it...
-	for(int i=0; i<readPtsCount; i++)
-	{
-		const float ratio = newPointCloud->features(2,i)/radius_reading(0,i);
-
-		angles_reading(0,i) = acos(ratio);
-		angles_reading(1,i) = atan2(newPointCloud->features(1,i), newPointCloud->features(0,i));
-	}
-
-	std::shared_ptr<NNS> featureNNS;
-	featureNNS.reset( NNS::create(angles_reading));
-
-
-	// Transform the global map in local coordinates
-	DP mapLocalFrameCut = transformation->compute(*mapPointCloud, T_updatedScanner_to_map.inverse());
-	
-
-	// Remove points out of sensor range
-	PM::Matrix globalId(1, mapPtsCount); 
-
-	int mapCutPtsCount= 0;
-	for (int i = 0; i < mapPtsCount; i++)
-	{
-		if (mapLocalFrameCut.features.col(i).head(3).norm() < sensorMaxRange)
+		// Prepare empty field if not existing
+		if(newPointCloud->descriptorExists("probabilityStatic") == false)
 		{
-			mapLocalFrameCut.setColFrom(mapCutPtsCount, mapLocalFrameCut, i);
-			globalId(0,mapCutPtsCount) = i;
-			mapCutPtsCount++;
+			//newPointCloud->addDescriptor("probabilityStatic", PM::Matrix::Zero(1, newPointCloud->features.cols()));
+			newPointCloud->addDescriptor("probabilityStatic", PM::Matrix::Constant(1, newPointCloud->features.cols(), priorStatic));
 		}
-	}
-
-	mapLocalFrameCut.conservativeResize(mapCutPtsCount);
-
-
-	PM::Matrix radius_map = mapLocalFrameCut.features.topRows(3).colwise().norm();
-
-	PM::Matrix angles_map(2, mapCutPtsCount); // 0=inclination, 1=azimuth
-
-	// No atan in Eigen, so we are for to loop through it...
-	for(int i=0; i<mapCutPtsCount; i++)
-	{
-		const float ratio = mapLocalFrameCut.features(2,i)/radius_map(0,i);
-
-		angles_map(0,i) = acos(ratio);
-
-		angles_map(1,i) = atan2(mapLocalFrameCut.features(1,i), mapLocalFrameCut.features(0,i));
-	}
-
-	// Look for NN in spherical coordinates
-	Matches::Dists dists(1,mapCutPtsCount);
-	Matches::Ids ids(1,mapCutPtsCount);
-	
-	featureNNS->knn(angles_map, ids, dists, 1, 0, NNS::ALLOW_SELF_MATCH, maxAngle);
-
-	// Define views on descriptors
-	DP::View viewOn_Msec_overlap = newPointCloud->getDescriptorViewByName("stamps_Msec");
-	DP::View viewOn_sec_overlap = newPointCloud->getDescriptorViewByName("stamps_sec");
-	DP::View viewOn_nsec_overlap = newPointCloud->getDescriptorViewByName("stamps_nsec");
-
-	DP::View viewOnProbabilityStatic = mapPointCloud->getDescriptorViewByName("probabilityStatic");
-	DP::View viewOnProbabilityDynamic = mapPointCloud->getDescriptorViewByName("probabilityDynamic");
-	DP::View viewOnDynamicRatio = mapPointCloud->getDescriptorViewByName("dynamic_ratio");
-	
-	DP::View viewOn_normals_map = mapPointCloud->getDescriptorViewByName("normals");
-	DP::View viewOn_Msec_map = mapPointCloud->getDescriptorViewByName("stamps_Msec");
-	DP::View viewOn_sec_map = mapPointCloud->getDescriptorViewByName("stamps_sec");
-	DP::View viewOn_nsec_map = mapPointCloud->getDescriptorViewByName("stamps_nsec");
-	
-	
-
-	viewOnDynamicRatio = PM::Matrix::Zero(1, mapPtsCount);
-	for(int i=0; i < mapCutPtsCount; i++)
-	{
-		if(dists(i) != numeric_limits<float>::infinity())
+		
+		if(newPointCloud->descriptorExists("probabilityDynamic") == false)
 		{
-			const int readId = ids(0,i);
-			const int mapId = globalId(0,i);
-			
-			// in local coordinates
-			const Eigen::Vector3f readPt = newPointCloud->features.col(readId).head(3);
-			const Eigen::Vector3f mapPt = mapLocalFrameCut.features.col(i).head(3);
-			const Eigen::Vector3f mapPt_n = mapPt.normalized();
-			const float delta = (readPt - mapPt).norm();
-			const float d_max = eps_a * readPt.norm();
+			//newPointCloud->addDescriptor("probabilityDynamic", PM::Matrix::Zero(1, newPointCloud->features.cols()));
+			newPointCloud->addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, newPointCloud->features.cols(), priorDyn));
+		}
+		
+		if(newPointCloud->descriptorExists("dynamic_ratio") == false)
+		{
+			newPointCloud->addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, newPointCloud->features.cols()));
+		}
 
-			const Eigen::Vector3f normal_map = viewOn_normals_map.col(mapId);
-			
-			// Weight for dynamic elements
-			const float w_v = eps + (1 - eps)*fabs(normal_map.dot(mapPt_n));
-			const float w_d1 =  eps + (1 - eps)*(1 - sqrt(dists(i))/maxAngle);
-			
-			
-			const float offset = delta - eps_d;
-			float w_d2 = 1;
-			if(delta < eps_d || mapPt.norm() > readPt.norm())
+		
+
+		if (!mapExists) 
+		{
+			ROS_INFO_STREAM( "[MAP] Initial map, only filtering points");
+			*newPointCloud = transformation->compute(*newPointCloud, T_updatedScanner_to_map); 
+			mapPostFilters.apply(*newPointCloud);
+
+
+			return newPointCloud;
+		}
+
+
+		// Early out if no map modification is wanted
+		if(!mapping)
+		{
+			ROS_INFO_STREAM("[MAP] Skipping modification of the map");
+			return mapPointCloud;
+		}
+		
+		
+		const int mapPtsCount(mapPointCloud->getNbPoints());
+		const int readPtsCount(newPointCloud->getNbPoints());
+		
+		// Build a range image of the reading point cloud (local coordinates)
+		PM::Matrix radius_reading = newPointCloud->features.topRows(3).colwise().norm();
+
+		PM::Matrix angles_reading(2, readPtsCount); // 0=inclination, 1=azimuth
+
+		// No atan in Eigen, so we are for to loop through it...
+		for(int i=0; i<readPtsCount; i++)
+		{
+			const float ratio = newPointCloud->features(2,i)/radius_reading(0,i);
+
+			angles_reading(0,i) = acos(ratio);
+			angles_reading(1,i) = atan2(newPointCloud->features(1,i), newPointCloud->features(0,i));
+		}
+
+		std::shared_ptr<NNS> featureNNS;
+		featureNNS.reset( NNS::create(angles_reading));
+
+
+		// Transform the global map in local coordinates
+		DP mapLocalFrameCut = transformation->compute(*mapPointCloud, T_updatedScanner_to_map.inverse());
+		
+
+		// Remove points out of sensor range
+		PM::Matrix globalId(1, mapPtsCount); 
+
+		int mapCutPtsCount= 0;
+		for (int i = 0; i < mapPtsCount; i++)
+		{
+			if (mapLocalFrameCut.features.col(i).head(3).norm() < sensorMaxRange)
 			{
-				w_d2 = eps;
+				mapLocalFrameCut.setColFrom(mapCutPtsCount, mapLocalFrameCut, i);
+				globalId(0,mapCutPtsCount) = i;
+				mapCutPtsCount++;
 			}
-			else 
-			{
-				if (offset < d_max)
-				{
-					w_d2 = eps + (1 - eps )*offset/d_max;
-				}
-			}
+		}
 
-			float w_p2 = eps;
-			if(delta < eps_d)
-			{
-				w_p2 = 1;
-			}
-			else
-			{
-				if(offset < d_max)
-				{
-					w_p2 = eps + (1 - eps)*(1 - offset/d_max);
-				}
-			}
+		mapLocalFrameCut.conservativeResize(mapCutPtsCount);
 
+		PM::Matrix radius_map = mapLocalFrameCut.features.topRows(3).colwise().norm();
 
-			// We don't update point behind the reading
-			if((readPt.norm() + eps_d + d_max) >= mapPt.norm())
+		PM::Matrix angles_map(2, mapCutPtsCount); // 0=inclination, 1=azimuth
+
+		// No atan in Eigen, so we need to loop through it...
+		for(int i=0; i<mapCutPtsCount; i++)
+		{
+			const float ratio = mapLocalFrameCut.features(2,i)/radius_map(0,i);
+
+			angles_map(0,i) = acos(ratio);
+
+			angles_map(1,i) = atan2(mapLocalFrameCut.features(1,i), mapLocalFrameCut.features(0,i));
+		}
+
+		// Look for NN in spherical coordinates
+		Matches::Dists dists(1,mapCutPtsCount);
+		Matches::Ids ids(1,mapCutPtsCount);
+		
+		featureNNS->knn(angles_map, ids, dists, 1, 0, NNS::ALLOW_SELF_MATCH, maxAngle);
+
+		// Define views on descriptors
+		DP::View viewOn_Msec_overlap = newPointCloud->getDescriptorViewByName("stamps_Msec");
+		DP::View viewOn_sec_overlap = newPointCloud->getDescriptorViewByName("stamps_sec");
+		DP::View viewOn_nsec_overlap = newPointCloud->getDescriptorViewByName("stamps_nsec");
+
+		DP::View viewOnProbabilityStatic = mapPointCloud->getDescriptorViewByName("probabilityStatic");
+		DP::View viewOnProbabilityDynamic = mapPointCloud->getDescriptorViewByName("probabilityDynamic");
+		DP::View viewOnDynamicRatio = mapPointCloud->getDescriptorViewByName("dynamic_ratio");
+		
+		DP::View viewOn_normals_map = mapPointCloud->getDescriptorViewByName("normals");
+		DP::View viewOn_Msec_map = mapPointCloud->getDescriptorViewByName("stamps_Msec");
+		DP::View viewOn_sec_map = mapPointCloud->getDescriptorViewByName("stamps_sec");
+		DP::View viewOn_nsec_map = mapPointCloud->getDescriptorViewByName("stamps_nsec");
+		
+		
+		viewOnDynamicRatio = PM::Matrix::Zero(1, mapPtsCount);
+		for(int i=0; i < mapCutPtsCount; i++)
+		{
+			if(dists(i) != numeric_limits<float>::infinity())
 			{
-				const float lastDyn = viewOnProbabilityDynamic(0,mapId);
-				const float lastStatic = viewOnProbabilityStatic(0, mapId);
-
-				const float c1 = (1 - (w_v*(1 - w_d1)));
-				const float c2 = w_v*(1 - w_d1);
+				const int readId = ids(0,i);
+				const int mapId = globalId(0,i);
 				
+				// in local coordinates
+				const Eigen::Vector3f readPt = newPointCloud->features.col(readId).head(3);
+				const Eigen::Vector3f mapPt = mapLocalFrameCut.features.col(i).head(3);
+				const Eigen::Vector3f mapPt_n = mapPt.normalized();
+				const float delta = (readPt - mapPt).norm();
+				const float d_max = eps_a * readPt.norm();
 
-				//Lock dynamic point to stay dynamic under a threshold
-				if(lastDyn < maxDyn)
+				const Eigen::Vector3f normal_map = viewOn_normals_map.col(mapId);
+				
+				// Weight for dynamic elements
+				const float w_v = eps + (1 - eps)*fabs(normal_map.dot(mapPt_n));
+				const float w_d1 =  eps + (1 - eps)*(1 - sqrt(dists(i))/maxAngle);
+				
+				
+				const float offset = delta - eps_d;
+				float w_d2 = 1;
+				if(delta < eps_d || mapPt.norm() > readPt.norm())
 				{
-					viewOnProbabilityDynamic(0,mapId) = c1*lastDyn + c2*w_d2*((1 - alpha)*lastStatic + beta*lastDyn);
-					viewOnProbabilityStatic(0, mapId) = c1*lastStatic + c2*w_p2*(alpha*lastStatic + (1 - beta)*lastDyn);
+					w_d2 = eps;
+				}
+				else 
+				{
+					if (offset < d_max)
+					{
+						w_d2 = eps + (1 - eps )*offset/d_max;
+					}
+				}
+
+				float w_p2 = eps;
+				if(delta < eps_d)
+				{
+					w_p2 = 1;
 				}
 				else
 				{
-					viewOnProbabilityStatic(0,mapId) = eps;
-					viewOnProbabilityDynamic(0,mapId) = 1-eps;
+					if(offset < d_max)
+					{
+						w_p2 = eps + (1 - eps)*(1 - offset/d_max);
+					}
 				}
-				
-				
-				
-				// normalization
-				const float sumZ = viewOnProbabilityDynamic(0,mapId) + viewOnProbabilityStatic(0, mapId);
-				assert(sumZ >= eps);	
-				
-				viewOnProbabilityDynamic(0,mapId) /= sumZ;
-				viewOnProbabilityStatic(0,mapId) /= sumZ;
-				
-				viewOnDynamicRatio(0,mapId) = w_d2;
 
 
-				//TODO use the new time structure
-				// Refresh time
-				viewOn_Msec_map(0,mapId) = viewOn_Msec_overlap(0,readId);	
-				viewOn_sec_map(0,mapId) = viewOn_sec_overlap(0,readId);	
-				viewOn_nsec_map(0,mapId) = viewOn_nsec_overlap(0,readId);	
+				// We don't update point behind the reading
+				if((readPt.norm() + eps_d + d_max) >= mapPt.norm())
+				{
+					const float lastDyn = viewOnProbabilityDynamic(0,mapId);
+					const float lastStatic = viewOnProbabilityStatic(0, mapId);
+
+					const float c1 = (1 - (w_v*(1 - w_d1)));
+					const float c2 = w_v*(1 - w_d1);
+					
+
+					//Lock dynamic point to stay dynamic under a threshold
+					if(lastDyn < maxDyn)
+					{
+						viewOnProbabilityDynamic(0,mapId) = c1*lastDyn + c2*w_d2*((1 - alpha)*lastStatic + beta*lastDyn);
+						viewOnProbabilityStatic(0, mapId) = c1*lastStatic + c2*w_p2*(alpha*lastStatic + (1 - beta)*lastDyn);
+					}
+					else
+					{
+						viewOnProbabilityStatic(0,mapId) = eps;
+						viewOnProbabilityDynamic(0,mapId) = 1-eps;
+					}
+					
+					
+					
+					// normalization
+					const float sumZ = viewOnProbabilityDynamic(0,mapId) + viewOnProbabilityStatic(0, mapId);
+					assert(sumZ >= eps);	
+					
+					viewOnProbabilityDynamic(0,mapId) /= sumZ;
+					viewOnProbabilityStatic(0,mapId) /= sumZ;
+					
+					viewOnDynamicRatio(0,mapId) = w_d2;
+
+
+					//TODO use the new time structure
+					// Refresh time
+					viewOn_Msec_map(0,mapId) = viewOn_Msec_overlap(0,readId);	
+					viewOn_sec_map(0,mapId) = viewOn_sec_overlap(0,readId);	
+					viewOn_nsec_map(0,mapId) = viewOn_nsec_overlap(0,readId);	
+				}
+
+
 			}
-
-
 		}
+
+		// Generate temporary map for density computation
+		DP tmp_map = mapLocalFrameCut; 
+		tmp_map.concatenate(*newPointCloud);
+
+		// build and populate NNS
+		featureNNS.reset( NNS::create(tmp_map.features, tmp_map.features.rows() - 1, NNS::KDTREE_LINEAR_HEAP, NNS::TOUCH_STATISTICS));
+		
+		PM::Matches matches_overlap(
+			Matches::Dists(1, readPtsCount),
+			Matches::Ids(1, readPtsCount)
+		);
+		
+
+		featureNNS->knn(newPointCloud->features, matches_overlap.ids, matches_overlap.dists, 1, 0);
+		
+		DP overlap(newPointCloud->createSimilarEmpty());
+		DP no_overlap(newPointCloud->createSimilarEmpty());
+
+		int ptsOut = 0;
+		int ptsIn = 0;
+		for (int i = 0; i < readPtsCount; ++i)
+		{
+			if (matches_overlap.dists(i) > maxDistNewPoint)
+			{
+				no_overlap.setColFrom(ptsOut, *newPointCloud, i);
+				ptsOut++;
+			}
+			else
+			{
+				overlap.setColFrom(ptsIn, *newPointCloud, i);
+				ptsIn++;
+			}
+		}
+
+		no_overlap.conservativeResize(ptsOut);
+		overlap.conservativeResize(ptsIn);
+
+		// Publish outliers
+		//if (outlierPub.getNumSubscribers())
+		//{
+			//outlierPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(no_overlap, mapFrame, mapCreationTime));
+		//}
+
+		// Initialize descriptors
+		no_overlap.addDescriptor("probabilityStatic", PM::Matrix::Constant(1, no_overlap.features.cols(), priorStatic));
+		no_overlap.addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, no_overlap.features.cols(), priorDyn));
+		no_overlap.addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, no_overlap.features.cols()));
+
+		// shrink the newPointCloud to the new information
+		*newPointCloud = no_overlap;
+		
+		// Correct new points using ICP result
+		*newPointCloud = transformation->compute(*newPointCloud, T_updatedScanner_to_map);
+		
+		// Merge point clouds to map
+		newPointCloud->concatenate(*mapPointCloud);
+		mapPostFilters.apply(*newPointCloud);
 	}
-
-
-	// Generate temporary map for density computation
-	DP tmp_map = mapLocalFrameCut; 
-	tmp_map.concatenate(*newPointCloud);
-
-
-	// build and populate NNS
-	featureNNS.reset( NNS::create(tmp_map.features, tmp_map.features.rows() - 1, NNS::KDTREE_LINEAR_HEAP, NNS::TOUCH_STATISTICS));
-	
-	PM::Matches matches_overlap(
-		Matches::Dists(1, readPtsCount),
-		Matches::Ids(1, readPtsCount)
-	);
-	
-	featureNNS->knn(newPointCloud->features, matches_overlap.ids, matches_overlap.dists, 1, 0);
-	
-	
-	DP overlap(newPointCloud->createSimilarEmpty());
-	DP no_overlap(newPointCloud->createSimilarEmpty());
-	
-
-	int ptsOut = 0;
-	int ptsIn = 0;
-	for (int i = 0; i < readPtsCount; ++i)
+	catch(DP::InvalidField e)
 	{
-		if (matches_overlap.dists(i) > maxDistNewPoint)
-		{
-			no_overlap.setColFrom(ptsOut, *newPointCloud, i);
-			ptsOut++;
-		}
-		else
-		{
-			overlap.setColFrom(ptsIn, *newPointCloud, i);
-			ptsIn++;
-		}
+		ROS_ERROR_STREAM(e.what());
+		abort();
 	}
-
-	no_overlap.conservativeResize(ptsOut);
-	overlap.conservativeResize(ptsIn);
-
-
-	// Publish outliers
-	//if (outlierPub.getNumSubscribers())
-	//{
-		//outlierPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(no_overlap, mapFrame, mapCreationTime));
-	//}
-
-	// Initialize descriptors
-	no_overlap.addDescriptor("probabilityStatic", PM::Matrix::Constant(1, no_overlap.features.cols(), priorStatic));
-	no_overlap.addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, no_overlap.features.cols(), priorDyn));
-	no_overlap.addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, no_overlap.features.cols()));
-
-	// shrink the newPointCloud to the new information
-	*newPointCloud = no_overlap;
 	
-	// Correct new points using ICP result
-	*newPointCloud = transformation->compute(*newPointCloud, T_updatedScanner_to_map);
-	
-	// Merge point clouds to map
-	newPointCloud->concatenate(*mapPointCloud);
-	mapPostFilters.apply(*newPointCloud);
-
-	ROS_INFO_STREAM("[TIME] New map available (" << newPointCloud->features.cols() << " pts), update took " << t.elapsed() << " [s]");
+	ROS_INFO_STREAM("[TIME][MAP] New map available (" << newPointCloud->features.cols() << " pts), update took " << t.elapsed() << " [s]");
 	
 	return newPointCloud;
 }

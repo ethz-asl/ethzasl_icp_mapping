@@ -16,8 +16,8 @@
 		<param name="mapping" value="true" /> 
 
     <!-- Parameters for dynamic elements -->
-		<param name="priorStatic" value="0.45"/>
-		<param name="priorDyn" value="0.55"/>
+		<param name="priorStatic" value="0.35"/>
+		<param name="priorDyn" value="0.65"/>
 		<param name="maxAngle" value="0.1"/>
 		<param name="eps_a" value="0.020"/><!--1 deg = 0.017rad-->
 		<param name="eps_d" value="0.1"/>
