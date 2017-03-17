@@ -6,7 +6,7 @@
 
 matcher:
   KDTreeMatcher:
-#    maxDist: 4.0
+    maxDist: 6.0
     knn: 3
     epsilon: 0.0
 
@@ -15,10 +15,10 @@ outlierFilters:
      ratio: 0.8
 #  - SurfaceNormalOutlierFilter:
 #     maxAngle: 0.42
-#  - GenericDescriptorOutlierFilter:
-#     source: reference
-#     descName: probabilityStatic
-#     useSoftThreshold: 0
+  - GenericDescriptorOutlierFilter:
+     source: reference
+     descName: probabilityStatic
+     useSoftThreshold: 1
 #     threshold: 0.40
   
 errorMinimizer:
