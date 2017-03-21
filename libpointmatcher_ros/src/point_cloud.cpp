@@ -89,7 +89,8 @@ namespace PointMatcher_ros
 				fieldTypes.push_back(PM_types::TIME);
 				fieldTypes.push_back(PM_types::TIME);
 			}
-			else if (name == "stamps")
+			//else if (name == "stamps")
+			else if (name == "time")
 			{
 			  timeLabels.push_back(Label(name, count));
         isFeature.push_back(false);
@@ -357,8 +358,8 @@ namespace PointMatcher_ros
 		Labels timeLabels;
     if(addTimestamps)
     {
-			//timeLabels.push_back(Label("time", 1));
-			timeLabels.push_back(Label("stamps", 1));
+			timeLabels.push_back(Label("time", 1));
+			//timeLabels.push_back(Label("stamps", 1));
     }
 
 		// filter points based on range
@@ -503,7 +504,8 @@ namespace PointMatcher_ros
 		// Fill time
     if(addTimestamps)
     {
-			auto is(cloud.getTimeViewByName("stamps"));
+			//auto is(cloud.getTimeViewByName("stamps"));
+			auto is(cloud.getTimeViewByName("time"));
 
 			for (size_t i = 0; i < ranges.size(); ++i)
       {
@@ -642,7 +644,8 @@ namespace PointMatcher_ros
     for(auto it(pmCloud.timeLabels.begin()); it != pmCloud.timeLabels.end(); ++it)
     {
       PF pointField;
-      if (it->text == "stamps")
+      //if (it->text == "stamps")
+      if (it->text == "time")
       {
         hasTime = true;
 
