@@ -92,11 +92,7 @@ class DynamicTrails
 	const float p_inputRate;
 	const int p_windowSize;
 	const string p_trailFilepName;
-  const bool p_accumulateMarkers;
-	const float p_maxGlobalMapDist;
-	const float p_maxClusterDistance;
-	
-  int trailCount;
+	int trailCount;
 	
 public:
 	DynamicTrails(ros::NodeHandle& n, ros::NodeHandle& pn);
@@ -133,14 +129,11 @@ DynamicTrails::DynamicTrails(ros::NodeHandle& n, ros::NodeHandle& pn):
 	p_inputRate(getParam<double>("input_rate", 1.5)),
 	p_windowSize(getParam<int>("window_size", 3)),
 	p_trailFilepName(getParam<string>("trail_filename", "trailMap.vtk")),
-	p_accumulateMarkers(getParam<bool>("accumulate_markers", false)),
-	p_maxGlobalMapDist(getParam<double>("max_global_map_dist", 0.5)),
-	p_maxClusterDistance(getParam<double>("max_cluster_distance", 0.75)),
 	trailCount(0)
 {
 	
 	// memory for last velocities
-	priors.resize(p_windowSize+1);
+	//priors.resize(p_windowSize);
 
 
 	// load configs
@@ -210,7 +203,7 @@ void DynamicTrails::gotCloud(const sensor_msgs::PointCloud2ConstPtr& cloudMsgIn)
 	const ros::Time currentTime = ros::Time::now();
 	const float currentRate = 1.0/(currentTime - lastInputTime).toSec();
 	
-	if(currentRate < p_inputRate || p_inputRate == -1)
+	if(currentRate < p_inputRate )
 	{
 		lastInputTime = currentTime;
 
@@ -239,10 +232,6 @@ void DynamicTrails::gotCloud(const sensor_msgs::PointCloud2ConstPtr& cloudMsgIn)
 		}
 	
 	}
-  else
-  {
-    ROS_WARN_STREAM("Skipping point cloud"); 
-  }
 
 }
 
@@ -342,11 +331,12 @@ void DynamicTrails::processCloud(DP inputPointCloud, const TP TScannerToMap)
 
 
 	// FIXME: those are parameters
+	const float maxClusterDistance = 0.75;
 	const int nbIter = 5;
 	for(int i=0; i<nbIter; i++)
 	{
-		computeVelocity(lastPointCloud, lastNNS, dynamicPointCloud, inputNNS, p_maxClusterDistance, nbIter-i, dynProjectedPub);
-		computeVelocity(dynamicPointCloud, inputNNS, lastPointCloud, lastNNS, p_maxClusterDistance, nbIter-i, lastProjectedPub);
+		computeVelocity(lastPointCloud, lastNNS, dynamicPointCloud, inputNNS, maxClusterDistance, nbIter-i, dynProjectedPub);
+		computeVelocity(dynamicPointCloud, inputNNS, lastPointCloud, lastNNS, maxClusterDistance, nbIter-i, lastProjectedPub);
 
 		averageWithReference(lastPointCloud, dynamicPointCloud, 1);
 		averageWithReference(dynamicPointCloud, lastPointCloud, 1);
@@ -372,30 +362,22 @@ void DynamicTrails::processCloud(DP inputPointCloud, const TP TScannerToMap)
 	marker.header.frame_id = p_mapFrame;
 	marker.header.stamp = ros::Time::now();
 	marker.ns = "basic_shapes";
+	marker.id = 0;
+	//marker.id = trailCount;
+	trailCount++;
 	marker.type = visualization_msgs::Marker::LINE_LIST;
 	
-	marker.scale.x = 0.3;
-	marker.scale.y = 0.3; //not use by line
-	marker.scale.z = 0.3; //not use by line 
+	marker.scale.x = 0.01;
+	marker.scale.y = 0.1;
+	marker.scale.z = 0.1;
 
-	marker.color.r = 1.0f;
+	marker.color.r = 0.0f;
 	marker.color.g = 1.0f;
 	marker.color.b = 0.0f;
-	
-  if(p_accumulateMarkers)
-  {
-    marker.color.a = 0.2;
-    marker.id = trailCount; 
-  }
-  else
-  {
-    marker.color.a = 1.0;
-    marker.id = 0;
-	}
+	//marker.color.a = 0.20;
+	marker.color.a = 1.0;
 
-  trailCount++;
-
-	marker.lifetime = ros::Duration(2);
+	marker.lifetime = ros::Duration();
 
 	DP currenttTrails = dynamicPointCloud->createSimilarEmpty();
 	int currentTrailPtCount = 0;
@@ -418,7 +400,6 @@ void DynamicTrails::processCloud(DP inputPointCloud, const TP TScannerToMap)
 		
 		int lastID = id;
 
-    // TODO: evaluate multiple scans
 		// FIXME: finish here
 		//for(int i = 0; i < priors.size(); i++)
 		//{
@@ -444,7 +425,7 @@ void DynamicTrails::processCloud(DP inputPointCloud, const TP TScannerToMap)
 		//if(w_ang > 0.75  && mag > eps && mag < p_maxVelocity)
 		if(mag > eps && mag < p_maxVelocity)
 		{
-			if(w_diffAngle > 0.25 && w_proj < 0.25)
+			if(w_diffAngle > 0.5 && w_proj < 0.5)
 			{
 				// Temporal smoothing
 
@@ -478,14 +459,14 @@ void DynamicTrails::processCloud(DP inputPointCloud, const TP TScannerToMap)
 
 	if(currentTrailPtCount > 0)
 	{
-		//if(trailPointCloud == false)
-		//{
-		//	trailPointCloud.reset(new DP(currenttTrails));
-		//}
-		//else
-		//{
-		//	trailPointCloud->concatenate(currenttTrails);
-		//}
+		if(trailPointCloud == false)
+		{
+			trailPointCloud.reset(new DP(currenttTrails));
+		}
+		else
+		{
+			trailPointCloud->concatenate(currenttTrails);
+		}
 	}
 
 	markerPub.publish(marker);
@@ -524,11 +505,13 @@ PM::DataPoints DynamicTrails::extractDynamicPoints (const PM::DataPoints input, 
 	Matches::Ids ids_input(knn, inputPtsCount);
 	
 	usingGlobalMap.lock();
-	globalNNS->knn(input.features, ids_input, dists_input, knn, 0, 0, p_maxGlobalMapDist);
+	// FIXME: this is a parameter
+	const float maxGlobalDist = 0.5;
+	globalNNS->knn(input.features, ids_input, dists_input, knn, 0, 0, maxGlobalDist);
 
 	if(globalMap.descriptorExists("probabilityStatic") == false ||
 			globalMap.descriptorExists("probabilityDynamic") == false ||
-			globalMap.descriptorExists("debug") == false
+			globalMap.descriptorExists("dynamic_ratio") == false
 		)
 	{
 		ROS_WARN_STREAM("Map descriptors not found");
@@ -536,7 +519,7 @@ PM::DataPoints DynamicTrails::extractDynamicPoints (const PM::DataPoints input, 
 		return output;
 	}
 
-	//DP::View viewOnDebug = globalMap.getDescriptorViewByName("debug");
+	//DP::View viewOnDynamicRatio = globalMap.getDescriptorViewByName("dynamic_ratio");
 	DP::View viewOnProbabilityStatic = globalMap.getDescriptorViewByName("probabilityStatic");
 	DP::View viewOnProbabilityDynamic = globalMap.getDescriptorViewByName("probabilityDynamic");
 
@@ -652,7 +635,6 @@ void DynamicTrails::computeVelocity(shared_ptr<DP> reference, shared_ptr<NNS> re
 		float sumDt = 0;
 		Eigen::Vector3f sumVec = Eigen::Vector3f::Zero(3,1);
 
-    int nbMatch = 0;
 		for(int k=0; k<knn; k++)
 		{
 			if(dists(k,i) != numeric_limits<float>::infinity())
@@ -688,13 +670,11 @@ void DynamicTrails::computeVelocity(shared_ptr<DP> reference, shared_ptr<NNS> re
 				//sumVec    += w*delta;
 				
 				closeId_read(i) = id;
-        nbMatch++;
 			}
 		}
 
 		// Weighted mean
-    //FIXME: this is a parameter
-		if(sumWeight > eps && nbMatch > 4)
+		if(sumWeight > eps)
 		{
 			sumDt /= sumWeight;
 			sumVec /= sumWeight;

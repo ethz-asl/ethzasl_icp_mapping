@@ -1,6 +1,9 @@
 #include "pointmatcher_ros/point_cloud.h"
 #include "ros/ros.h"
 #include "boost/detail/endian.hpp"
+#include "boost/algorithm/string.hpp"
+//#include <boost/algorithm/string/predicate.hpp>
+//#include <boost/algorithm/string/erase.hpp>
 #include "tf/transform_listener.h"
 #include <vector>
 #include <memory>
@@ -11,23 +14,31 @@ namespace PointMatcher_ros
 	
 	//! Transform a ROS PointCloud2 message into a libpointmatcher point cloud
 	template<typename T>
-	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::PointCloud2& rosMsg)
+	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::PointCloud2& rosMsg, const bool isDense)
 	{
+
+		//FIXME: continue from here, need to decode time properly   
 		typedef PointMatcher<T> PM;
+		typedef PointMatcherIO<T> PMIO;
+		typedef typename PMIO::PMPropTypes PM_types;
 		typedef typename PM::DataPoints DataPoints;
 		typedef typename DataPoints::Label Label;
 		typedef typename DataPoints::Labels Labels;
 		typedef typename DataPoints::View View;
+		typedef typename DataPoints::TimeView TimeView;
 		
 		if (rosMsg.fields.empty())
 			return DataPoints();
 		
+
 		// fill labels
 		// conversions of descriptor fields from pcl
 		// see http://www.ros.org/wiki/pcl/Overview
 		Labels featLabels;
 		Labels descLabels;
+		Labels timeLabels;
 		vector<bool> isFeature;
+		vector<PM_types> fieldTypes;
 		for(auto it(rosMsg.fields.begin()); it != rosMsg.fields.end(); ++it)
 		{
 			const string name(it->name);
@@ -36,6 +47,7 @@ namespace PointMatcher_ros
 			{
 				featLabels.push_back(Label(name, count));
 				isFeature.push_back(true);
+				fieldTypes.push_back(PM_types::FEATURE);
 			}
 			else if (name == "rgb" || name == "rgba")
 			{
@@ -50,27 +62,54 @@ namespace PointMatcher_ros
 					it += 2;
 					isFeature.push_back(false);
 					isFeature.push_back(false);
+					fieldTypes.push_back(PM_types::DESCRIPTOR);
+					fieldTypes.push_back(PM_types::DESCRIPTOR);
 				}
 				else
 				{
 					descLabels.push_back(Label("normals", 2));
 					it += 1;
 					isFeature.push_back(false);
+					fieldTypes.push_back(PM_types::DESCRIPTOR);
 				}
 				isFeature.push_back(false);
+				fieldTypes.push_back(PM_types::DESCRIPTOR);
 			}
-			else 
+			else if((it+1) != rosMsg.fields.end() && boost::algorithm::ends_with(name, "_splitTime_high32") && boost::algorithm::ends_with(((it+1)->name), "_splitTime_low32"))
+			{
+				// time extraction
+				//const string beginning = name.substr(0, name.size()-4);
+				string startingName = name;
+				boost::algorithm::erase_last(startingName, "_splitTime_high32");
+				const string beginning = startingName;
+
+				timeLabels.push_back(Label(beginning, 1));
+				it += 1;
+				isFeature.push_back(false);
+				fieldTypes.push_back(PM_types::TIME);
+				fieldTypes.push_back(PM_types::TIME);
+			}
+			//else if (name == "stamps")
+			else if (name == "time")
+			{
+			  timeLabels.push_back(Label(name, count));
+        isFeature.push_back(false);
+			}
+			else
 			{
 				descLabels.push_back(Label(name, count));
 				isFeature.push_back(false);
+				fieldTypes.push_back(PM_types::DESCRIPTOR);
 			}
 		}
+
 		featLabels.push_back(Label("pad", 1));
 		assert(isFeature.size() == rosMsg.fields.size());
+		assert(fieldTypes.size() == rosMsg.fields.size());
 		
 		// create cloud
 		const unsigned pointCount(rosMsg.width * rosMsg.height);
-		DataPoints cloud(featLabels, descLabels, pointCount);
+		DataPoints cloud(featLabels, descLabels, timeLabels, pointCount);
 		cloud.getFeatureViewByName("pad").setConstant(1);
 		
 		// fill cloud
@@ -108,8 +147,126 @@ namespace PointMatcher_ros
 					}
 				}
 			}
+			else if(boost::algorithm::ends_with(it->name, "_splitTime_high32") || 
+			        boost::algorithm::ends_with(it->name, "_splitTime_low32"))
+			{
+				string startingName = it->name;
+				bool isHigh = false;
+				if(boost::algorithm::ends_with(it->name, "_splitTime_high32"))
+				{
+					boost::algorithm::erase_last(startingName, "_splitTime_high32");
+					isHigh = true;
+				}
+				if(boost::algorithm::ends_with(it->name, "_splitTime_low32"))
+				{
+					boost::algorithm::erase_last(startingName, "_splitTime_low32");
+				}
+
+
+			  TimeView timeView(cloud.getTimeViewByName(startingName));
+				// use view to read data
+        
+				int ptId(0);
+        const size_t count(std::max<size_t>(it->count, 1));
+        for (size_t y(0); y < rosMsg.height; ++y)
+        {
+          const uint8_t* dataPtr(&rosMsg.data[0] + rosMsg.row_step*y);
+          for (size_t x(0); x < rosMsg.width; ++x)
+          {
+            const uint8_t* fPtr(dataPtr + it->offset);
+            for (unsigned dim(0); dim < count; ++dim)
+            {
+							if(isHigh)
+							{
+								const uint32_t high32 = *reinterpret_cast<const uint32_t*>(fPtr);
+								const uint32_t low32 = uint32_t(timeView(dim, ptId));
+								timeView(dim, ptId) = (((uint64_t) high32) << 32) | ((uint64_t) low32);
+							}
+							else
+							{
+								const uint32_t high32 = uint32_t(timeView(dim, ptId) >> 32);
+								const uint32_t low32 = *reinterpret_cast<const uint32_t*>(fPtr);
+								timeView(dim, ptId) = (((uint64_t) high32) << 32) | ((uint64_t) low32);
+
+							}
+							dataPtr += rosMsg.point_step;
+							ptId += 1;
+						}
+					}
+				}
+
+			}
+			// FIXME: this might never be used
+			//else if (it->name == "stamps")
+			//{
+			//  ROS_INFO("!!!!!!!!!!!! GOT MSG WITH STAMPS FIELD !!!!!!!!!!!!!!!!");
+
+			//  TimeView timeView(cloud.getTimeViewByName("stamps"));
+
+      //  // use view to read data
+      //  int ptId(0);
+      //  const size_t count(std::max<size_t>(it->count, 1));
+      //  for (size_t y(0); y < rosMsg.height; ++y)
+      //  {
+      //    const uint8_t* dataPtr(&rosMsg.data[0] + rosMsg.row_step*y);
+      //    for (size_t x(0); x < rosMsg.width; ++x)
+      //    {
+      //      const uint8_t* fPtr(dataPtr + it->offset);
+      //      for (unsigned dim(0); dim < count; ++dim)
+      //      {
+      //        switch (it->datatype)
+      //        {
+      //          case PF::INT8:
+      //            timeView(dim, ptId) = boost::uint64_t(*reinterpret_cast<const int8_t*>(fPtr));
+      //            fPtr += 1;
+      //            ROS_INFO("!!!!!!!!!!!! CASE INT8 !!!!!!!!!!!!!!!!");
+      //            break;
+      //          case PF::UINT8:
+      //            timeView(dim, ptId) = boost::uint64_t(*reinterpret_cast<const uint8_t*>(fPtr));
+      //            fPtr += 1;
+      //            ROS_INFO("!!!!!!!!!!!! CASE UINT8 !!!!!!!!!!!!!!!!");
+      //            break;
+      //          case PF::INT16:
+      //            timeView(dim, ptId) = boost::uint64_t(*reinterpret_cast<const int16_t*>(fPtr));
+      //            fPtr += 2;
+      //            ROS_INFO("!!!!!!!!!!!! CASE INT16 !!!!!!!!!!!!!!!!");
+      //            break;
+      //          case PF::UINT16:
+      //            timeView(dim, ptId) = boost::uint64_t(*reinterpret_cast<const uint16_t*>(fPtr));
+      //            fPtr += 2;
+      //            ROS_INFO("!!!!!!!!!!!! CASE UINT16 !!!!!!!!!!!!!!!!");
+      //            break;
+      //          case PF::INT32:
+      //            timeView(dim, ptId) = boost::uint64_t(*reinterpret_cast<const int32_t*>(fPtr));
+      //            fPtr += 4;
+      //            ROS_INFO("!!!!!!!!!!!! CASE INT32 !!!!!!!!!!!!!!!!");
+      //            break;
+      //          case PF::UINT32:
+      //            timeView(dim, ptId) = boost::uint64_t(*reinterpret_cast<const uint32_t*>(fPtr));
+      //            fPtr += 4;
+      //            ROS_INFO("!!!!!!!!!!!! CASE UINT32 !!!!!!!!!!!!!!!!");
+      //            break;
+      //          case PF::FLOAT32:
+      //            timeView(dim, ptId) = boost::uint64_t(*reinterpret_cast<const float*>(fPtr));
+      //            fPtr += 4;
+      //            //ROS_INFO("!!!!!!!!!!!! CASE FLOAT32 !!!!!!!!!!!!!!!!");
+      //            break;
+      //          case PF::FLOAT64:
+      //            timeView(dim, ptId) = boost::uint64_t(*reinterpret_cast<const double*>(fPtr));
+      //            fPtr += 8;
+      //            ROS_INFO("!!!!!!!!!!!! CASE FLOAT64 !!!!!!!!!!!!!!!!");
+      //            break;
+      //          default: abort();
+      //        }
+      //      }
+      //      dataPtr += rosMsg.point_step;
+      //      ptId += 1;
+      //    }
+      //  }
+			//}
 			else
 			{
+
 				// get view for editing data
 				View view(
 					 (it->name == "normal_x") ? cloud.getDescriptorRowViewByName("normals", 0) :
@@ -118,6 +275,7 @@ namespace PointMatcher_ros
 					((isFeature[fieldId]) ? cloud.getFeatureViewByName(it->name) :
 					cloud.getDescriptorViewByName(it->name))))
 				);
+
 				// use view to read data
 				int ptId(0);
 				const size_t count(std::max<size_t>(it->count, 1));
@@ -131,12 +289,12 @@ namespace PointMatcher_ros
 						{
 							switch (it->datatype)
 							{
-								case PF::INT8: view(dim, ptId) = T(*reinterpret_cast<const int8_t*>(fPtr)); fPtr += 1; break;
-								case PF::UINT8: view(dim, ptId) = T(*reinterpret_cast<const uint8_t*>(fPtr)); fPtr += 1; break;
-								case PF::INT16: view(dim, ptId) = T(*reinterpret_cast<const int16_t*>(fPtr)); fPtr += 2; break;
-								case PF::UINT16: view(dim, ptId) = T(*reinterpret_cast<const uint16_t*>(fPtr)); fPtr += 2; break;
-								case PF::INT32: view(dim, ptId) = T(*reinterpret_cast<const int32_t*>(fPtr)); fPtr += 4; break;
-								case PF::UINT32: view(dim, ptId) = T(*reinterpret_cast<const uint32_t*>(fPtr)); fPtr += 4; break;
+								case PF::INT8:    view(dim, ptId) = T(*reinterpret_cast<const int8_t*>(fPtr)); fPtr += 1; break;
+								case PF::UINT8:   view(dim, ptId) = T(*reinterpret_cast<const uint8_t*>(fPtr)); fPtr += 1; break;
+								case PF::INT16:   view(dim, ptId) = T(*reinterpret_cast<const int16_t*>(fPtr)); fPtr += 2; break;
+								case PF::UINT16:  view(dim, ptId) = T(*reinterpret_cast<const uint16_t*>(fPtr)); fPtr += 2; break;
+								case PF::INT32:   view(dim, ptId) = T(*reinterpret_cast<const int32_t*>(fPtr)); fPtr += 4; break;
+								case PF::UINT32:  view(dim, ptId) = T(*reinterpret_cast<const uint32_t*>(fPtr)); fPtr += 4; break;
 								case PF::FLOAT32: view(dim, ptId) = T(*reinterpret_cast<const float*>(fPtr)); fPtr += 4; break;
 								case PF::FLOAT64: view(dim, ptId) = T(*reinterpret_cast<const double*>(fPtr)); fPtr += 8; break;
 								default: abort();
@@ -150,14 +308,19 @@ namespace PointMatcher_ros
 		}
 
 		
-		shared_ptr<typename PM::DataPointsFilter> filter(PM::get().DataPointsFilterRegistrar.create("RemoveNaNDataPointsFilter"));
-		return filter->filter(cloud);
+		if(isDense == false)
+		{
+			shared_ptr<typename PM::DataPointsFilter> filter(PM::get().DataPointsFilterRegistrar.create("RemoveNaNDataPointsFilter"));
+			return filter->filter(cloud);
+		}
+
+		return cloud;
 	}
 	
 	template
-	PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::PointCloud2& rosMsg);
+	PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::PointCloud2& rosMsg, const bool isDense);
 	template
-	PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::PointCloud2& rosMsg);
+	PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::PointCloud2& rosMsg, const bool isDense);
 	
 	
 	template<typename T>
@@ -191,11 +354,14 @@ namespace PointMatcher_ros
 			descLabels.push_back(Label("observationDirections", 3));
     }
 		
-    //TODO: change that once the time_support branch is merge in libpointmatcher
+		// Build time
+		Labels timeLabels;
     if(addTimestamps)
     {
-			descLabels.push_back(Label("timestamp", 3));
+			timeLabels.push_back(Label("time", 1));
+			//timeLabels.push_back(Label("stamps", 1));
     }
+
 		// filter points based on range
     std::vector<size_t> ids(rosMsg.ranges.size());
     std::vector<double> ranges(rosMsg.ranges.size());
@@ -205,6 +371,7 @@ namespace PointMatcher_ros
 		for (size_t i = 0; i < rosMsg.ranges.size(); ++i)
 		{
 			const float range(rosMsg.ranges[i]);
+			//TODO: we might want to keep points with nan values
 			if (range >= rosMsg.range_min && range <= rosMsg.range_max)
       {
         ranges[goodCount] = range;
@@ -224,7 +391,7 @@ namespace PointMatcher_ros
     if(!rosMsg.intensities.empty())
       intensities.resize(goodCount);
 
-		DataPoints cloud(featLabels, descLabels, goodCount);
+		DataPoints cloud(featLabels, descLabels, timeLabels, goodCount);
 		cloud.getFeatureViewByName("pad").setConstant(1);
       
     if(addObservationDirection)
@@ -245,6 +412,7 @@ namespace PointMatcher_ros
 
       // the turn ratio correct for the fact that not all sensor scan
       // continuously during 360 deg 
+			//TODO: check that. FP
       const float turnRatio = (rosMsg.angle_max - rosMsg.angle_min)/(2*M_PI);
       // dt_point should be more precise than rosMsg.time_increment
       const float dt_point = (rosMsg.scan_time*turnRatio)/rosMsg.ranges.size();
@@ -280,7 +448,6 @@ namespace PointMatcher_ros
 
         try
         {
-      
           listener->transformPoint(
 						fixedFrame,
             rosMsg.header.stamp,
@@ -334,26 +501,22 @@ namespace PointMatcher_ros
 			}
 		}
 
+		// Fill time
     if(addTimestamps)
     {
-			auto is(cloud.getDescriptorViewByName("timestamp"));
+			//auto is(cloud.getTimeViewByName("stamps"));
+			auto is(cloud.getTimeViewByName("time"));
 
 			for (size_t i = 0; i < ranges.size(); ++i)
       {
         const ros::Time curTime(rosMsg.header.stamp + ros::Duration(ids[i] * rosMsg.time_increment));
+				const boost::posix_time::time_duration duration = boost::posix_time::seconds(curTime.sec) + boost::posix_time::nanoseconds(curTime.nsec);
 
-        const T Msec = round(curTime.sec/1e6);
-        const T sec  = round(curTime.sec - Msec*1e6);
-        const T nsec = round(curTime.nsec);
-
-        is(0,i) = Msec;
-        is(1,i) = sec;
-        is(2,i) = nsec;
-      }
+				is(0,i) = duration.ticks();
+			}
     }
-		
 
-		//cerr << "point cloud:\n" << cloud.features.leftCols(10) << endl;
+		//cerr << "point cloud:\n" << cloud.times.leftCols(10) << endl;
 		return cloud;
 	}
 	
@@ -366,6 +529,7 @@ namespace PointMatcher_ros
 	template<typename T>
 	sensor_msgs::PointCloud2 pointMatcherCloudToRosMsg(const typename PointMatcher<T>::DataPoints& pmCloud, const std::string& frame_id, const ros::Time& stamp)
 	{
+
 		sensor_msgs::PointCloud2 rosCloud;
 		typedef sensor_msgs::PointField PF;
 		
@@ -385,7 +549,11 @@ namespace PointMatcher_ros
 			scalarSize = 8;
 		}
 		
+		size_t timeSize = 4; // we split in two UINT32
+		
 		// build labels
+
+		// features
 		unsigned offset(0);
 		assert(!pmCloud.featureLabels.empty());
 		assert(pmCloud.featureLabels[pmCloud.featureLabels.size()-1].text == "pad");
@@ -414,6 +582,8 @@ namespace PointMatcher_ros
 			offset += scalarSize;
 			addZ = true;
 		}
+		
+		// descriptors
 		const bool isDescriptor(!pmCloud.descriptorLabels.empty());
 		bool hasColor(false);
 		unsigned colorPos(0);
@@ -468,7 +638,45 @@ namespace PointMatcher_ros
 			}
 			inDescriptorPos += it->span;
 		}
-		
+
+		// time
+    bool hasTime(false);
+    for(auto it(pmCloud.timeLabels.begin()); it != pmCloud.timeLabels.end(); ++it)
+    {
+      PF pointField;
+      //if (it->text == "stamps")
+      if (it->text == "time")
+      {
+        hasTime = true;
+
+				// for Rviz view
+
+        pointField.datatype = PF::FLOAT32;
+
+        //pointField.datatype = PF::UINT32;
+        pointField.name = "elapsedTimeSec";
+        pointField.offset = offset;
+        pointField.count = 1;
+        rosCloud.fields.push_back(pointField);
+        offset += 4;
+
+				// Split time in two because there is not PF::UINT64
+				pointField.datatype = PF::UINT32;
+				pointField.name = it->text + "_splitTime_high32";
+				pointField.offset = offset;
+				pointField.count = 1;
+				rosCloud.fields.push_back(pointField);
+				offset += timeSize;
+				
+				pointField.datatype = PF::UINT32;
+				pointField.name = it->text + "_splitTime_low32";
+				pointField.offset = offset;
+				pointField.count = 1;
+				rosCloud.fields.push_back(pointField);
+				offset += timeSize;
+      }
+    }
+
 		// fill cloud with data
 		rosCloud.header.frame_id = frame_id;
 		rosCloud.header.stamp = stamp;
@@ -483,15 +691,20 @@ namespace PointMatcher_ros
 		rosCloud.row_step = rosCloud.point_step * rosCloud.width;
 		rosCloud.is_dense = true;
 		rosCloud.data.resize(rosCloud.row_step * rosCloud.height);
+		
 		const unsigned featureDim(pmCloud.features.rows()-1);
 		const unsigned descriptorDim(pmCloud.descriptors.rows());
+		const unsigned timeDim(pmCloud.times.rows());
+		
 		assert(descriptorDim == inDescriptorPos);
 		const unsigned postColorPos(colorPos + colorCount);
 		assert(postColorPos <= inDescriptorPos);
 		const unsigned postColorCount(descriptorDim - postColorPos);
+		
 		for (unsigned pt(0); pt < rosCloud.width; ++pt)
 		{
 			uint8_t *fPtr(&rosCloud.data[pt * offset]);
+
 			memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.features(0, pt)), scalarSize * featureDim);
 			fPtr += scalarSize * featureDim;
 			if (addZ)
@@ -519,11 +732,52 @@ namespace PointMatcher_ros
 					fPtr += 4;
 					// after color
 					memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(postColorPos, pt)), scalarSize * postColorCount);
+					fPtr += scalarSize * postColorCount;
 				}
 				else
 				{
 					memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(0, pt)), scalarSize * descriptorDim);
+					fPtr += scalarSize * descriptorDim;
 				}
+			}
+
+			// TODO: reactivate that properly
+			//if(isTime)
+			//{
+			//	for(unsigned d = 0; d<timeDim; d++)
+			//	{
+			//		const uint32_t nsec = (uint32_t) pmCloud.times(d,pt);
+			//		const uint32_t sec = (uint32_t) (pmCloud.times(d,pt) >> 32);
+			//		memcpy(fPtr, reinterpret_cast<const uint8_t*>(&sec), timeSize);
+			//		fPtr += timeSize;
+			//		memcpy(fPtr, reinterpret_cast<const uint8_t*>(&nsec), timeSize);
+			//		fPtr += timeSize;
+			//	}
+			//}
+			if (hasTime) 
+			{
+			  // PointCloud2 can not contain uint64_t variables
+			  // uint32_t are used for publishing, pmCloud.times(0, pt)/1000 (time in micro seconds)
+			  
+				//uint32_t temp = (uint32_t)(pmCloud.times(0, pt)/(uint64_t)1000);
+
+				const size_t ptrSize = timeSize * timeDim;
+				
+				// Elapsed time
+			  const float elapsedTime = (float)(pmCloud.times(0, pt) - pmCloud.times(0, 0))*1e-9f;
+			  memcpy(fPtr, reinterpret_cast<const uint8_t*>(&elapsedTime), ptrSize);
+				fPtr += ptrSize;
+				
+				// high32
+				const uint32_t high32 = (uint32_t)(pmCloud.times(0, pt) >> 32);
+			  memcpy(fPtr, reinterpret_cast<const uint8_t*>(&high32), ptrSize);
+				fPtr += ptrSize;
+				
+				// low32
+				const uint32_t low32 = (uint32_t)(pmCloud.times(0, pt));
+			  memcpy(fPtr, reinterpret_cast<const uint8_t*>(&low32), ptrSize);
+				fPtr += ptrSize;
+
 			}
 		}
 

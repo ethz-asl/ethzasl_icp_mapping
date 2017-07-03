@@ -1,15 +1,33 @@
-cmake_minimum_required(VERSION 2.4.6)
-include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
+cmake_minimum_required(VERSION 2.8.3)
 
-# Set the build type.  Options are:
-#  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage
-#  Debug          : w/ debug symbols, w/o optimization
-#  Release        : w/o debug symbols, w/ optimization
-#  RelWithDebInfo : w/ debug symbols, w/ optimization
-#  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
-set(ROS_BUILD_TYPE RelWithDebInfo)
+project(libpointmatcher_ros)
 
-rosbuild_init()
+find_package(catkin REQUIRED COMPONENTS
+roscpp
+sensor_msgs
+nav_msgs
+tf
+tf_conversions
+eigen_conversions
+)
+
+# This was tested for a system install of libpointmatcher
+find_package(libpointmatcher CONFIG)
+
+
+catkin_package(
+INCLUDE_DIRS include
+LIBRARIES pointmatcher_ros
+CATKIN_DEPENDS
+roscpp
+sensor_msgs
+nav_msgs
+tf
+tf_conversions
+eigen_conversions
+libpointmatcher
+)
+
 
 # c++ 0x
 #if("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang") 
@@ -25,6 +43,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 else(CMAKE_COMPILER_IS_GNUCXX)
 	message(SEND_ERROR "You need partial C++0x support for N2351, N2672, N1984. Currently this build toolchain supports only GCC >= 4.4. If your compiler supports these specifications, please send us a patch.")
 endif(CMAKE_COMPILER_IS_GNUCXX)
+
 # well, this breaks libpointmatcher on non-unix platform,
 # please contribute the define for your favorite compiler
 # It must support (compiler support in parenthesis):
@@ -33,12 +52,10 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-find_package(roscpp)
-
-find_package(Eigen REQUIRED)
-include_directories(${Eigen_INCLUDE_DIRS})
-
 add_definitions(-DHAVE_YAML_CPP)
+add_definitions(-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG)
+include_directories(include)
 
-rosbuild_add_boost_directories()
-rosbuild_add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)
+add_library(pointmatcher_ros src/point_cloud.cpp src/transform.cpp)
+include_directories(${catkin_INCLUDE_DIRS} ${libpointmatcher_INCLUDE_DIRS})
+target_link_libraries(pointmatcher_ros ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})

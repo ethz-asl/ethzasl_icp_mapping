@@ -1,6 +1,0 @@
-[submodule "libnabo/upstream_src"]
-	path = libnabo/upstream_src
-	url = git://github.com/ethz-asl/libnabo.git
-[submodule "libpointmatcher/upstream_src"]
-	path = libpointmatcher/upstream_src
-	url = git://github.com/ethz-asl/libpointmatcher.git

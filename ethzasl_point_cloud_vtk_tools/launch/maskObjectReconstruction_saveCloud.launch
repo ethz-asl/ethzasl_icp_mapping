@@ -1,0 +1,13 @@
+<launch>
+	<node name="pointCloudToVtk" type="pointCloudToVtk" pkg="ethzasl_point_cloud_vtk_tools" output="screen">
+		<param name="cloudTopic" value="/processed_cloud" />
+		<param name="mapFrameId" value="root" />
+		<param name="recordOnce" value="true" />
+		<param name="outputPath" value="./" />
+		<param name="outputPrefix" value="objectReconstruct" />
+		<param name="outputExtension" value="vtk" />
+		<param name="outputSuffixTimestamp" value="true" />
+		<param name="usedAsGlobalShutter" value="true" />
+
+	</node>
+</launch>

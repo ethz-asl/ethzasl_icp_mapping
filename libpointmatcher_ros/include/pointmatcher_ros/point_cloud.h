@@ -2,6 +2,7 @@
 #define __POINTMATCHER_ROS_POINT_CLOUD_H
 
 #include "pointmatcher/PointMatcher.h"
+#include "pointmatcher/IO.h"
 #include "sensor_msgs/PointCloud2.h"
 #include "sensor_msgs/LaserScan.h"
 
@@ -17,7 +18,7 @@ namespace tf
 namespace PointMatcher_ros
 {
 	template<typename T>
-	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::PointCloud2& rosMsg);
+	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::PointCloud2& rosMsg, const bool isDense=false);
 	
 	template<typename T>
 	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener = 0, const std::string& fixed_frame = "/world", const bool force3D = false, const bool addTimestamps=false, const bool addObservationDirection=false);

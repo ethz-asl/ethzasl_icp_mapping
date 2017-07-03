@@ -1,5 +1,25 @@
-cmake_minimum_required(VERSION 2.4.6)
-include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
+cmake_minimum_required(VERSION 2.8.3)
+project(ethzasl_point_cloud_vtk_tools)
+
+find_package(catkin REQUIRED 
+roscpp
+rospy
+rosbag
+std_msgs
+geometry_msgs
+sensor_msgs
+nav_msgs
+tf
+tf_conversions
+libpointmatcher_ros)
+
+# This was tested for a system install of libpointmatcher
+find_package(libpointmatcher CONFIG)
+
+catkin_package(
+CATKIN_DEPENDS roscpp rospy rosbag std_msgs geometry_msgs sensor_msgs nav_msgs
+tf tf_conversions libpointmatcher libpointmatcher_ros
+)
 
 # Set the build type.  Options are:
 #  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage
@@ -7,9 +27,7 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  Release        : w/o debug symbols, w/ optimization
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
-set(ROS_BUILD_TYPE RelWithDebInfo)
-
-rosbuild_init()
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
 # c++ 0x
 #if("${CMAKE_CXX_COMPILER_ID}" MATCHES "clang") 
@@ -35,14 +53,14 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-rosbuild_add_boost_directories()
+add_definitions(-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG)
 
-rosbuild_add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
-rosbuild_link_boost(pointCloudToVtk filesystem system)
-target_link_libraries(pointCloudToVtk ${EXTRA_LIBS} argtable2 rt yaml-cpp)
+include_directories(${catkin_INCLUDE_DIRS} ${libpointmatcher_INCLUDE_DIRS})
 
-rosbuild_add_executable(vtkToPointCloud src/vtkToPointCloud.cpp)
-rosbuild_link_boost(vtkToPointCloud filesystem system)
-target_link_libraries(vtkToPointCloud ${EXTRA_LIBS} argtable2 rt yaml-cpp)
+add_executable(pointCloudToVtk src/pointCloudToVtk.cpp)
+target_link_libraries(pointCloudToVtk ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
+
+add_executable(vtkToPointCloud src/vtkToPointCloud.cpp)
+target_link_libraries(vtkToPointCloud ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
 
 

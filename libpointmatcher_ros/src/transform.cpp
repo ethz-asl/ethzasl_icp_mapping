@@ -17,7 +17,6 @@ namespace PointMatcher_ros
 	template<typename T>
 	typename PointMatcher<T>::TransformationParameters transformListenerToEigenMatrix(const tf::TransformListener &listener, const std::string& target, const std::string& source, const ros::Time& stamp)
 	{
-		typedef typename PointMatcher<T>::TransformationParameters TransformationParameters;
 		
 		tf::StampedTransform stampedTr;
 		listener.waitForTransform(target, source, stamp, ros::Duration(0.1));
@@ -34,6 +33,8 @@ namespace PointMatcher_ros
 	PointMatcher<double>::TransformationParameters transformListenerToEigenMatrix<double>(const tf::TransformListener &listener, const std::string& target, const std::string& source, const ros::Time& stamp);
 
 	
+
+	//--------------------------------
 	template<typename T>
 	typename PointMatcher<T>::TransformationParameters odomMsgToEigenMatrix(const nav_msgs::Odometry& odom)
 	{
@@ -47,7 +48,9 @@ namespace PointMatcher_ros
 	template
 	PointMatcher<double>::TransformationParameters odomMsgToEigenMatrix<double>(const nav_msgs::Odometry& odom);
 	
-	
+
+	//--------------------------------
+	// Eigen to Odom
 	template<typename T>
 	nav_msgs::Odometry eigenMatrixToOdomMsg(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& frame_id, const ros::Time& stamp)
 	{
@@ -83,6 +86,51 @@ namespace PointMatcher_ros
 	nav_msgs::Odometry eigenMatrixToOdomMsg<double>(const PointMatcher<double>::TransformationParameters& inTr, const std::string& frame_id, const ros::Time& stamp);
 	
 	
+	//--------------------------------
+	// Pose to Eigen
+	template<typename T>
+	typename PointMatcher<T>::TransformationParameters poseMsgToEigenMatrix(const geometry_msgs::Pose& pose)
+	{
+		Eigen::Affine3d eigenTr;
+		tf::poseMsgToEigen(pose, eigenTr);
+		return eigenTr.matrix().cast<T>();
+	}
+	
+	template
+	PointMatcher<float>::TransformationParameters poseMsgToEigenMatrix<float>(const geometry_msgs::Pose& pose);
+	template
+	PointMatcher<double>::TransformationParameters poseMsgToEigenMatrix<double>(const geometry_msgs::Pose& pose);
+
+
+	//--------------------------------
+	// Eigen to Pose
+	template<typename T>
+	geometry_msgs::Pose eigenMatrixToPoseMsg(const typename PointMatcher<T>::TransformationParameters& inTr)
+	{
+		geometry_msgs::Pose pose;
+		
+		// Fill pose
+		const Eigen::Affine3d eigenTr(
+			Eigen::Matrix4d(
+				eigenMatrixToDim<double>(
+					inTr.template cast<double>(), 4
+				)
+			)
+		);
+		tf::poseEigenToMsg(eigenTr, pose);
+
+		
+		return pose;
+	}
+	
+	template
+	geometry_msgs::Pose eigenMatrixToPoseMsg<float>(const PointMatcher<float>::TransformationParameters& inTr);
+	template
+	geometry_msgs::Pose eigenMatrixToPoseMsg<double>(const PointMatcher<double>::TransformationParameters& inTr);
+	
+
+
+	//--------------------------------
 	template<typename T>
 	tf::Transform eigenMatrixToTransform(const typename PointMatcher<T>::TransformationParameters& inTr)
 	{
@@ -104,6 +152,8 @@ namespace PointMatcher_ros
 	tf::Transform eigenMatrixToTransform<double>(const PointMatcher<double>::TransformationParameters& inTr);
 	
 	
+
+	//--------------------------------
 	template<typename T>
 	tf::StampedTransform eigenMatrixToStampedTransform(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp)
 	{
@@ -116,6 +166,8 @@ namespace PointMatcher_ros
 	tf::StampedTransform eigenMatrixToStampedTransform<double>(const PointMatcher<double>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp);
 	
 	
+
+	//--------------------------------
 	template<typename T>
 	typename PointMatcher<T>::TransformationParameters eigenMatrixToDim(const typename PointMatcher<T>::TransformationParameters& matrix, int dimp1)
 	{

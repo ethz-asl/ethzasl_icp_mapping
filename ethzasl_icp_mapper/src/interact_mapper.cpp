@@ -26,6 +26,7 @@
 #include "ethzasl_icp_mapper/SetMode.h"
 #include "ethzasl_icp_mapper/GetMode.h"
 #include "ethzasl_icp_mapper/GetBoundedMap.h"
+#include "std_srvs/Empty.h"
 
 #include "boost/algorithm/string.hpp"
 #include "boost/filesystem.hpp"
@@ -72,6 +73,7 @@ public:
 	ros::ServiceClient correctMapClient;
 	ros::ServiceClient setModeClient;
 	ros::ServiceClient getModeClient;
+	ros::ServiceClient reloadAllYamlClient;
 	// test
 	ros::ServiceClient getBoundedMapClient;
 
@@ -84,6 +86,7 @@ public:
 	MenuHandler::EntryHandle h_save;
 	MenuHandler::EntryHandle h_adjustPose;
 	MenuHandler::EntryHandle h_getboundedMap;
+	MenuHandler::EntryHandle h_reloadAllYaml;
 
 	tf::TransformListener tfListener;
 	geometry_msgs::Pose markerPose;
@@ -98,6 +101,7 @@ protected:
 	void loadMapCallback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
 	void adjustPoseCallback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
 	void getBoundedMapCallback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
+	void reloadAllYamlCallback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
 	
 	void update_tf(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback );
 
@@ -133,6 +137,7 @@ InteractMapper::InteractMapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	setModeClient = n.serviceClient<ethzasl_icp_mapper::SetMode>("mapper/set_mode");
 	getModeClient = n.serviceClient<ethzasl_icp_mapper::GetMode>("mapper/get_mode");
 	getBoundedMapClient = n.serviceClient<ethzasl_icp_mapper::GetBoundedMap>("mapper/get_bounded_map");
+	reloadAllYamlClient= n.serviceClient<std_srvs::Empty>("mapper/reload_all_yaml");
 
 	// Setup interactive maker
 	server.reset( new InteractiveMarkerServer("MapControl","", false) );
@@ -144,6 +149,7 @@ InteractMapper::InteractMapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	h_adjustPose = menu_handler.insert( "Correct map pose", boost::bind(&InteractMapper::adjustPoseCallback, this, _1));
 	
 	h_getboundedMap = menu_handler.insert( "Publish 3x3 meter map", boost::bind(&InteractMapper::getBoundedMapCallback, this, _1));
+	h_reloadAllYaml= menu_handler.insert( "Reload yaml paramters", boost::bind(&InteractMapper::reloadAllYamlCallback, this, _1));
 	
 	// Fetch states of the mapper node
 	ethzasl_icp_mapper::GetMode srv;
@@ -443,10 +449,12 @@ void InteractMapper::getBoundedMapCallback( const visualization_msgs::Interactiv
 	Eigen::Affine3d eigenTr;
 	tf::transformTFToEigen(stampedTr, eigenTr);
 
-	srv.request.mapCenter.orientation.x = eigenTr.rotation().x();
-	srv.request.mapCenter.orientation.z = eigenTr.rotation().y();
-	srv.request.mapCenter.orientation.y = eigenTr.rotation().z();
-	srv.request.mapCenter.orientation.w = eigenTr.rotation().w();
+	Eigen::Quaterniond quat(eigenTr.rotation());
+
+	srv.request.mapCenter.orientation.x = quat.x();
+	srv.request.mapCenter.orientation.z = quat.y();
+	srv.request.mapCenter.orientation.y = quat.z();
+	srv.request.mapCenter.orientation.w = quat.w();
 	srv.request.mapCenter.position.x = eigenTr.translation().x();
 	srv.request.mapCenter.position.y = eigenTr.translation().y();
 	srv.request.mapCenter.position.z = eigenTr.translation().z();
@@ -454,6 +462,13 @@ void InteractMapper::getBoundedMapCallback( const visualization_msgs::Interactiv
 
 	test_mapPub.publish(srv.response.boundedMap);
 
+}
+
+
+void InteractMapper::reloadAllYamlCallback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
+{
+	std_srvs::Empty e;
+	reloadAllYamlClient.call(e);
 }
 
 
