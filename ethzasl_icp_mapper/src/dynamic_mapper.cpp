@@ -544,7 +544,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	{
 		ROS_ERROR_STREAM("[ICP] failed to converge: " << error.what());
 		newPointCloud->save("error_read.vtk");
-		icp.getMap().save("error_ref.vtk");
+		icp.getPrefilteredMap().save("error_ref.vtk");
 		return;
 	}
 	
