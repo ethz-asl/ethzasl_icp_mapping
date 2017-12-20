@@ -477,9 +477,9 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 			ROS_INFO("Adding new points to the map in background");
 			mapBuildingTask = MapBuildingTask(boost::bind(&Mapper::updateMap, this, newPointCloud.release(), Ticp, true));
 			mapBuildingFuture = mapBuildingTask.get_future();
-			mapBuildingInProgress = true;
 			mapBuildingThread = boost::thread(boost::move(boost::ref(mapBuildingTask)));
             mapBuildingThread.detach();
+			mapBuildingInProgress = true;
 			#else // BOOST_VERSION >= 104100
 			ROS_INFO("Adding new points to the map");
 			setMap(updateMap( newPointCloud.release(), Ticp, true));
