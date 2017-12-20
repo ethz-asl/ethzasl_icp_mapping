@@ -536,7 +536,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 			mapBuildingTask = MapBuildingTask(boost::bind(&Mapper::updateMap, this, newPointCloud.release(), T_updatedScanner_to_map, true));
 			mapBuildingFuture = mapBuildingTask.get_future();
 			mapBuildingThread = boost::thread(boost::move(boost::ref(mapBuildingTask)));
-            mapBuildingThread.detach();
+			mapBuildingThread.detach();
 			mapBuildingInProgress = true;
 		}
 		
