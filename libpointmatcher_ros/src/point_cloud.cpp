@@ -52,6 +52,7 @@ namespace PointMatcher_ros
 			else if (name == "rgb" || name == "rgba")
 			{
 				descLabels.push_back(Label("color", (name == "rgba") ? 4 : 3));
+				fieldTypes.push_back(PM_types::DESCRIPTOR);
 				isFeature.push_back(false);
 			}
 			else if ((it+1) != rosMsg.fields.end() && it->name == "normal_x" && (it+1)->name == "normal_y")
