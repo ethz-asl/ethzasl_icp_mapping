@@ -445,9 +445,9 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	}
 	
 	// Check dimension
-	if (newPointCloud->getEuclideanDim() != icp.getInternalMap().getEuclideanDim())
+	if (newPointCloud->getEuclideanDim() != icp.getPrefilteredInternalMap().getEuclideanDim())
 	{
-		ROS_ERROR_STREAM("[ICP] Dimensionality missmatch: incoming cloud is " << newPointCloud->getEuclideanDim() << " while map is " << icp.getInternalMap().getEuclideanDim());
+		ROS_ERROR_STREAM("[ICP] Dimensionality missmatch: incoming cloud is " << newPointCloud->getEuclideanDim() << " while map is " << icp.getPrefilteredInternalMap().getEuclideanDim());
 		return;
 	}
 	
@@ -525,7 +525,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 
 		// check if news points should be added to the map
 		if (
-			((estimatedOverlap < maxOverlapToMerge) || (icp.getInternalMap().features.cols() < minMapPointCount)) &&(!mapBuildingInProgress)
+			((estimatedOverlap < maxOverlapToMerge) || (icp.getPrefilteredInternalMap().features.cols() < minMapPointCount)) &&(!mapBuildingInProgress)
 		)
 		{
 			// make sure we process the last available map
@@ -545,7 +545,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	{
 		ROS_ERROR_STREAM("[ICP] failed to converge: " << error.what());
 		newPointCloud->save("error_read.vtk");
-		icp.getMap().save("error_ref.vtk");
+		icp.getPrefilteredMap().save("error_ref.vtk");
 		return;
 	}
 	
