@@ -459,7 +459,7 @@ void DynamicTrails::processCloud(DP inputPointCloud, const TP TScannerToMap)
 
 	if(currentTrailPtCount > 0)
 	{
-		if(trailPointCloud == false)
+		if(!trailPointCloud)
 		{
 			trailPointCloud.reset(new DP(currenttTrails));
 		}
