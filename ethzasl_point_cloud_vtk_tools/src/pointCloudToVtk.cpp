@@ -27,6 +27,8 @@ class ExportVtk
 
     ros::NodeHandle& n;
 
+		PM::DataPointsFilters filters;
+
 		// Parameters
     ros::Subscriber cloudSub;
     const string cloudTopic;
@@ -37,6 +39,7 @@ class ExportVtk
     string outputExtension;
 		const bool usedAsGlobalShutter;
 		const bool outputSuffixTimestamp;
+    const string filterName;
 
     tf::TransformListener tf_listener;
     std::shared_ptr<PM::Transformation> transformation;
@@ -58,6 +61,7 @@ ExportVtk::ExportVtk(ros::NodeHandle& n):
     outputExtension(getParam<string>("outputExtension", ".vtk")),
     usedAsGlobalShutter(getParam<bool>("usedAsGlobalShutter", "false")),
     outputSuffixTimestamp(getParam<bool>("outputSuffixTimestamp", "false")),
+    filterName(getParam<string>("filterName", "")),
     transformation(PM::get().TransformationRegistrar.create("RigidTransformation"))
 {
     if(outputPrefix.empty())
@@ -69,7 +73,18 @@ ExportVtk::ExportVtk(ros::NodeHandle& n):
     // ROS initialization
     cloudSub = n.subscribe(cloudTopic, 100, &ExportVtk::gotCloud, this);
 
-    // Parameters for 3D map
+    // Point cloud filters
+		{
+			ifstream ifs(filterName.c_str());
+			if (ifs.good())
+			{
+				filters = PM::DataPointsFilters(ifs);
+			}
+			else
+			{
+				ROS_ERROR_STREAM("Cannot load input filters config from YAML file " << filterName);
+			}
+		}
 }
 
 void ExportVtk::validateOutputExtension()
@@ -100,6 +115,8 @@ void ExportVtk::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 		const boost::posix_time::time_duration duration = boost::posix_time::seconds(cloudMsgIn.header.stamp.sec) + boost::posix_time::nanoseconds(cloudMsgIn.header.stamp.nsec);
 
     DP inCloud(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloudMsgIn));
+		
+		
 
 		// Assumes the frame_id to be in sensor frame and that all points were recorded at the same time
 		if(usedAsGlobalShutter)
@@ -116,14 +133,18 @@ void ExportVtk::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 			// Add new field to current point cloud
 			inCloud.addDescriptor("observationDirections", observationDirections);
 			inCloud.addTime("time", time);
-
+			
+			if(filterName != "")
+			{
+				filters.apply(inCloud);
+			}
 		}
 
     try
     {
         const PM::TransformationParameters tr(PointMatcher_ros::transformListenerToEigenMatrix<float>(tf_listener,  mapFrame, cloudMsgIn.header.frame_id, cloudMsgIn.header.stamp));
 
-        const DP outCloud(transformation->compute(inCloud, tr));
+        DP outCloud(transformation->compute(inCloud, tr));
 
         if (outCloud.features.cols() == 0)
         {
@@ -150,6 +171,8 @@ void ExportVtk::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 				{
         	nameStream << outputPrefix << "_" << cloudMsgIn.header.seq << outputExtension;
 				}
+
+				
 
         outCloud.save(nameStream.str());
 				ROS_INFO_STREAM("Point cloud saved: " << nameStream.str());

@@ -1,0 +1,15 @@
+- RemoveNaNDataPointsFilter
+- SurfaceNormalDataPointsFilter:
+    knn: 100
+#    maxDist: 0.05
+    epsilon: 0.0
+    keepNormals: 1
+    keepMeanDist: 1
+    keepEigenValues: 1
+    sortEigen: 1
+    keepDensities: 0
+    smoothNormals: 1
+- ObservationDirectionDataPointsFilter
+- OrientNormalsDataPointsFilter
+- IncidenceAngleDataPointsFilter
+

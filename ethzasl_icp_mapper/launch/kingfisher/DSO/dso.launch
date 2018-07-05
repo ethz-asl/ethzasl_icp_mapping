@@ -1,0 +1,40 @@
+<!--
+This launch file is an example for 3D registration using DSO stero reconstruction
+
+-->
+
+<launch>
+	<node name="mapper" type="dynamic_mapper" pkg="ethzasl_icp_mapper" output="screen">
+		<remap from="cloud_in" to="/dso_accumulator/accum_out" />
+		<param name="subscribe_scan" value="false" />
+		<param name="subscribe_cloud" value="true" />
+		<param name="icpConfig" value="$(find ethzasl_icp_mapper)/launch/kingfisher/DSO/icp.yaml" />
+		<param name="inputFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/kingfisher/DSO/input_filters.yaml" />
+		<param name="mapPostFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/kingfisher/DSO/map_post_filters.yaml" />
+		<param name="sensor_frame" value="/kingfisher/tilt" />
+		<param name="odom_frame" value="/kingfisher/base" />
+		<param name="map_frame" value="/map" />
+		<param name="useROSLogger" value="true" />
+		<param name="minOverlap" value="0.1" /> 
+		<param name="maxOverlapToMerge" value="0.85" /> 
+		<param name="minMapPointCount" value="500" /> 
+		<param name="minReadingPointCount" value="30" /> 
+
+		<!-- Parameters for dynamic elements -->
+		<param name="priorDyn" value="0.65"/>
+		<param name="maxAngle" value="0.017"/><!--1 deg = 0.017rad-->
+		<param name="eps_a" value="0.05"/><!-- ratio-->
+		<param name="eps_d" value="0.10"/><!-- distance in meter-->
+		<param name="alpha" value="0.99"/>
+		<param name="beta" value="0.90"/>
+		<param name="maxDyn" value="1.90"/>
+
+		<param name="maxDistNewPoint" value="0.05"/>
+		<param name="sensorMaxRange" value="30.0"/>
+
+
+	</node>
+
+	<!--node pkg="tf" type="static_transform_publisher" name="correction_tf" args="0 0 0 0 -0.2 0 /boat_level /pointcloud  100"/-->
+
+</launch>

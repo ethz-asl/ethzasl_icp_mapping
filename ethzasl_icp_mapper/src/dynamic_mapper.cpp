@@ -58,6 +58,7 @@ class Mapper
 	
 	// Publishers
 	ros::Publisher mapPub;
+	ros::Publisher scanPub;
 	ros::Publisher outlierPub;
 	ros::Publisher odomPub;
 	ros::Publisher odomErrorPub;
@@ -103,6 +104,7 @@ class Mapper
 	bool useConstMotionModel; 
 	bool localizing;
 	bool mapping;
+	bool inverseTransform; // If true, publish the inverse transform, useful to maintain a tree in TF
 	int minReadingPointCount;
 	int minMapPointCount;
 	int inputQueueSize; 
@@ -117,8 +119,8 @@ class Mapper
 	const double mapElevation; // initial correction on z-axis //FIXME: handle the full matrix
 	
 	// Parameters for dynamic filtering
-	const float priorStatic; //!< ratio. Prior to be static when a new point is added
 	const float priorDyn; //!< ratio. Prior to be dynamic when a new point is added
+	const float priorStatic; //!< ratio. Prior to be static when a new point is added
 	const float maxAngle; //!< in rad. Openning angle of a laser beam
 	const float eps_a; //!< ratio. Error proportional to the laser distance
 	const float eps_d; //!< in meter. Fix error on the laser distance
@@ -132,7 +134,8 @@ class Mapper
 	
 
 	PM::TransformationParameters T_odom_to_map;
-	PM::TransformationParameters T_cutMap_to_map;
+	PM::TransformationParameters T_localMap_to_map;
+	PM::TransformationParameters T_odom_to_scanner;
 	boost::thread publishThread;
 	boost::mutex publishLock;
 	boost::mutex icpMapLock;
@@ -186,18 +189,20 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	useConstMotionModel(getParam<bool>("useConstMotionModel", false)),
 	localizing(getParam<bool>("localizing", true)),
 	mapping(getParam<bool>("mapping", true)),
+	inverseTransform(getParam<bool>("inverseTransform", false)),
 	minReadingPointCount(getParam<int>("minReadingPointCount", 2000)),
 	minMapPointCount(getParam<int>("minMapPointCount", 500)),
 	inputQueueSize(getParam<int>("inputQueueSize", 10)),
 	minOverlap(getParam<double>("minOverlap", 0.5)),
 	maxOverlapToMerge(getParam<double>("maxOverlapToMerge", 0.9)),
 	tfRefreshPeriod(getParam<double>("tfRefreshPeriod", 0.01)),
+	sensorFrame(getParam<string>("sensor_frame", "")),
 	odomFrame(getParam<string>("odom_frame", "odom")),
 	mapFrame(getParam<string>("map_frame", "map")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
 	mapElevation(getParam<double>("mapElevation", 0)),
-	priorStatic(getParam<double>("priorStatic", 0.5)),
 	priorDyn(getParam<double>("priorDyn", 0.5)),
+	priorStatic(1. - priorDyn),
 	maxAngle(getParam<double>("maxAngle", 0.02)),
 	eps_a(getParam<double>("eps_a", 0.05)),
 	eps_d(getParam<double>("eps_d", 0.02)),
@@ -207,11 +212,13 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	maxDistNewPoint(pow(getParam<double>("maxDistNewPoint", 0.1),2)),
 	sensorMaxRange(getParam<double>("sensorMaxRange", 80.0)),
 	T_odom_to_map(PM::TransformationParameters::Identity(4, 4)),
-	T_cutMap_to_map(PM::TransformationParameters::Identity(4, 4)),
+	T_localMap_to_map(PM::TransformationParameters::Identity(4, 4)),
+	T_odom_to_scanner(PM::TransformationParameters::Identity(4, 4)),
 	publishStamp(ros::Time::now()),
   tfListener(ros::Duration(30)),
 	eps(0.0001)
 {
+
 
 	// Ensure proper states
 	if(localizing == false)
@@ -239,6 +246,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 		cloudSub = n.subscribe("cloud_in", inputQueueSize, &Mapper::gotCloud, this);
 
 	mapPub = n.advertise<sensor_msgs::PointCloud2>("point_map", 2, true);
+	scanPub = n.advertise<sensor_msgs::PointCloud2>("corrected_scan", 2, true);
 	outlierPub = n.advertise<sensor_msgs::PointCloud2>("outliers", 2, true);
 	odomPub = n.advertise<nav_msgs::Odometry>("icp_odom", 50, true);
 	odomErrorPub = n.advertise<nav_msgs::Odometry>("icp_error_odom", 50, true);
@@ -285,9 +293,20 @@ void Mapper::gotScan(const sensor_msgs::LaserScan& scanMsgIn)
 	if(localizing)
 	{
 		const ros::Time endScanTime(scanMsgIn.header.stamp + ros::Duration(scanMsgIn.time_increment * (scanMsgIn.ranges.size() - 1)));
-		unique_ptr<DP> cloud(new DP(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(scanMsgIn, &tfListener, odomFrame)));
+		try
+		{
+			unique_ptr<DP> cloud(new DP(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(scanMsgIn, &tfListener, scanMsgIn.header.frame_id))); //odomFrame
 
-		processCloud(move(cloud), scanMsgIn.header.frame_id, endScanTime, scanMsgIn.header.seq);
+			processCloud(move(cloud), scanMsgIn.header.frame_id, endScanTime, scanMsgIn.header.seq);
+		}
+		catch(tf2::ConnectivityException)
+		{
+			ROS_ERROR_STREAM("Multiple tree... ignoring scan");
+		}
+		catch(tf2::TransformException &e)
+		{
+			ROS_ERROR_STREAM("Fix me..." << e.what() );
+		}
 	}
 }
 
@@ -328,9 +347,15 @@ protected:
 
 void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scannerFrame, const ros::Time& stamp, uint32_t seq)
 {
+
 	processingNewCloud = true;
 	BoolSetter stopProcessingSetter(processingNewCloud, false);
-	this->sensorFrame = scannerFrame;
+	
+	// If the sensor frame was not set by the user, use default
+	if(sensorFrame == "")
+	{
+		this->sensorFrame = scannerFrame;
+	}
 
 	// if the future has completed, use the new map
 	
@@ -339,11 +364,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	
 	// IMPORTANT:  We need to receive the point clouds in local coordinates (scanner or robot)
 	timer t;
-
-
-	cerr << "newPointCloud->getNbPoints()" << newPointCloud->getNbPoints() << endl;
-	cerr << "newPointCloud->times.cols()" << newPointCloud->times.cols() << endl;
-
 	
 	// Convert point cloud
 	const size_t goodCount(newPointCloud->features.cols());
@@ -356,6 +376,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	// Dimension of the point cloud, important since we handle 2D and 3D
 	const int dimp1(newPointCloud->features.rows());
 
+	// This need to be depreciated, there is addTime for those field in pm
 	if(!(newPointCloud->descriptorExists("stamps_Msec") && newPointCloud->descriptorExists("stamps_sec") && newPointCloud->descriptorExists("stamps_nsec")))
 	{
 		const float Msec = round(stamp.sec/1e6);
@@ -373,6 +394,15 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		
 	}
 
+	// Ensure a minimum amount of point before filtering
+	int ptsCount = newPointCloud->getNbPoints();
+	if(ptsCount < minReadingPointCount)
+	{
+		ROS_ERROR_STREAM("[ICP] Not enough points in newPointCloud: only " << ptsCount << " pts.");
+		return;
+	}
+
+
 	{
 		timer t; // Print how long take the algo
 		
@@ -381,8 +411,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		
 		ROS_INFO_STREAM("[ICP] Input filters took " << t.elapsed() << " [s]");
 	}
-	cerr << "newPointCloud->getNbPoints()" << newPointCloud->getNbPoints() << endl;
-	cerr << "newPointCloud->times.cols()" << newPointCloud->times.cols() << endl;
 
 	string reason;
 	// Initialize the transformation to identity if empty
@@ -391,16 +419,21 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		// we need to know the dimensionality of the point cloud to initialize properly
 		publishLock.lock();
 		T_odom_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
-		T_cutMap_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
-		//ISER
-		//T_odom_to_map(2,3) = mapElevation;
+		T_localMap_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
+		T_odom_to_scanner = PM::TransformationParameters::Identity(dimp1, dimp1);
 		publishLock.unlock();
+	}
+	else
+	{
+		//Ensure that all global transforms don't cumulate floating error
+		T_odom_to_map = transformation->correctParameters(T_odom_to_map);
+		T_localMap_to_map = transformation->correctParameters(T_localMap_to_map);
+		T_odom_to_scanner = transformation->correctParameters(T_odom_to_scanner);
 	}
 
 
 	// Fetch transformation from scanner to odom
-	// Note: we don't need to wait for transform. It is already called in transformListenerToEigenMatrix()
-	PM::TransformationParameters T_odom_to_scanner;
+	// Note: we don't need to actively wait for transform here. It is already waited in transformListenerToEigenMatrix()
 	try
 	{
 		T_odom_to_scanner = PointMatcher_ros::eigenMatrixToDim<float>(
@@ -416,18 +449,24 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		ROS_ERROR_STREAM("Extrapolation Exception. stamp = "<< stamp << " now = " << ros::Time::now() << " delta = " << ros::Time::now() - stamp << endl << e.what() );
 		return;
 	}
+	catch ( ... )
+	{
+		// everything else
+		ROS_ERROR_STREAM("Unexpected exception... ignoring scan");
+		return;
+	}
 
+	const PM::TransformationParameters T_scanner_to_map = T_odom_to_map * T_odom_to_scanner.inverse();
 
+	// Recuring need to see those transformations...
 	ROS_DEBUG_STREAM("[ICP] T_odom_to_scanner(" << odomFrame<< " to " << scannerFrame << "):\n" << T_odom_to_scanner);
 	ROS_DEBUG_STREAM("[ICP] T_odom_to_map(" << odomFrame<< " to " << mapFrame << "):\n" << T_odom_to_map);
-		
-	const PM::TransformationParameters T_scanner_to_map = T_odom_to_map * T_odom_to_scanner.inverse();
 	ROS_DEBUG_STREAM("[ICP] T_scanner_to_map (" << scannerFrame << " to " << mapFrame << "):\n" << T_scanner_to_map);
 
-	const PM::TransformationParameters T_scanner_to_cutMap = T_cutMap_to_map.inverse() * T_scanner_to_map;
-	
+	const PM::TransformationParameters T_scanner_to_localMap = transformation->correctParameters(T_localMap_to_map.inverse() * T_scanner_to_map);
+
 	// Ensure a minimum amount of point after filtering
-	const int ptsCount = newPointCloud->getNbPoints();
+	ptsCount = newPointCloud->getNbPoints();
 	if(ptsCount < minReadingPointCount)
 	{
 		ROS_ERROR_STREAM("[ICP] Not enough points in newPointCloud: only " << ptsCount << " pts.");
@@ -455,35 +494,19 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	{
 		// Apply ICP
 		PM::TransformationParameters T_updatedScanner_to_map;
-		PM::TransformationParameters T_updatedScanner_to_cutMap;
+		PM::TransformationParameters T_updatedScanner_to_localMap;
 		
 		ROS_INFO_STREAM("[ICP] Computing - reading: " << newPointCloud->getNbPoints() << ", reference: " << icp.getInternalMap().getNbPoints() );
-		//T_updatedScanner_to_map = icp(*newPointCloud, T_scanner_to_map);
+
 		icpMapLock.lock();
-		T_updatedScanner_to_cutMap = icp(*newPointCloud, T_scanner_to_cutMap);
+		T_updatedScanner_to_localMap = icp(*newPointCloud, T_scanner_to_localMap);
 		icpMapLock.unlock();
-		T_updatedScanner_to_map = T_cutMap_to_map * T_updatedScanner_to_cutMap;
 
-		// ISER
-		// TODO: generalize that
-		/*{
-		// extract corrections
-		PM::TransformationParameters Tdelta = T_updatedScanner_to_map * TscannerToMap.inverse();
-		
-		// remove roll and pitch
-		Tdelta(2,0) = 0; 
-		Tdelta(2,1) = 0; 
-		Tdelta(2,2) = 1; 
-		Tdelta(0,2) = 0; 
-		Tdelta(1,2) = 0;
-		Tdelta(2,3) = 0; //z
-		Tdelta.block(0,0,3,3) = transformation->correctParameters(Tdelta.block(0,0,3,3));
+		T_updatedScanner_to_map = T_localMap_to_map * T_updatedScanner_to_localMap;
 
-		T_updatedScanner_to_map = Tdelta*TscannerToMap;
-
-		}*/
 
 		ROS_DEBUG_STREAM("[ICP] T_updatedScanner_to_map:\n" << T_updatedScanner_to_map);
+		ROS_DEBUG_STREAM("[ICP] T_updatedScanner_to_localMap:\n" << T_updatedScanner_to_localMap);
 		
 		// Ensure minimum overlap between scans
 		const double estimatedOverlap = icp.errorMinimizer->getOverlap();
@@ -504,7 +527,15 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		// Publish tf
 		if(publishMapTf == true)
 		{
-			tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, stamp));
+			
+			if (inverseTransform) 
+			{
+				tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map.inverse(), odomFrame, mapFrame, stamp));
+			} 
+			else 
+			{
+				tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, stamp));
+			}		
 		}
 
 		publishLock.unlock();
@@ -515,6 +546,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		// Publish odometry
 		if (odomPub.getNumSubscribers())
 		{
+			// Not sure that the transformation represents the odometry
 			odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(T_updatedScanner_to_map, mapFrame, stamp));
 		}
 		// Publish error on odometry
@@ -536,12 +568,33 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 			mapBuildingTask = MapBuildingTask(boost::bind(&Mapper::updateMap, this, newPointCloud.release(), T_updatedScanner_to_map, true));
 			mapBuildingFuture = mapBuildingTask.get_future();
 			mapBuildingThread = boost::thread(boost::move(boost::ref(mapBuildingTask)));
+			mapBuildingThread.detach(); // We don't care about joining this one
+			sched_yield();
 			mapBuildingInProgress = true;
+		}
+		else
+		{
+			cerr << "SKIPPING MAP" << endl;
+			cerr << "estimatedOverlap < maxOverlapToMerge: " << (estimatedOverlap < maxOverlapToMerge) << endl;
+			cerr << "(icp.getInternalMap().features.cols() < minMapPointCount): " << icp.getInternalMap().features.cols() << " < " << minMapPointCount << " = " << (icp.getInternalMap().features.cols() < minMapPointCount) << endl;
+			cerr << "mapBuildingInProgress: " << mapBuildingInProgress << endl;
+			
+			bool stateLock = publishLock.try_lock();
+			if(stateLock) publishLock.unlock();
+			cerr << "publishLock.try_lock(): " << stateLock << endl;
+			
+			stateLock = icpMapLock.try_lock();
+			if(stateLock) icpMapLock.unlock();
+			cerr << "icpMapLock.try_lock(): " << stateLock << endl;
+
+			cerr << "mapBuildingFuture.has_value(): " << mapBuildingFuture.has_value() << endl;
+
 		}
 		
 	}
 	catch (PM::ConvergenceError error)
 	{
+		icpMapLock.unlock();
 		ROS_ERROR_STREAM("[ICP] failed to converge: " << error.what());
 		newPointCloud->save("error_read.vtk");
 		icp.getMap().save("error_ref.vtk");
@@ -589,38 +642,54 @@ void Mapper::setMap(DP* newMapPointCloud)
 	
 	// Publish map point cloud
 	// FIXME this crash when used without descriptor
-	if (mapPub.getNumSubscribers())
+	publishLock.lock();
+	if (mapPub.getNumSubscribers() && mapping)
 	{
 		ROS_INFO_STREAM("[MAP] publishing " << mapPointCloud->getNbPoints() << " points");
 		mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud, mapFrame, mapCreationTime));
 	}
+	publishLock.unlock();
 }
 
 void Mapper::updateIcpMap(const DP* newMapPointCloud)
 {
 	ros::Time time_current = ros::Time::now();
-	tfListener.waitForTransform(sensorFrame, odomFrame, time_current, ros::Duration(3.0));
+	//TODO check if T_odom_to_scanner can be reused
+	try
+	{
+		//tfListener.waitForTransform(sensorFrame, odomFrame, time_current, ros::Duration(3.0));
 
-	// Fetching current transformation to the sensor
-	const PM::TransformationParameters T_odom_to_scanner = 
-	   PointMatcher_ros::eigenMatrixToDim<float>(
-				PointMatcher_ros::transformListenerToEigenMatrix<float>(
-				tfListener,
-				sensorFrame, 
-				odomFrame,
-				time_current
-			), mapPointCloud->getHomogeneousDim());
+		// Fetching current transformation to the sensor
+	
+		//const PM::TransformationParameters T_odom_to_scanner = 
+		//	PointMatcher_ros::eigenMatrixToDim<float>(
+		//			PointMatcher_ros::transformListenerToEigenMatrix<float>(
+		//				tfListener,
+		//				sensorFrame, 
+		//				odomFrame,
+		//				time_current
+		//				), mapPointCloud->getHomogeneousDim());
 
-	const PM::TransformationParameters T_scanner_to_map = this->T_odom_to_map * T_odom_to_scanner.inverse();
-	DP localMap = transformation->compute(*newMapPointCloud, T_scanner_to_map.inverse());
-	radiusFilter->inPlaceFilter(localMap);
-	
-	icpMapLock.lock();
-	// Update the transformation to the cut map
-	this->T_cutMap_to_map = T_scanner_to_map;
-	
-	icp.setMap(localMap);
-	icpMapLock.unlock();
+		// Move the global map to the scanner pose
+		const PM::TransformationParameters T_scanner_to_map = this->T_odom_to_map * T_odom_to_scanner.inverse();
+		DP localMap = transformation->compute(*newMapPointCloud, T_scanner_to_map.inverse());
+
+		// Cut points in a radius of the parameter sensorMaxRange
+		radiusFilter->inPlaceFilter(localMap);
+
+		icpMapLock.lock();
+		// Update the transformation to the local map
+		this->T_localMap_to_map = T_scanner_to_map;
+
+		icp.setMap(localMap);
+		icpMapLock.unlock();
+	}
+	catch ( ... )
+	{
+		// everything else
+		ROS_ERROR_STREAM("Unexpected exception... ignoring scan");
+		return;
+	}
 }
 
 Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParameters T_updatedScanner_to_map, bool mapExists)
@@ -642,9 +711,9 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 			newPointCloud->addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, newPointCloud->features.cols(), priorDyn));
 		}
 		
-		if(newPointCloud->descriptorExists("dynamic_ratio") == false)
+		if(newPointCloud->descriptorExists("debug") == false)
 		{
-			newPointCloud->addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, newPointCloud->features.cols()));
+			newPointCloud->addDescriptor("debug", PM::Matrix::Zero(1, newPointCloud->features.cols()));
 		}
 
 		
@@ -654,7 +723,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 			ROS_INFO_STREAM( "[MAP] Initial map, only filtering points");
 			*newPointCloud = transformation->compute(*newPointCloud, T_updatedScanner_to_map); 
 			mapPostFilters.apply(*newPointCloud);
-
 
 			return newPointCloud;
 		}
@@ -668,20 +736,24 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 		}
 		
 		
+		const int dimp1(newPointCloud->features.rows());
 		const int mapPtsCount(mapPointCloud->getNbPoints());
 		const int readPtsCount(newPointCloud->getNbPoints());
+		const int dim = mapPointCloud->getEuclideanDim();
 		
 		// Build a range image of the reading point cloud (local coordinates)
-		PM::Matrix radius_reading = newPointCloud->features.topRows(3).colwise().norm();
+		PM::Matrix radius_reading = newPointCloud->features.topRows(dimp1-1).colwise().norm();
 
 		PM::Matrix angles_reading(2, readPtsCount); // 0=inclination, 1=azimuth
 
 		// No atan in Eigen, so we are for to loop through it...
 		for(int i=0; i<readPtsCount; i++)
 		{
-			const float ratio = newPointCloud->features(2,i)/radius_reading(0,i);
-
-			angles_reading(0,i) = acos(ratio);
+			angles_reading(0,i) = 0;
+            if (dimp1 == 4) { // 3D only
+                const float ratio = newPointCloud->features(2,i)/radius_reading(0,i);
+                angles_reading(0,i) = acos(ratio);
+            }
 			angles_reading(1,i) = atan2(newPointCloud->features(1,i), newPointCloud->features(0,i));
 		}
 
@@ -699,7 +771,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 		int mapCutPtsCount= 0;
 		for (int i = 0; i < mapPtsCount; i++)
 		{
-			if (mapLocalFrameCut.features.col(i).head(3).norm() < sensorMaxRange)
+			if (mapLocalFrameCut.features.col(i).head(dimp1-1).norm() < sensorMaxRange)
 			{
 				mapLocalFrameCut.setColFrom(mapCutPtsCount, mapLocalFrameCut, i);
 				globalId(0,mapCutPtsCount) = i;
@@ -709,16 +781,18 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 
 		mapLocalFrameCut.conservativeResize(mapCutPtsCount);
 
-		PM::Matrix radius_map = mapLocalFrameCut.features.topRows(3).colwise().norm();
+		PM::Matrix radius_map = mapLocalFrameCut.features.topRows(dimp1-1).colwise().norm();
 
 		PM::Matrix angles_map(2, mapCutPtsCount); // 0=inclination, 1=azimuth
 
 		// No atan in Eigen, so we need to loop through it...
 		for(int i=0; i<mapCutPtsCount; i++)
 		{
-			const float ratio = mapLocalFrameCut.features(2,i)/radius_map(0,i);
-
-			angles_map(0,i) = acos(ratio);
+			angles_map(0,i) = 0;
+            if (dimp1 == 4) { // 3D
+                const float ratio = mapLocalFrameCut.features(2,i)/radius_map(0,i);
+                angles_map(0,i) = acos(ratio);
+            }
 
 			angles_map(1,i) = atan2(mapLocalFrameCut.features(1,i), mapLocalFrameCut.features(0,i));
 		}
@@ -736,7 +810,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 
 		DP::View viewOnProbabilityStatic = mapPointCloud->getDescriptorViewByName("probabilityStatic");
 		DP::View viewOnProbabilityDynamic = mapPointCloud->getDescriptorViewByName("probabilityDynamic");
-		DP::View viewOnDynamicRatio = mapPointCloud->getDescriptorViewByName("dynamic_ratio");
+		DP::View viewDebug = mapPointCloud->getDescriptorViewByName("debug");
 		
 		DP::View viewOn_normals_map = mapPointCloud->getDescriptorViewByName("normals");
 		DP::View viewOn_Msec_map = mapPointCloud->getDescriptorViewByName("stamps_Msec");
@@ -744,7 +818,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 		DP::View viewOn_nsec_map = mapPointCloud->getDescriptorViewByName("stamps_nsec");
 		
 		
-		viewOnDynamicRatio = PM::Matrix::Zero(1, mapPtsCount);
+		viewDebug = PM::Matrix::Zero(1, mapPtsCount);
 		for(int i=0; i < mapCutPtsCount; i++)
 		{
 			if(dists(i) != numeric_limits<float>::infinity())
@@ -753,21 +827,21 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 				const int mapId = globalId(0,i);
 				
 				// in local coordinates
-				const Eigen::Vector3f readPt = newPointCloud->features.col(readId).head(3);
-				const Eigen::Vector3f mapPt = mapLocalFrameCut.features.col(i).head(3);
-				const Eigen::Vector3f mapPt_n = mapPt.normalized();
+				const Eigen::VectorXf readPt = newPointCloud->features.col(readId).head(dimp1-1);
+				const Eigen::VectorXf mapPt = mapLocalFrameCut.features.col(i).head(dimp1-1);
+				const Eigen::VectorXf mapPt_n = mapPt.normalized();
 				const float delta = (readPt - mapPt).norm();
 				const float d_max = eps_a * readPt.norm();
 
-				const Eigen::Vector3f normal_map = viewOn_normals_map.col(mapId);
+				const Eigen::VectorXf normal_map = viewOn_normals_map.col(mapId);
 				
 				// Weight for dynamic elements
-				const float w_v = eps + (1 - eps)*fabs(normal_map.dot(mapPt_n));
-				const float w_d1 =  eps + (1 - eps)*(1 - sqrt(dists(i))/maxAngle);
+				const float w_v = eps + (1. - eps)*fabs(normal_map.dot(mapPt_n));
+				const float w_d1 =  eps + (1. - eps)*(1. - sqrt(dists(i))/maxAngle);
 				
 				
 				const float offset = delta - eps_d;
-				float w_d2 = 1;
+				float w_d2 = 1.;
 				if(delta < eps_d || mapPt.norm() > readPt.norm())
 				{
 					w_d2 = eps;
@@ -789,7 +863,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 				{
 					if(offset < d_max)
 					{
-						w_p2 = eps + (1 - eps)*(1 - offset/d_max);
+						w_p2 = eps + (1. - eps)*(1. - offset/d_max);
 					}
 				}
 
@@ -825,7 +899,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 					viewOnProbabilityDynamic(0,mapId) /= sumZ;
 					viewOnProbabilityStatic(0,mapId) /= sumZ;
 					
-					viewOnDynamicRatio(0,mapId) = w_d2;
+					viewDebug(0,mapId) = w_d2;
 
 
 					//TODO use the new time structure
@@ -885,7 +959,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 		// Initialize descriptors
 		no_overlap.addDescriptor("probabilityStatic", PM::Matrix::Constant(1, no_overlap.features.cols(), priorStatic));
 		no_overlap.addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, no_overlap.features.cols(), priorDyn));
-		no_overlap.addDescriptor("dynamic_ratio", PM::Matrix::Zero(1, no_overlap.features.cols()));
+		no_overlap.addDescriptor("debug", PM::Matrix::Zero(1, no_overlap.features.cols()));
 
 		// shrink the newPointCloud to the new information
 		*newPointCloud = no_overlap;
@@ -900,6 +974,12 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 	catch(DP::InvalidField e)
 	{
 		ROS_ERROR_STREAM(e.what());
+		abort();
+	}
+	catch (const std::exception &exc)
+	{
+		// catch anything thrown within try block that derives from std::exception
+		std::cerr << exc.what();
 		abort();
 	}
 	
@@ -937,8 +1017,14 @@ void Mapper::publishTransform()
 	if(processingNewCloud == false && publishMapTf == true)
 	{
 		publishLock.lock();
+    ros::Time stamp = ros::Time::now();
 		// Note: we use now as timestamp to refresh the tf and avoid other buffer to be empty
-		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, ros::Time::now()));
+		if (inverseTransform) {
+        tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map.inverse(), odomFrame, mapFrame, stamp));
+    } else {
+        tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, stamp));
+    }		
+		
 		publishLock.unlock();
 	}
 }
@@ -992,15 +1078,17 @@ bool Mapper::loadMap(ethzasl_icp_mapper::LoadMap::Request &req, ethzasl_icp_mapp
 	//reset transformation
 	publishLock.lock();
 	T_odom_to_map = PM::TransformationParameters::Identity(dim,dim);
-	T_cutMap_to_map = PM::TransformationParameters::Identity(dim,dim);
-	T_cutMap_to_map = PM::TransformationParameters::Identity(dim,dim);
+	T_localMap_to_map = PM::TransformationParameters::Identity(dim,dim);
+	T_odom_to_scanner = PM::TransformationParameters::Identity(dim,dim);
 	
 	//ISER
 	//T_odom_to_map(2,3) = mapElevation;
 	publishLock.unlock();
 
-	//setMap(cloud);
+	//TODO: check that...
+	mapping = true;
 	setMap(updateMap(cloud, PM::TransformationParameters::Identity(dim,dim), false));
+	mapping = false;
 	
 	return true;
 }
@@ -1011,8 +1099,10 @@ bool Mapper::reset(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res
 	
 	// note: no need for locking as we do ros::spin(), to update if we go for multi-threading
 	publishLock.lock();
+	// WARNING: this will break in 2D
 	T_odom_to_map = PM::TransformationParameters::Identity(4,4);
-	T_cutMap_to_map = PM::TransformationParameters::Identity(4,4);
+	T_localMap_to_map = PM::TransformationParameters::Identity(4,4);
+	T_odom_to_scanner = PM::TransformationParameters::Identity(4,4);
 	publishLock.unlock();
 
 	icp.clearMap();
@@ -1023,37 +1113,51 @@ bool Mapper::reset(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res
 bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req, ethzasl_icp_mapper::CorrectPose::Response &res)
 {
 	publishLock.lock();
-	T_odom_to_map = PointMatcher_ros::odomMsgToEigenMatrix<float>(req.odom);
+	const int dim = mapPointCloud->getHomogeneousDim();
 
-	const PM::TransformationParameters T_odom_to_scanner = 
-	   PointMatcher_ros::eigenMatrixToDim<float>(
-				PointMatcher_ros::transformListenerToEigenMatrix<float>(
-				tfListener,
-				sensorFrame, 
-				odomFrame,
-				ros::Time::now()
-			), mapPointCloud->getHomogeneousDim());
-
-	const PM::TransformationParameters T_scanner_to_map = T_odom_to_map * T_odom_to_scanner.inverse();
-	//T_cutMap_to_map = T_scanner_to_map;
-
-	
-	// update ICP map
-	updateIcpMap(mapPointCloud);
-	
-	//ISER
-	/*
+	try
 	{
-	// remove roll and pitch
-	T_odom_to_map(2,0) = 0; 
-	T_odom_to_map(2,1) = 0; 
-	T_odom_to_map(2,2) = 1; 
-	T_odom_to_map(0,2) = 0; 
-	T_odom_to_map(1,2) = 0;
-	T_odom_to_map(2,3) = mapElevation; //z
-	}*/
+		T_odom_to_map = PointMatcher_ros::eigenMatrixToDim<float>(PointMatcher_ros::odomMsgToEigenMatrix<float>(req.odom), dim);
 
-	tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, ros::Time::now()));
+
+		const PM::TransformationParameters T_odom_to_scanner = 
+			PointMatcher_ros::eigenMatrixToDim<float>(
+					PointMatcher_ros::transformListenerToEigenMatrix<float>(
+						tfListener,
+						sensorFrame, 
+						odomFrame,
+						ros::Time::now()
+						), dim);
+
+		const PM::TransformationParameters T_scanner_to_map = T_odom_to_map * T_odom_to_scanner.inverse();
+
+
+		// update ICP map
+		updateIcpMap(mapPointCloud);
+
+		//ISER
+		/*
+			 {
+		// remove roll and pitch
+		T_odom_to_map(2,0) = 0; 
+		T_odom_to_map(2,1) = 0; 
+		T_odom_to_map(2,2) = 1; 
+		T_odom_to_map(0,2) = 0; 
+		T_odom_to_map(1,2) = 0;
+		T_odom_to_map(2,3) = mapElevation; //z
+		}*/
+
+		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, ros::Time::now()));
+
+	}
+	catch ( ... )
+	{
+		// everything else
+		publishLock.unlock();
+		ROS_ERROR_STREAM("Unexpected exception... ignoring scan");
+		return false;
+	}
+
 	publishLock.unlock();
 
 	return true;
@@ -1093,10 +1197,6 @@ bool Mapper::getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethz
 	const float min_y = req.bottomLeftCorner.y;
 	const float min_z = req.bottomLeftCorner.z;
 
-	cerr << "min [" << min_x << ", " << min_y << ", " << min_z << "] " << endl;
-	cerr << "max [" << max_x << ", " << max_y << ", " << max_z << "] " << endl;
-
-
 
 	tf::StampedTransform stampedTr;
 	
@@ -1105,16 +1205,12 @@ bool Mapper::getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethz
 	Eigen::MatrixXf T = eigenTr.matrix().inverse().cast<float>();
 	//const Eigen::MatrixXf T = eigenTr.matrix().cast<float>();
 
-	cerr << "T:" << endl << T << endl;
 	T = transformation->correctParameters(T);
 
 		
 	// FIXME: do we need a mutex here?
 	const DP centeredPointCloud = transformation->compute(*mapPointCloud, T); 
 	DP cutPointCloud = centeredPointCloud.createSimilarEmpty();
-
-	cerr << centeredPointCloud.features.topLeftCorner(3, 10) << endl;
-	cerr << T << endl;
 
 	int newPtCount = 0;
 	for(int i=0; i < centeredPointCloud.features.cols(); i++)

@@ -1,11 +1,11 @@
 <launch>
 	<node name="pointCloudToVtk" type="pointCloudToVtk" pkg="ethzasl_point_cloud_vtk_tools" output="screen">
-		<param name="cloudTopic" value="/pico_flexx/points" />
-		<param name="mapFrameId" value="/pico_flexx_optical_frame" />
+		<param name="cloudTopic" value="/object_map" />
+		<param name="mapFrameId" value="/root" />
 		<param name="recordOnce" value="false" />
 		<param name="outputPath" value="./" />
 		<param name="outputPrefix" value="picoFlexx" />
-		<param name="outputExtension" value="csv" />
+		<param name="outputExtension" value="vtk" />
 		<param name="outputSuffixTimestamp" value="true" />
 		<param name="usedAsGlobalShutter" value="true" />
 

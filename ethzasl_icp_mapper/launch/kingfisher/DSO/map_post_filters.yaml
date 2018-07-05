@@ -1,9 +1,11 @@
 - SurfaceNormalDataPointsFilter:
     knn: 10
     epsilon: 3.16
-    keepNormals: 0
-    keepDensities: 1
+    keepNormals: 1
+- MaxPointCountDataPointsFilter:
+    maxCount: 600000
 - CutAtDescriptorThresholdDataPointsFilter:
     descName: probabilityStatic
     useLargerThan: 0
-    threshold: 0.1
+    threshold: 0.3
+

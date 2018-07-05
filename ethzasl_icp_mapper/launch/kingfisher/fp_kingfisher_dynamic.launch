@@ -1,0 +1,95 @@
+<!--
+This launch file is an example for 2D scan matching
+
+-->
+
+<launch>
+	<param name="use_sim_time" value="true"/>
+
+	<node name="mapper" type="dynamic_mapper" pkg="ethzasl_icp_mapper" output="screen"> launch-prefix="xterm -e gdb --args">
+		<!--remap from="scan" to="/lidar/scan" /-->
+		<remap from="scan" to="/lidar/scan_flip" />
+		<remap from="cloud_in" to="/ls_to_pc2/scan" /> 
+		<!--<remap from="cloud_in" to="/cloud_ortho" />-->
+		<remap from="odom" to="/gps/odom" />
+		<param name="subscribe_scan" value="true" />
+		<param name="subscribe_cloud" value="false" />
+		<param name="icpConfig" value="$(find ethzasl_icp_mapper)/launch/kingfisher/icp.yaml" />
+		<param name="optIcpConfig" value="$(find ethzasl_icp_mapper)/launch/kingfisher/icpOpt.yaml" />
+		<param name="inputFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/kingfisher/input_filters.yaml" />
+		<param name="mapPostFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/kingfisher/map_post_filters.yaml" />
+		<param name="sensor_frame" value="" />
+		<param name="odom_frame" value="kingfisher/gps_odom" />
+		<param name="map_frame" value="map" />
+		<param name="useROSLogger" value="true" />
+		<param name="minOverlap" value="0.35" /> 
+		<param name="maxOverlapToMerge" value="1.99" /> 
+		<param name="minMapPointCount" value="200" /> 
+		<param name="inputQueueSize" value="1" /> 
+		<param name="minReadingPointCount" value="30" /> 
+		<param name="inverseTransform" value="true" />
+		<param name="force2D" value="true" />
+		<param name="enableMapOptimization" value="true" />
+		<param name="savePointCloudOnError" value="false" />
+		<param name="verbose" value="0" />
+		<param name="tfRefreshPeriod" value="0.05" />
+		<param name="numErrorToReset" value="20" />
+		<param name="numScansPerKeyFrame" value="5000" />
+		<param name="distPerKeyFrame" value="20.0" />
+		<param name="minOverlapToOpt" value="0.20" /> 
+		<param name="maxKeyframeDist" value="0.5" /> 
+		<param name="maxDistToCheckNeighbours" value="1000.0" />  <!-- Disable -->
+		<param name="keyframeInitRadius" value="20.0" />  <!-- Disable -->
+
+		<!-- Parameters for dynamic elements -->
+		<param name="priorDyn" value="0.7"/>
+		<param name="maxAngle" value="0.008"/><!--1 deg = 0.017rad-->
+		<param name="eps_a" value="0.01"/><!-- ratio-->
+		<param name="eps_d" value="0.05"/><!-- distance in meter-->
+		<param name="alpha" value="0.99"/>
+		<param name="beta" value="0.90"/>
+		<param name="maxDyn" value="1.90"/>
+
+		<param name="maxDistNewPoint" value="0.2"/>
+		<param name="sensorMaxRange" value="20.0"/>
+
+	</node>
+
+    <!--- disabling. Imu is not working well enough on the boat to use this.
+        
+  <node pkg="laser_ortho_projector" type="laser_ortho_projector_node" name="laser_ortho_projector" 
+    output="screen">
+    <param name="use_pose" type="bool" value="false"/>
+    <param name="use_imu" type="bool" value="true"/>
+    <param name="publish_tf" type="bool" value="true"/>
+    <param name="base_frame" value="/kingfisher/laser"/>
+    <param name="fixed_frame" value="/kingfisher/base"/>
+    <remap from="/scan" to="/lidar/scan"/>
+    <remap from="/imu/data" to="/rpy_to_imu/imu"/>
+  </node>
+
+  <node pkg="ethzasl_icp_mapper" type="rpy_to_imu.py" name="rpy_to_imu">
+      <remap from="~rpy" to="/imu/rpy"/>
+  </node>
+  -->
+  
+    <node name="gps2odom" type="gps2odom.py" pkg="ethzasl_icp_mapper" output="screen">
+        <param name="use_compass_heading" value="True"/> <!-- 150806, IMU is not working-->
+        <param name="frame_id" value="kingfisher/gps_odom"/> <!-- map is set to the initial gps value -->
+        <remap from="~utm" to="/gps/odom"/>
+        <remap from="~gps" to="/gps/extfix"/>
+        <remap from="~compass" to="/compass/compass"/>
+    </node>
+
+    <node name="ls_to_pc2" type="laserscan_to_pc2" pkg="laserscan_to_pc2" output="screen">
+        <remap from="~laser" to="/lidar/scan"/>
+        <param name="base_frame" value="kingfisher/base"/>
+    </node>
+
+		<node pkg="laserscan_to_pc2" type="laserscan_flip" name="lsflip" output="screen">
+
+			<remap from="~scan_in" to="/lidar/scan"/>
+			<remap from="~scan_out" to="/lidar/scan_flip"/>
+		</node>
+
+</launch>

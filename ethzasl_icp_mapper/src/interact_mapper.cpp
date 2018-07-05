@@ -185,7 +185,7 @@ InteractMapper::InteractMapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 			{
 				if ( fs::is_regular_file( dir_itr->status()) )
 				{
-					if(dir_itr->path().extension() == ".vtk")
+					if(dir_itr->path().extension() == ".vtk" || dir_itr->path().extension() == ".csv")
 					{
 						#if BOOST_FILESYSTEM_VERSION >= 3
 						menu_handler.insert(h_load, dir_itr->path().filename().string(), boost::bind(&InteractMapper::loadMapCallback, this, _1) );

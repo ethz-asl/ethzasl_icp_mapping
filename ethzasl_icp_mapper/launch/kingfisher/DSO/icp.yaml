@@ -1,15 +1,19 @@
 matcher:
   KDTreeMatcher:
-    maxDist: 3.0
-    knn: 2
+    maxDist: 5.00
+    knn: 5
     epsilon: 0
 
 outlierFilters:
   - TrimmedDistOutlierFilter:
      ratio: 0.60
+#  - GenericDescriptorOutlierFilter:
+#     source: reference
+#     descName: probabilityStatic
 
 errorMinimizer:
-  PointToPointErrorMinimizer
+  PointToPlaneErrorMinimizer:
+    force2D: 1
 
 transformationCheckers:
   - DifferentialTransformationChecker:
@@ -27,5 +31,5 @@ inspector:
  NullInspector
 
 logger:
-  NullLogger
-#  FileLogger
+#  NullLogger
+  FileLogger

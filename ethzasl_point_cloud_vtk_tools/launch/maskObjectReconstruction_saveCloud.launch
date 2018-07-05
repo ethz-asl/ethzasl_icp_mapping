@@ -1,6 +1,6 @@
 <launch>
 	<node name="pointCloudToVtk" type="pointCloudToVtk" pkg="ethzasl_point_cloud_vtk_tools" output="screen">
-		<param name="cloudTopic" value="/processed_cloud" />
+		<param name="cloudTopic" value="/hdr_cloud" />
 		<param name="mapFrameId" value="root" />
 		<param name="recordOnce" value="true" />
 		<param name="outputPath" value="./" />
@@ -8,6 +8,7 @@
 		<param name="outputExtension" value="vtk" />
 		<param name="outputSuffixTimestamp" value="true" />
 		<param name="usedAsGlobalShutter" value="true" />
+		<param name="filterName" value="$(find ethzasl_point_cloud_vtk_tools)/launch/inputFilters.yaml" />
 
 	</node>
 </launch>
