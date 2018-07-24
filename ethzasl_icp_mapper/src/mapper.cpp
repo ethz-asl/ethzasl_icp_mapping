@@ -410,9 +410,9 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	}
 	
 	// Check dimension
-	if (newPointCloud->features.rows() != icp.getInternalMap().features.rows())
+	if (newPointCloud->features.rows() != icp.getPrefilteredInternalMap().features.rows())
 	{
-		ROS_ERROR_STREAM("Dimensionality missmatch: incoming cloud is " << newPointCloud->features.rows()-1 << " while map is " << icp.getInternalMap().features.rows()-1);
+		ROS_ERROR_STREAM("Dimensionality missmatch: incoming cloud is " << newPointCloud->features.rows()-1 << " while map is " << icp.getPrefilteredInternalMap().features.rows()-1);
 		return;
 	}
 	
@@ -463,7 +463,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		// check if news points should be added to the map
 		if (
 			mapping &&
-			((estimatedOverlap < maxOverlapToMerge) || (icp.getInternalMap().features.cols() < minMapPointCount)) &&
+			((estimatedOverlap < maxOverlapToMerge) || (icp.getPrefilteredInternalMap().features.cols() < minMapPointCount)) &&
 			#if BOOST_VERSION >= 104100
 			(!mapBuildingInProgress)
 			#else // BOOST_VERSION >= 104100
@@ -478,6 +478,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 			mapBuildingTask = MapBuildingTask(boost::bind(&Mapper::updateMap, this, newPointCloud.release(), Ticp, true));
 			mapBuildingFuture = mapBuildingTask.get_future();
 			mapBuildingThread = boost::thread(boost::move(boost::ref(mapBuildingTask)));
+			mapBuildingThread.detach();
 			mapBuildingInProgress = true;
 			#else // BOOST_VERSION >= 104100
 			ROS_INFO("Adding new points to the map");
