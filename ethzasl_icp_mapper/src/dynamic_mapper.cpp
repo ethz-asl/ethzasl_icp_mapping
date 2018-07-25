@@ -874,8 +874,8 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 					const float lastDyn = viewOnProbabilityDynamic(0,mapId);
 					const float lastStatic = viewOnProbabilityStatic(0, mapId);
 
-					const float c1 = (1 - (w_v*(1 - w_d1)));
-					const float c2 = w_v*(1 - w_d1);
+					const float c1 = (1 - (w_v*w_d1));
+					const float c2 = w_v*w_d1;
 					
 
 					//Lock dynamic point to stay dynamic under a threshold
