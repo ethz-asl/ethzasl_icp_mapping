@@ -812,7 +812,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 		DP::View viewOnProbabilityDynamic = mapPointCloud->getDescriptorViewByName("probabilityDynamic");
 		DP::View viewDebug = mapPointCloud->getDescriptorViewByName("debug");
 		
-		DP::View viewOn_normals_map = mapPointCloud->getDescriptorViewByName("normals");
+		DP::View viewOn_normals_map = mapLocalFrameCut.getDescriptorViewByName("normals");
 		DP::View viewOn_Msec_map = mapPointCloud->getDescriptorViewByName("stamps_Msec");
 		DP::View viewOn_sec_map = mapPointCloud->getDescriptorViewByName("stamps_sec");
 		DP::View viewOn_nsec_map = mapPointCloud->getDescriptorViewByName("stamps_nsec");
@@ -833,7 +833,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 				const float delta = (readPt - mapPt).norm();
 				const float d_max = eps_a * readPt.norm();
 
-				const Eigen::VectorXf normal_map = viewOn_normals_map.col(mapId);
+				const Eigen::VectorXf normal_map = viewOn_normals_map.col(i);
 				
 				// Weight for dynamic elements
 				const float w_v = eps + (1. - eps)*fabs(normal_map.dot(mapPt_n));
