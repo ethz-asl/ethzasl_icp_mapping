@@ -64,7 +64,7 @@ class DynamicTrails
 	ros::Publisher markerPub;
 
 	PM::DataPointsFilters inputFilters;
-	unique_ptr<PM::Transformation> transformation;
+	shared_ptr<PM::Transformation> transformation;
 	shared_ptr<DP> lastPointCloud;
 	shared_ptr<DP> trailPointCloud;
 	PM::DataPoints globalMap;

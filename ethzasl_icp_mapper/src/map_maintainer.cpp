@@ -61,7 +61,7 @@ class MapMaintener
 	PM::DataPointsFilters inputFilters;
 	PM::DataPointsFilters mapPreFilters;
 	PM::DataPointsFilters mapPostFilters;
-	unique_ptr<PM::Transformation> transformation;
+	shared_ptr<PM::Transformation> transformation;
 	
 	PM::DataPoints mapPointCloud;
 	
@@ -130,7 +130,7 @@ MapMaintener::MapMaintener(ros::NodeHandle& n, ros::NodeHandle& pn):
 	size_z(getParam<double>("size_z", 1.0)),
 	mappingActive(false),
 	singleScan(false),
-  tfListener(ros::Duration(30)),
+	tfListener(ros::Duration(30)),
 	TObjectToMap(PM::TransformationParameters::Identity(4,4)),
 	objectFrame(getParam<string>("object_frame", "map")),
 	mapFrame(getParam<string>("map_frame", "map"))
@@ -191,7 +191,7 @@ MapMaintener::MapMaintener(ros::NodeHandle& n, ros::NodeHandle& pn):
 			params["zMin"] = toParam(-size_z/2);
 			params["zMax"] = toParam(size_z/2);
 
-			PM::DataPointsFilter* box = 
+			shared_ptr<PM::DataPointsFilter> box =
 				PM::get().DataPointsFilterRegistrar.create("BoundingBoxDataPointsFilter", params);
 			mapPreFilters.push_back(box);	
 
