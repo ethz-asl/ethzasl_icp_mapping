@@ -62,6 +62,7 @@ class Mapper
 	ros::Publisher outlierPub;
 	ros::Publisher odomPub;
 	ros::Publisher odomErrorPub;
+	ros::Publisher posePub;
 	
 	// Services
 	ros::ServiceServer getPointMapSrv;
@@ -249,6 +250,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	scanPub = n.advertise<sensor_msgs::PointCloud2>("corrected_scan", 2, true);
 	outlierPub = n.advertise<sensor_msgs::PointCloud2>("outliers", 2, true);
 	odomPub = n.advertise<nav_msgs::Odometry>("icp_odom", 50, true);
+	posePub = n.advertise<geometry_msgs::TransformStamped>("icp_pose", 50, true);
 	odomErrorPub = n.advertise<nav_msgs::Odometry>("icp_error_odom", 50, true);
 	
 	// service initializations
@@ -548,6 +550,12 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		{
 			// Not sure that the transformation represents the odometry
 			odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(T_updatedScanner_to_map, mapFrame, stamp));
+		}
+		// Publish pose
+		if (posePub.getNumSubscribers())
+		{
+			// Not sure that the transformation represents the odometry
+			posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_updatedScanner_to_map, mapFrame, odomFrame, stamp));
 		}
 		// Publish error on odometry
 		if (odomErrorPub.getNumSubscribers())
