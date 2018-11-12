@@ -85,8 +85,8 @@ class Mapper
 	PM::DataPointsFilters mapPostFilters;
 	PM::DataPoints *mapPointCloud;
 	PM::ICPSequence icp;
-	unique_ptr<PM::Transformation> transformation;
-	PM::DataPointsFilter* radiusFilter;
+	shared_ptr<PM::Transformation> transformation;
+	shared_ptr<PM::DataPointsFilter> radiusFilter;
 	
 	// multi-threading mapper
 	#if BOOST_VERSION >= 104100
@@ -215,7 +215,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	T_localMap_to_map(PM::TransformationParameters::Identity(4, 4)),
 	T_odom_to_scanner(PM::TransformationParameters::Identity(4, 4)),
 	publishStamp(ros::Time::now()),
-  tfListener(ros::Duration(30)),
+	tfListener(ros::Duration(30)),
 	eps(0.0001)
 {
 
@@ -228,7 +228,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	
 	// set logger
 	if (getParam<bool>("useROSLogger", false))
-		PointMatcherSupport::setLogger(new PointMatcherSupport::ROSLogger);
+		PointMatcherSupport::setLogger(make_shared<PointMatcherSupport::ROSLogger>());
 
 	// Load all parameters stored in external files
 	loadExternalParameters();
