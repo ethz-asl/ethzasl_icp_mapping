@@ -557,7 +557,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		if (posePub.getNumSubscribers())
 		{
 			// Not sure that the transformation represents the odometry
-			posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_updatedScanner_to_map, mapFrame, odomFrame, stamp));
+			posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_updatedScanner_to_map, odomFrame, mapFrame, stamp));
 		}
 		// Publish error on odometry
 		if (odomErrorPub.getNumSubscribers())
