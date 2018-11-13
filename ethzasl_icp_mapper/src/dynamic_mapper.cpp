@@ -656,7 +656,7 @@ void Mapper::setMap(DP* newMapPointCloud)
 	if (mapPub.getNumSubscribers() && mapping)
 	{
 		ROS_INFO_STREAM("[MAP] publishing " << mapPointCloud->getNbPoints() << " points");
-		mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud, mapFrame, mapCreationTime));
+		mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud, tfMapFrame, mapCreationTime));
 	}
 	publishLock.unlock();
 }
