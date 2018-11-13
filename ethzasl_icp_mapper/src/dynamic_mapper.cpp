@@ -34,6 +34,7 @@
 #include "ethzasl_icp_mapper/CorrectPose.h"
 #include "ethzasl_icp_mapper/SetMode.h"
 #include "ethzasl_icp_mapper/GetMode.h"
+#include "ethzasl_icp_mapper/InitialTransform.h"
 #include "ethzasl_icp_mapper/GetBoundedMap.h" // FIXME: should that be moved to map_msgs?
 
 using namespace std;
@@ -74,6 +75,7 @@ class Mapper
 	ros::ServiceServer getModeSrv;
 	ros::ServiceServer getBoundedMapSrv;
 	ros::ServiceServer reloadAllYamlSrv;
+    ros::ServiceServer initialTransformSrv;
 
 	// Time
 	ros::Time mapCreationTime;
@@ -176,6 +178,7 @@ protected:
 	bool getMode(ethzasl_icp_mapper::GetMode::Request &req, ethzasl_icp_mapper::GetMode::Response &res);
 	bool getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethzasl_icp_mapper::GetBoundedMap::Response &res);
 	bool reloadallYaml(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+    bool initialTransform(ethzasl_icp_mapper::InitialTransform::Request &req, ethzasl_icp_mapper::InitialTransform::Response &res);
 };
 
 Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
@@ -261,6 +264,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	loadMapSrv = pn.advertiseService("load_map", &Mapper::loadMap, this);
 	resetSrv = pn.advertiseService("reset", &Mapper::reset, this);
 	correctPoseSrv = pn.advertiseService("correct_pose", &Mapper::correctPose, this);
+    initialTransformSrv = pn.advertiseService("intial_transform", &Mapper::initialTransform, this);
 	setModeSrv = pn.advertiseService("set_mode", &Mapper::setMode, this);
 	getModeSrv = pn.advertiseService("get_mode", &Mapper::getMode, this);
 	getBoundedMapSrv = pn.advertiseService("get_bounded_map", &Mapper::getBoundedMap, this);
@@ -534,11 +538,11 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 			
 			if (inverseTransform) 
 			{
-				tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map.inverse(), odomFrame, tfMapFrame, stamp));
+				tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map.inverse(), odomFrame, mapFrame, stamp));
 			} 
 			else 
 			{
-				tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, tfMapFrame, odomFrame, stamp));
+				tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, stamp));
 			}		
 		}
 
@@ -1030,9 +1034,9 @@ void Mapper::publishTransform()
     ros::Time stamp = ros::Time::now();
 		// Note: we use now as timestamp to refresh the tf and avoid other buffer to be empty
 		if (inverseTransform) {
-        tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map.inverse(), odomFrame, tfMapFrame, stamp));
+        tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map.inverse(), odomFrame, mapFrame, stamp));
     } else {
-        tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, tfMapFrame, odomFrame, stamp));
+        tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, stamp));
     }		
 		
 		publishLock.unlock();
@@ -1157,7 +1161,7 @@ bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req, ethzasl_
 		T_odom_to_map(2,3) = mapElevation; //z
 		}*/
 
-		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, tfMapFrame, odomFrame, ros::Time::now()));
+		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, ros::Time::now()));
 
 	}
 	catch ( ... )
@@ -1190,6 +1194,12 @@ bool Mapper::getMode(ethzasl_icp_mapper::GetMode::Request &req, ethzasl_icp_mapp
 	res.localize = localizing;
 	res.map = mapping;
 	return true;
+}
+
+bool Mapper::initialTransform(ethzasl_icp_mapper::InitialTransform::Request &req, ethzasl_icp_mapper::InitialTransform::Response &res)
+{
+  posePub.publish(req.transform);
+  return true;
 }
 
 

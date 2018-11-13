@@ -31,6 +31,7 @@ GetMode.srv
 LoadMap.srv
 MatchClouds.srv
 SetMode.srv
+InitialTransform.srv
 )
 
 generate_messages(DEPENDENCIES sensor_msgs nav_msgs std_msgs geometry_msgs actionlib_msgs)
