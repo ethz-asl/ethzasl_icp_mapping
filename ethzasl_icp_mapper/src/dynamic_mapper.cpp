@@ -115,6 +115,7 @@ class Mapper
 	string sensorFrame;
 	string odomFrame;
 	string mapFrame;
+	string tfMapFrame;
 	string vtkFinalMapName; //!< name of the final vtk map
 
 	const double mapElevation; // initial correction on z-axis //FIXME: handle the full matrix
@@ -199,7 +200,8 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	tfRefreshPeriod(getParam<double>("tfRefreshPeriod", 0.01)),
 	sensorFrame(getParam<string>("sensor_frame", "")),
 	odomFrame(getParam<string>("odom_frame", "odom")),
-	mapFrame(getParam<string>("map_frame", "map")),
+	mapFrame(getParam<string>("map_frame", "world")),
+  tfMapFrame(getParam<string>("tf_map_frame", "map")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
 	mapElevation(getParam<double>("mapElevation", 0)),
 	priorDyn(getParam<double>("priorDyn", 0.5)),
@@ -532,11 +534,11 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 			
 			if (inverseTransform) 
 			{
-				tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map.inverse(), odomFrame, mapFrame, stamp));
+				tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map.inverse(), odomFrame, tfMapFrame, stamp));
 			} 
 			else 
 			{
-				tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, stamp));
+				tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, tfMapFrame, odomFrame, stamp));
 			}		
 		}
 
@@ -1028,9 +1030,9 @@ void Mapper::publishTransform()
     ros::Time stamp = ros::Time::now();
 		// Note: we use now as timestamp to refresh the tf and avoid other buffer to be empty
 		if (inverseTransform) {
-        tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map.inverse(), odomFrame, mapFrame, stamp));
+        tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map.inverse(), odomFrame, tfMapFrame, stamp));
     } else {
-        tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, stamp));
+        tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, tfMapFrame, odomFrame, stamp));
     }		
 		
 		publishLock.unlock();
@@ -1155,7 +1157,7 @@ bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req, ethzasl_
 		T_odom_to_map(2,3) = mapElevation; //z
 		}*/
 
-		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, ros::Time::now()));
+		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, tfMapFrame, odomFrame, ros::Time::now()));
 
 	}
 	catch ( ... )
