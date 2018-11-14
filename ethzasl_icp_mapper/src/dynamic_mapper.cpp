@@ -56,6 +56,7 @@ class Mapper
 	// Subscribers
 	ros::Subscriber scanSub;
 	ros::Subscriber cloudSub;
+    ros::Subscriber cadSub;
 	
 	// Publishers
 	ros::Publisher mapPub;
@@ -76,6 +77,7 @@ class Mapper
 	ros::ServiceServer getBoundedMapSrv;
 	ros::ServiceServer reloadAllYamlSrv;
     ros::ServiceServer initialTransformSrv;
+    ros::ServiceServer loadPublishedMapSrv;
 
 	// Time
 	ros::Time mapCreationTime;
@@ -113,7 +115,8 @@ class Mapper
 	int inputQueueSize; 
 	double minOverlap;
 	double maxOverlapToMerge;
-	double tfRefreshPeriod;  //!< if set to zero, tf will be publish at the rate of the incoming point cloud messages 
+	double tfRefreshPeriod;  //!< if set to zero, tf will be publish at the rate of the incoming point cloud messages
+	bool cad_trigger;
 	string sensorFrame;
 	string odomFrame;
 	string mapFrame;
@@ -157,6 +160,7 @@ public:
 protected:
 	void gotScan(const sensor_msgs::LaserScan& scanMsgIn);
 	void gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn);
+    void gotCAD(const sensor_msgs::PointCloud2& cloudMsgIn);
 	void processCloud(unique_ptr<DP> cloud, const std::string& scannerFrame, const ros::Time& stamp, uint32_t seq);
 	void processNewMapIfAvailable();
 	void setMap(DP* newPointCloud);
@@ -179,6 +183,7 @@ protected:
 	bool getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethzasl_icp_mapper::GetBoundedMap::Response &res);
 	bool reloadallYaml(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
     bool initialTransform(ethzasl_icp_mapper::InitialTransform::Request &req, ethzasl_icp_mapper::InitialTransform::Response &res);
+    bool loadPublishedMap(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 };
 
 Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
@@ -204,7 +209,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	sensorFrame(getParam<string>("sensor_frame", "")),
 	odomFrame(getParam<string>("odom_frame", "odom")),
 	mapFrame(getParam<string>("map_frame", "world")),
-  tfMapFrame(getParam<string>("tf_map_frame", "map")),
+    tfMapFrame(getParam<string>("tf_map_frame", "map")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
 	mapElevation(getParam<double>("mapElevation", 0)),
 	priorDyn(getParam<double>("priorDyn", 0.5)),
@@ -222,7 +227,8 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	T_odom_to_scanner(PM::TransformationParameters::Identity(4, 4)),
 	publishStamp(ros::Time::now()),
 	tfListener(ros::Duration(30)),
-	eps(0.0001)
+	eps(0.0001),
+	cad_trigger(false)
 {
 
 
@@ -250,6 +256,9 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 		scanSub = n.subscribe("scan", inputQueueSize, &Mapper::gotScan, this);
 	if (getParam<bool>("subscribe_cloud", true))
 		cloudSub = n.subscribe("cloud_in", inputQueueSize, &Mapper::gotCloud, this);
+    if (getParam<bool>("subscribe_cad", true))
+        cadSub = n.subscribe("CADInterface/cad_model", inputQueueSize, &Mapper::gotCAD, this);
+
 
 	mapPub = n.advertise<sensor_msgs::PointCloud2>("point_map", 2, true);
 	scanPub = n.advertise<sensor_msgs::PointCloud2>("corrected_scan", 2, true);
@@ -265,6 +274,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	resetSrv = pn.advertiseService("reset", &Mapper::reset, this);
 	correctPoseSrv = pn.advertiseService("correct_pose", &Mapper::correctPose, this);
     initialTransformSrv = pn.advertiseService("intial_transform", &Mapper::initialTransform, this);
+    loadPublishedMapSrv = pn.advertiseService("load_published_map", &Mapper::loadPublishedMap, this);
 	setModeSrv = pn.advertiseService("set_mode", &Mapper::setMode, this);
 	getModeSrv = pn.advertiseService("get_mode", &Mapper::getMode, this);
 	getBoundedMapSrv = pn.advertiseService("get_bounded_map", &Mapper::getBoundedMap, this);
@@ -335,6 +345,26 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 		//}
 		processCloud(move(cloud), cloudMsgIn.header.frame_id, cloudMsgIn.header.stamp, cloudMsgIn.header.seq);
 	}
+}
+
+void Mapper::gotCAD(const sensor_msgs::PointCloud2 &cloudMsgIn) {
+  if (cad_trigger) {
+    std::cout << "getting cad" << std::endl;
+    // Load the cad map as base map.
+    localizing = true;
+    mapping = true;
+    std_srvs::Empty::Request req;
+    std_srvs::Empty::Response res;
+    reset(req, res);
+    unique_ptr<DP> cloud
+        (new DP(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloudMsgIn)));
+    processCloud(move(cloud),
+                 cloudMsgIn.header.frame_id,
+                 cloudMsgIn.header.stamp,
+                 cloudMsgIn.header.seq);
+    mapping = false;
+    cad_trigger = false;
+  }
 }
 
 struct BoolSetter
@@ -1201,6 +1231,12 @@ bool Mapper::initialTransform(ethzasl_icp_mapper::InitialTransform::Request &req
   posePub.publish(req.transform);
   return true;
 }
+
+bool Mapper::loadPublishedMap(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+{
+  cad_trigger = true;
+}
+
 
 
 
