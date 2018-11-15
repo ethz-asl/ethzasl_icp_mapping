@@ -19,7 +19,7 @@ namespace PointMatcher_ros
 	{
 		
 		tf::StampedTransform stampedTr;
-		listener.waitForTransform(target, source, stamp, ros::Duration(0.1));
+		listener.waitForTransform(target, source, stamp, ros::Duration(0.5));
 		listener.lookupTransform(target, source, stamp, stampedTr);
 						
 		Eigen::Affine3d eigenTr;

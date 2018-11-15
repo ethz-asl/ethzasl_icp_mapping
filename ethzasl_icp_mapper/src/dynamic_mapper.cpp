@@ -283,6 +283,15 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	// refreshing tf transform thread
 	publishThread = boost::thread(boost::bind(&Mapper::publishLoop, this, tfRefreshPeriod));
 
+  ros::Duration(0.2).sleep();
+    posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_odom_to_scanner, "lidar", tfMapFrame, ros::Time::now()));
+    std::cout << "sleep" << std::endl;
+  ros::Duration(0.2).sleep();
+  posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_odom_to_scanner, "lidar", tfMapFrame, ros::Time::now()));
+  std::cout << "sleep" << std::endl;
+  ros::Duration(0.2).sleep();
+  posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_odom_to_scanner, "lidar", tfMapFrame, ros::Time::now()));
+  std::cout << "sleep" << std::endl;
 }
 
 Mapper::~Mapper()
@@ -349,6 +358,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 
 void Mapper::gotCAD(const sensor_msgs::PointCloud2 &cloudMsgIn) {
   if (cad_trigger) {
+    ROS_WARN_STREAM("Processing CAD");
     std::cout << "getting cad" << std::endl;
     // Load the cad map as base map.
     localizing = true;
@@ -474,6 +484,8 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	// Note: we don't need to actively wait for transform here. It is already waited in transformListenerToEigenMatrix()
 	try
 	{
+      ROS_INFO_STREAM("scannerFrame " << scannerFrame);
+      ROS_INFO_STREAM("odomFrame " << odomFrame);
 		T_odom_to_scanner = PointMatcher_ros::eigenMatrixToDim<float>(
 				PointMatcher_ros::transformListenerToEigenMatrix<float>(
 				tfListener,
@@ -493,6 +505,8 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		ROS_ERROR_STREAM("Unexpected exception... ignoring scan");
 		return;
 	}
+
+  ROS_INFO_STREAM("Went past!");
 
 	const PM::TransformationParameters T_scanner_to_map = T_odom_to_map * T_odom_to_scanner.inverse();
 
@@ -591,7 +605,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		if (posePub.getNumSubscribers())
 		{
 			// Not sure that the transformation represents the odometry
-			posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_updatedScanner_to_map, odomFrame, tfMapFrame, stamp));
+			posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_updatedScanner_to_map, "lidar", tfMapFrame, stamp)); // lidar = odom_frame before
 		}
 		// Publish error on odometry
 		if (odomErrorPub.getNumSubscribers())
