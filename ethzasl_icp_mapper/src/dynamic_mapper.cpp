@@ -117,6 +117,7 @@ class Mapper
 	double maxOverlapToMerge;
 	double tfRefreshPeriod;  //!< if set to zero, tf will be publish at the rate of the incoming point cloud messages
 	bool cad_trigger;
+	int odom_received;
 	string sensorFrame;
 	string odomFrame;
 	string mapFrame;
@@ -228,7 +229,8 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	publishStamp(ros::Time::now()),
 	tfListener(ros::Duration(30)),
 	eps(0.0001),
-	cad_trigger(false)
+	cad_trigger(false),
+    odom_received(0)
 {
 
 
@@ -282,16 +284,6 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 
 	// refreshing tf transform thread
 	publishThread = boost::thread(boost::bind(&Mapper::publishLoop, this, tfRefreshPeriod));
-
-  ros::Duration(0.2).sleep();
-    posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_odom_to_scanner, "lidar", tfMapFrame, ros::Time::now()));
-    std::cout << "sleep" << std::endl;
-  ros::Duration(0.2).sleep();
-  posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_odom_to_scanner, "lidar", tfMapFrame, ros::Time::now()));
-  std::cout << "sleep" << std::endl;
-  ros::Duration(0.2).sleep();
-  posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_odom_to_scanner, "lidar", tfMapFrame, ros::Time::now()));
-  std::cout << "sleep" << std::endl;
 }
 
 Mapper::~Mapper()
@@ -339,21 +331,34 @@ void Mapper::gotScan(const sensor_msgs::LaserScan& scanMsgIn)
 
 void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 {
-	if(localizing)
-	{
-		unique_ptr<DP> cloud(new DP(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloudMsgIn)));
-		
-		
-		// TEST for UTIAS work on velodyne
-		// TODO: move that to a libpointmatcher filter
-		//const int maxNbPoints = 38000; // 70000 or 38000
-		//if(cloud->getNbPoints() >= maxNbPoints)
-		//{
-	//		cloud->features = cloud->features.leftCols(maxNbPoints); 
-	//		cloud->descriptors= cloud->descriptors.leftCols(maxNbPoints);
-		//}
-		processCloud(move(cloud), cloudMsgIn.header.frame_id, cloudMsgIn.header.stamp, cloudMsgIn.header.seq);
-	}
+	if(localizing) {
+      if (odom_received < 3) {
+        try {
+          tf::StampedTransform transform;
+          tfListener.lookupTransform(tfMapFrame,
+                                     "/lidar",
+                                     cloudMsgIn.header.stamp,
+                                     transform);
+        } catch (tf::TransformException ex) {
+          ROS_WARN_STREAM("Transformations still initializing.");
+          posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
+              T_odom_to_scanner,
+              "lidar",
+              tfMapFrame,
+              cloudMsgIn.header.stamp));
+          odom_received++;
+        }
+      } else {
+        unique_ptr<DP> cloud
+            (new DP(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(
+                cloudMsgIn)));
+
+        processCloud(move(cloud),
+                     cloudMsgIn.header.frame_id,
+                     cloudMsgIn.header.stamp,
+                     cloudMsgIn.header.seq);
+      }
+    }
 }
 
 void Mapper::gotCAD(const sensor_msgs::PointCloud2 &cloudMsgIn) {
@@ -374,6 +379,7 @@ void Mapper::gotCAD(const sensor_msgs::PointCloud2 &cloudMsgIn) {
                  cloudMsgIn.header.seq);
     mapping = false;
     cad_trigger = false;
+    publishLock.unlock();
   }
 }
 
@@ -526,14 +532,24 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	}
 
 	// Initialize the map if empty
- 	if(!icp.hasMap())
- 	{
-		ROS_INFO_STREAM("[MAP] Creating an initial map");
-		mapCreationTime = stamp;
-		setMap(updateMap(newPointCloud.release(), T_scanner_to_map, false));
-		// we must not delete newPointCloud because we just stored it in the mapPointCloud
-		return;
-	}
+ 	if(!icp.hasMap()) {
+      ROS_INFO_STREAM("[MAP] Creating an initial map");
+      mapCreationTime = stamp;
+      DP pc = transformation->compute(*newPointCloud, T_scanner_to_map);
+      mapPostFilters.apply(pc);
+      publishLock.lock();
+      if (scanPub.getNumSubscribers() && localizing) {
+        ROS_INFO_STREAM(
+            "Corrected scan publishing " << pc.getNbPoints() << " points");
+        scanPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(pc,
+                                                                           tfMapFrame,
+                                                                           stamp));
+      }
+      publishLock.unlock();
+      setMap(updateMap(newPointCloud.release(), T_scanner_to_map, false));
+      // we must not delete newPointCloud because we just stored it in the mapPointCloud
+      return;
+    }
 	
 	// Check dimension
 	if (newPointCloud->getEuclideanDim() != icp.getPrefilteredInternalMap().getEuclideanDim())
@@ -611,7 +627,17 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		if (odomErrorPub.getNumSubscribers())
 			odomErrorPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(T_odom_to_map, mapFrame, stamp));
 
-		
+		// Publish the corrected scan point cloud
+      DP pc = transformation->compute(*newPointCloud, T_updatedScanner_to_map);
+      mapPostFilters.apply(pc);
+      publishLock.lock();
+      if (scanPub.getNumSubscribers() && localizing)
+      {
+        ROS_INFO_STREAM("Corrected scan publishing " << pc.getNbPoints() << " points");
+        scanPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(pc, tfMapFrame, stamp));
+      }
+      publishLock.unlock();
+
 
 		// check if news points should be added to the map
 		if (
