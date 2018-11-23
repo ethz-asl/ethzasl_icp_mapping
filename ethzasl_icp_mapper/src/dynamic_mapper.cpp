@@ -259,7 +259,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	if (getParam<bool>("subscribe_cloud", true))
 		cloudSub = n.subscribe("cloud_in", inputQueueSize, &Mapper::gotCloud, this);
     if (getParam<bool>("subscribe_cad", true))
-        cadSub = n.subscribe("CADInterface/cad_model", inputQueueSize, &Mapper::gotCAD, this);
+        cadSub = n.subscribe("cad_interface_node/cad_model", inputQueueSize, &Mapper::gotCAD, this);
 
 
 	mapPub = n.advertise<sensor_msgs::PointCloud2>("point_map", 2, true);
