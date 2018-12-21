@@ -46,18 +46,18 @@ class Mapper
 {
 	typedef PM::DataPoints DP;
 	typedef PM::Matches Matches;
-	
+
 	typedef typename Nabo::NearestNeighbourSearch<float> NNS;
 	typedef typename NNS::SearchType NNSearchType;
-		
+
 	ros::NodeHandle& n;
 	ros::NodeHandle& pn;
-	
+
 	// Subscribers
 	ros::Subscriber scanSub;
 	ros::Subscriber cloudSub;
     ros::Subscriber cadSub;
-	
+
 	// Publishers
 	ros::Publisher mapPub;
 	ros::Publisher scanPub;
@@ -122,6 +122,7 @@ class Mapper
 	string odomFrame;
 	string mapFrame;
 	string tfMapFrame;
+	string lidarFrame;
 	string vtkFinalMapName; //!< name of the final vtk map
 
 	const double mapElevation; // initial correction on z-axis //FIXME: handle the full matrix
@@ -211,6 +212,7 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	odomFrame(getParam<string>("odom_frame", "odom")),
 	mapFrame(getParam<string>("map_frame", "world")),
     tfMapFrame(getParam<string>("tf_map_frame", "map")),
+	lidarFrame(getParam<string>("lidar_frame", "lidar")),
 	vtkFinalMapName(getParam<string>("vtkFinalMapName", "finalMap.vtk")),
 	mapElevation(getParam<double>("mapElevation", 0)),
 	priorDyn(getParam<double>("priorDyn", 0.5)),
@@ -336,14 +338,14 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
         try {
           tf::StampedTransform transform;
           tfListener.lookupTransform(tfMapFrame,
-                                     "/lidar",
+									 lidarFrame,
                                      cloudMsgIn.header.stamp,
                                      transform);
         } catch (tf::TransformException ex) {
           ROS_WARN_STREAM("Transformations still initializing.");
           posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
               T_odom_to_scanner,
-              "lidar",
+			  lidarFrame,
               tfMapFrame,
               cloudMsgIn.header.stamp));
           odom_received++;
@@ -490,8 +492,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	// Note: we don't need to actively wait for transform here. It is already waited in transformListenerToEigenMatrix()
 	try
 	{
-      ROS_INFO_STREAM("scannerFrame " << scannerFrame);
-      ROS_INFO_STREAM("odomFrame " << odomFrame);
 		T_odom_to_scanner = PointMatcher_ros::eigenMatrixToDim<float>(
 				PointMatcher_ros::transformListenerToEigenMatrix<float>(
 				tfListener,
@@ -511,8 +511,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		ROS_ERROR_STREAM("Unexpected exception... ignoring scan");
 		return;
 	}
-
-  ROS_INFO_STREAM("Went past!");
 
 	const PM::TransformationParameters T_scanner_to_map = T_odom_to_map * T_odom_to_scanner.inverse();
 
@@ -535,7 +533,13 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
  	if(!icp.hasMap()) {
       ROS_INFO_STREAM("[MAP] Creating an initial map");
       mapCreationTime = stamp;
-      DP pc = transformation->compute(*newPointCloud, T_scanner_to_map);
+      DP pc;
+      if (cad_trigger) {
+        const PM::TransformationParameters T_scanner_to_world = T_odom_to_scanner.inverse();
+        pc = transformation->compute(*newPointCloud, T_scanner_to_map);
+      } else {
+        pc = transformation->compute(*newPointCloud, T_scanner_to_map);
+      }
       mapPostFilters.apply(pc);
       publishLock.lock();
       if (scanPub.getNumSubscribers() && localizing) {
