@@ -12,7 +12,7 @@ matcher:
   KDTreeMatcher:
     knn: 3
     maxDist: 10.0
-    epsilon: 0
+    epsilon: 1.0
 
 outlierFilters:
   - TrimmedDistOutlierFilter:

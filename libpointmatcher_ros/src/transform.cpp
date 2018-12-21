@@ -19,7 +19,7 @@ namespace PointMatcher_ros
 	{
 		
 		tf::StampedTransform stampedTr;
-		listener.waitForTransform(target, source, stamp, ros::Duration(0.1));
+		listener.waitForTransform(target, source, stamp, ros::Duration(0.5));
 		listener.lookupTransform(target, source, stamp, stampedTr);
 						
 		Eigen::Affine3d eigenTr;
@@ -164,10 +164,34 @@ namespace PointMatcher_ros
 	tf::StampedTransform eigenMatrixToStampedTransform<float>(const PointMatcher<float>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp);
 	template
 	tf::StampedTransform eigenMatrixToStampedTransform<double>(const PointMatcher<double>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp);
-	
-	
 
 	//--------------------------------
+	template<typename T>
+	geometry_msgs::TransformStamped eigenMatrixToTransformStamped(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp)
+	{
+		geometry_msgs::TransformStamped pose_msg;
+		pose_msg.header.stamp = stamp;
+		pose_msg.header.frame_id = source;
+		pose_msg.child_frame_id = target;
+		pose_msg.transform.translation.x = inTr(0,3);
+		pose_msg.transform.translation.y = inTr(1,3);
+		pose_msg.transform.translation.z = inTr(2,3);
+		Eigen::Matrix<T, 3, 3> m = inTr.block(0,0,3,3);
+		Eigen::Quaternion<T> q(m);
+		pose_msg.transform.rotation.w = q.w();
+		pose_msg.transform.rotation.x = q.x();
+		pose_msg.transform.rotation.y = q.y();
+		pose_msg.transform.rotation.z = q.z();
+		return pose_msg;
+	}
+
+	template
+	geometry_msgs::TransformStamped eigenMatrixToTransformStamped<float>(const PointMatcher<float>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp);
+	template
+	geometry_msgs::TransformStamped eigenMatrixToTransformStamped<double>(const PointMatcher<double>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp);
+
+
+		//--------------------------------
 	template<typename T>
 	typename PointMatcher<T>::TransformationParameters eigenMatrixToDim(const typename PointMatcher<T>::TransformationParameters& matrix, int dimp1)
 	{

@@ -3,6 +3,7 @@
 
 #include "pointmatcher/PointMatcher.h"
 #include "nav_msgs/Odometry.h"
+#include "geometry_msgs/TransformStamped.h"
 #include "Eigen/Eigen"
 
 namespace ros
@@ -46,8 +47,12 @@ namespace PointMatcher_ros
 	// Eigen to Stamped Transform
 	template<typename T>
 	tf::StampedTransform eigenMatrixToStampedTransform(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp);
-	
-	// 2D / 3D transform
+
+	// Eigen to TransformStamped
+	template<typename T>
+	geometry_msgs::TransformStamped eigenMatrixToTransformStamped(const typename PointMatcher<T>::TransformationParameters& inTr, const std::string& target, const std::string& source, const ros::Time& stamp);
+
+		// 2D / 3D transform
 	template<typename T>
 	typename PointMatcher<T>::TransformationParameters eigenMatrixToDim(const typename PointMatcher<T>::TransformationParameters& matrix, int dimp1);
 	
