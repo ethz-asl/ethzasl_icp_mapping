@@ -345,7 +345,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
           ROS_WARN_STREAM("Transformations still initializing.");
           posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
               T_odom_to_scanner,
-			  lidarFrame,
+			  "lidar", //lidarFrame
               tfMapFrame,
               cloudMsgIn.header.stamp));
           odom_received++;
@@ -495,7 +495,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		T_odom_to_scanner = PointMatcher_ros::eigenMatrixToDim<float>(
 				PointMatcher_ros::transformListenerToEigenMatrix<float>(
 				tfListener,
-				scannerFrame, // to
+				"lidar", // to
 				odomFrame, // from
 				stamp
 			), dimp1);
@@ -508,7 +508,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 	catch ( ... )
 	{
 		// everything else
-		ROS_ERROR_STREAM("Unexpected exception... ignoring scan");
+		ROS_ERROR_STREAM("Unexpected exception... ignoring scan A");
 		return;
 	}
 
@@ -775,7 +775,7 @@ void Mapper::updateIcpMap(const DP* newMapPointCloud)
 	catch ( ... )
 	{
 		// everything else
-		ROS_ERROR_STREAM("Unexpected exception... ignoring scan");
+		ROS_ERROR_STREAM("Unexpected exception... ignoring scan B");
 		return;
 	}
 }
@@ -1242,7 +1242,7 @@ bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req, ethzasl_
 	{
 		// everything else
 		publishLock.unlock();
-		ROS_ERROR_STREAM("Unexpected exception... ignoring scan");
+		ROS_ERROR_STREAM("Unexpected exception... ignoring scan C");
 		return false;
 	}
 

@@ -17,11 +17,11 @@ namespace PointMatcher_ros
 	template<typename T>
 	typename PointMatcher<T>::TransformationParameters transformListenerToEigenMatrix(const tf::TransformListener &listener, const std::string& target, const std::string& source, const ros::Time& stamp)
 	{
-		
+
 		tf::StampedTransform stampedTr;
 		listener.waitForTransform(target, source, stamp, ros::Duration(0.5));
 		listener.lookupTransform(target, source, stamp, stampedTr);
-						
+
 		Eigen::Affine3d eigenTr;
 		tf::transformTFToEigen(stampedTr, eigenTr);
 		return eigenTr.matrix().cast<T>();
