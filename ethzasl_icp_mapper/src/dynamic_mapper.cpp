@@ -345,7 +345,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
           ROS_WARN_STREAM("Transformations still initializing.");
           posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
               T_odom_to_scanner,
-			  "lidar", //lidarFrame
+			  lidarFrame,
               tfMapFrame,
               cloudMsgIn.header.stamp));
           odom_received++;
@@ -495,7 +495,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		T_odom_to_scanner = PointMatcher_ros::eigenMatrixToDim<float>(
 				PointMatcher_ros::transformListenerToEigenMatrix<float>(
 				tfListener,
-				"lidar", // to
+				lidarFrame, // to
 				odomFrame, // from
 				stamp
 			), dimp1);
@@ -625,7 +625,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		if (posePub.getNumSubscribers())
 		{
 			// Not sure that the transformation represents the odometry
-			posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_updatedScanner_to_map, "lidar", tfMapFrame, stamp)); // lidar = odom_frame before
+			posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_updatedScanner_to_map, lidarFrame, tfMapFrame, stamp));
 		}
 		// Publish error on odometry
 		if (odomErrorPub.getNumSubscribers())
@@ -745,18 +745,19 @@ void Mapper::updateIcpMap(const DP* newMapPointCloud)
 	//TODO check if T_odom_to_scanner can be reused
 	try
 	{
-		//tfListener.waitForTransform(sensorFrame, odomFrame, time_current, ros::Duration(3.0));
+		std::cout << "sensor frame: " << sensorFrame << " odomframe " << odomFrame << std::endl;
+		tfListener.waitForTransform(sensorFrame, odomFrame, time_current, ros::Duration(3.0));
 
-		// Fetching current transformation to the sensor
-	
-		//const PM::TransformationParameters T_odom_to_scanner = 
-		//	PointMatcher_ros::eigenMatrixToDim<float>(
-		//			PointMatcher_ros::transformListenerToEigenMatrix<float>(
-		//				tfListener,
-		//				sensorFrame, 
-		//				odomFrame,
-		//				time_current
-		//				), mapPointCloud->getHomogeneousDim());
+//		 Fetching current transformation to the sensor
+
+		const PM::TransformationParameters T_odom_to_scanner =
+			PointMatcher_ros::eigenMatrixToDim<float>(
+					PointMatcher_ros::transformListenerToEigenMatrix<float>(
+						tfListener,
+						sensorFrame,
+						odomFrame,
+						time_current
+						), mapPointCloud->getHomogeneousDim());
 
 		// Move the global map to the scanner pose
 		const PM::TransformationParameters T_scanner_to_map = this->T_odom_to_map * T_odom_to_scanner.inverse();
