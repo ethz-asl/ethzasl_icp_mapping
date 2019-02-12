@@ -496,7 +496,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		T_odom_to_scanner = PointMatcher_ros::eigenMatrixToDim<float>(
 				PointMatcher_ros::transformListenerToEigenMatrix<float>(
 				tfListener,
-				lidarFrame, // to
+				scannerFrame, // to
 				odomFrame, // from
 				stamp
 			), dimp1);
