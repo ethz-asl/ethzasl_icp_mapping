@@ -341,6 +341,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
 									 lidarFrame,
                                      cloudMsgIn.header.stamp,
                                      transform);
+          odom_received++;
         } catch (tf::TransformException ex) {
           ROS_WARN_STREAM("Transformations still initializing.");
           posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
@@ -519,7 +520,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		T_odom_to_scanner = PointMatcher_ros::eigenMatrixToDim<float>(
 				PointMatcher_ros::transformListenerToEigenMatrix<float>(
 				tfListener,
-				lidarFrame, // to
+				scannerFrame, // to
 				odomFrame, // from
 				stamp
 			), dimp1);
