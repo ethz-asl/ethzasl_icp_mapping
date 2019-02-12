@@ -473,8 +473,32 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
  	if(!icp.hasMap())
  	{
 		// we need to know the dimensionality of the point cloud to initialize properly
-		publishLock.lock();
-		T_odom_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
+      publishLock.lock();
+      try {
+        T_odom_to_map = PointMatcher_ros::eigenMatrixToDim<float>(
+            PointMatcher_ros::transformListenerToEigenMatrix<float>(
+                tfListener,
+                mapFrame, // to
+                odomFrame, // from
+                stamp
+            ), dimp1);
+      }
+      catch (tf::ExtrapolationException e) {
+        ROS_ERROR_STREAM(
+            "Extrapolation Exception. stamp = " << stamp << " now = "
+                                                << ros::Time::now()
+                                                << " delta = "
+                                                << ros::Time::now()
+                                                    - stamp << endl
+                                                << e.what());
+        return;
+      }
+      catch (...) {
+        // everything else
+        ROS_ERROR_STREAM("Unexpected exception... ignoring scan D");
+        return;
+      }
+//		T_odom_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
 		T_localMap_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
 		T_odom_to_scanner = PM::TransformationParameters::Identity(dimp1, dimp1);
 		publishLock.unlock();
