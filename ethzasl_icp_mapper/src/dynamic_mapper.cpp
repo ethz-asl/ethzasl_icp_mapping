@@ -492,12 +492,14 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
                                                 << ros::Time::now()
                                                     - stamp << endl
                                                 << e.what());
-        return;
+        T_odom_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
+        //return;
       }
       catch (...) {
         // everything else
         ROS_ERROR_STREAM("Unexpected exception... ignoring scan D");
-        return;
+        T_odom_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
+        //return;
       }
 //		T_odom_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
 		T_localMap_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
