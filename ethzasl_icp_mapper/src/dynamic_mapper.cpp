@@ -560,24 +560,12 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
  	if(!icp.hasMap()) {
       ROS_INFO_STREAM("[MAP] Creating an initial map");
       mapCreationTime = stamp;
-      DP pc;
       if (cad_trigger) {
         const PM::TransformationParameters T_scanner_to_world = T_odom_to_scanner.inverse();
-        pc = transformation->compute(*newPointCloud, T_scanner_to_map);
+        setMap(updateMap(newPointCloud.release(), T_scanner_to_map, false));
       } else {
-        pc = transformation->compute(*newPointCloud, T_scanner_to_map);
+        setMap(updateMap(newPointCloud.release(), T_scanner_to_map, false));
       }
-      mapPostFilters.apply(pc);
-      publishLock.lock();
-      if (scanPub.getNumSubscribers() && localizing) {
-        ROS_INFO_STREAM(
-            "Corrected scan publishing " << pc.getNbPoints() << " points");
-        scanPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(pc,
-                                                                           tfMapFrame,
-                                                                           stamp));
-      }
-      publishLock.unlock();
-      setMap(updateMap(newPointCloud.release(), T_scanner_to_map, false));
       // we must not delete newPointCloud because we just stored it in the mapPointCloud
       return;
     }
@@ -658,6 +646,12 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		if (odomErrorPub.getNumSubscribers())
 			odomErrorPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(T_odom_to_map, mapFrame, stamp));
 
+                // Publish the point map.
+                if (mapPub.getNumSubscribers()) {
+                      mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud,
+                                                                        tfMapFrame,
+                                                                        mapCreationTime));
+                } 
 		// Publish the corrected scan point cloud
       DP pc = transformation->compute(*newPointCloud, T_updatedScanner_to_map);
       mapPostFilters.apply(pc);
