@@ -141,10 +141,8 @@ class Mapper
 
 
 	
-
-	PM::TransformationParameters T_odom_to_map;
 	PM::TransformationParameters T_localMap_to_map;
-	PM::TransformationParameters T_odom_to_scanner;
+        PM::TransformationParameters T_scanner_to_map;
 	boost::thread publishThread;
 	boost::mutex publishLock;
 	boost::mutex icpMapLock;
@@ -162,7 +160,7 @@ public:
 protected:
 	void gotScan(const sensor_msgs::LaserScan& scanMsgIn);
 	void gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn);
-    void gotCAD(const sensor_msgs::PointCloud2& cloudMsgIn);
+        void gotCAD(const sensor_msgs::PointCloud2& cloudMsgIn);
 	void processCloud(unique_ptr<DP> cloud, const std::string& scannerFrame, const ros::Time& stamp, uint32_t seq);
 	void processNewMapIfAvailable();
 	void setMap(DP* newPointCloud);
@@ -184,8 +182,8 @@ protected:
 	bool getMode(ethzasl_icp_mapper::GetMode::Request &req, ethzasl_icp_mapper::GetMode::Response &res);
 	bool getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethzasl_icp_mapper::GetBoundedMap::Response &res);
 	bool reloadallYaml(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
-    bool initialTransform(ethzasl_icp_mapper::InitialTransform::Request &req, ethzasl_icp_mapper::InitialTransform::Response &res);
-    bool loadPublishedMap(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+        bool initialTransform(ethzasl_icp_mapper::InitialTransform::Request &req, ethzasl_icp_mapper::InitialTransform::Response &res);
+        bool loadPublishedMap(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 };
 
 Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
@@ -225,9 +223,8 @@ Mapper::Mapper(ros::NodeHandle& n, ros::NodeHandle& pn):
 	maxDyn(getParam<double>("maxDyn", 0.95)),
 	maxDistNewPoint(pow(getParam<double>("maxDistNewPoint", 0.1),2)),
 	sensorMaxRange(getParam<double>("sensorMaxRange", 80.0)),
-	T_odom_to_map(PM::TransformationParameters::Identity(4, 4)),
 	T_localMap_to_map(PM::TransformationParameters::Identity(4, 4)),
-	T_odom_to_scanner(PM::TransformationParameters::Identity(4, 4)),
+        T_scanner_to_map(PM::TransformationParameters::Identity(4, 4)),
 	publishStamp(ros::Time::now()),
 	tfListener(ros::Duration(30)),
 	eps(0.0001),
@@ -317,8 +314,7 @@ void Mapper::gotScan(const sensor_msgs::LaserScan& scanMsgIn)
 		try
 		{
 			unique_ptr<DP> cloud(new DP(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(scanMsgIn, &tfListener, scanMsgIn.header.frame_id))); //odomFrame
-
-			processCloud(move(cloud), scanMsgIn.header.frame_id, endScanTime, scanMsgIn.header.seq);
+                        processCloud(move(cloud), scanMsgIn.header.frame_id, endScanTime, scanMsgIn.header.seq);
 		}
 		catch(tf2::ConnectivityException)
 		{
@@ -345,7 +341,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
         } catch (tf::TransformException ex) {
           ROS_WARN_STREAM("Transformations still initializing.");
           posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
-              T_odom_to_scanner,
+              T_scanner_to_map.inverse(),
 			  lidarFrame,
               tfMapFrame,
               cloudMsgIn.header.stamp));
@@ -355,7 +351,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2& cloudMsgIn)
         unique_ptr<DP> cloud
             (new DP(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(
                 cloudMsgIn)));
-
+        
         processCloud(move(cloud),
                      cloudMsgIn.header.frame_id,
                      cloudMsgIn.header.stamp,
@@ -459,91 +455,36 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		return;
 	}
 
-
 	{
-		timer t; // Print how long take the algo
 		
 		// Apply filters to incoming cloud, in scanner coordinates
 		inputFilters.apply(*newPointCloud);
-		
-		ROS_INFO_STREAM("[ICP] Input filters took " << t.elapsed() << " [s]");
 	}
 
 	string reason;
-	// Initialize the transformation to identity if empty
- 	if(!icp.hasMap())
- 	{
-		// we need to know the dimensionality of the point cloud to initialize properly
-      publishLock.lock();
-      try {
-        T_odom_to_map = PointMatcher_ros::eigenMatrixToDim<float>(
-            PointMatcher_ros::transformListenerToEigenMatrix<float>(
-                tfListener,
-                mapFrame, // to
-                odomFrame, // from
-                stamp
-            ), dimp1);
-      }
-      catch (tf::ExtrapolationException e) {
-        ROS_ERROR_STREAM(
-            "Extrapolation Exception. stamp = " << stamp << " now = "
-                                                << ros::Time::now()
-                                                << " delta = "
-                                                << ros::Time::now()
-                                                    - stamp << endl
-                                                << e.what());
-        T_odom_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
-        //return;
-      }
-      catch (...) {
-        // everything else
-        ROS_ERROR_STREAM("Unexpected exception... ignoring scan D");
-        T_odom_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
-        //return;
-      }
-//		T_odom_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
-		T_localMap_to_map = PM::TransformationParameters::Identity(dimp1, dimp1);
-		T_odom_to_scanner = PM::TransformationParameters::Identity(dimp1, dimp1);
-		publishLock.unlock();
-	}
-	else
-	{
-		//Ensure that all global transforms don't cumulate floating error
-		T_odom_to_map = transformation->correctParameters(T_odom_to_map);
-		T_localMap_to_map = transformation->correctParameters(T_localMap_to_map);
-		T_odom_to_scanner = transformation->correctParameters(T_odom_to_scanner);
-	}
 
-
-	// Fetch transformation from scanner to odom
-	// Note: we don't need to actively wait for transform here. It is already waited in transformListenerToEigenMatrix()
-	try
-	{
-		T_odom_to_scanner = PointMatcher_ros::eigenMatrixToDim<float>(
-				PointMatcher_ros::transformListenerToEigenMatrix<float>(
-				tfListener,
-				scannerFrame, // to
-				odomFrame, // from
-				stamp
-			), dimp1);
-	}
-	catch(tf::ExtrapolationException e)
-	{
-		ROS_ERROR_STREAM("Extrapolation Exception. stamp = "<< stamp << " now = " << ros::Time::now() << " delta = " << ros::Time::now() - stamp << endl << e.what() );
-		return;
-	}
-	catch ( ... )
-	{
-		// everything else
-		ROS_ERROR_STREAM("Unexpected exception... ignoring scan A");
-		return;
-	}
-
-	const PM::TransformationParameters T_scanner_to_map = T_odom_to_map * T_odom_to_scanner.inverse();
-
+        try
+        {
+                T_scanner_to_map = PointMatcher_ros::eigenMatrixToDim<float>(
+                                PointMatcher_ros::transformListenerToEigenMatrix<float>(
+                                tfListener,
+                                tfMapFrame, // to
+                                scannerFrame, // from
+                                stamp
+                        ), dimp1);
+        }
+        catch(tf::ExtrapolationException e)
+        {
+                ROS_ERROR_STREAM("Extrapolation Exception. stamp = "<< stamp << " now = " << ros::Time::now() << " delta = " << ros::Time::now() - stamp << endl << e.what() );
+                return;
+        }
+        catch ( ... )
+        {
+                // everything else
+                ROS_ERROR_STREAM("Unexpected exception... ignoring scan X");
+                return;
+        }
 	// Recuring need to see those transformations...
-	ROS_DEBUG_STREAM("[ICP] T_odom_to_scanner(" << odomFrame<< " to " << scannerFrame << "):\n" << T_odom_to_scanner);
-	ROS_DEBUG_STREAM("[ICP] T_odom_to_map(" << odomFrame<< " to " << mapFrame << "):\n" << T_odom_to_map);
 	ROS_DEBUG_STREAM("[ICP] T_scanner_to_map (" << scannerFrame << " to " << mapFrame << "):\n" << T_scanner_to_map);
 
 	const PM::TransformationParameters T_scanner_to_localMap = transformation->correctParameters(T_localMap_to_map.inverse() * T_scanner_to_map);
@@ -561,7 +502,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
       ROS_INFO_STREAM("[MAP] Creating an initial map");
       mapCreationTime = stamp;
       if (cad_trigger) {
-        const PM::TransformationParameters T_scanner_to_world = T_odom_to_scanner.inverse();
+        ROS_INFO_STREAM("[ICP] T_scanner_to_map (" << scannerFrame << " to " << tfMapFrame << "):\n" << T_scanner_to_map);
         setMap(updateMap(newPointCloud.release(), T_scanner_to_map, false));
       } else {
         setMap(updateMap(newPointCloud.release(), T_scanner_to_map, false));
@@ -583,7 +524,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		PM::TransformationParameters T_updatedScanner_to_map;
 		PM::TransformationParameters T_updatedScanner_to_localMap;
 		
-		ROS_INFO_STREAM("[ICP] Computing - reading: " << newPointCloud->getNbPoints() << ", reference: " << icp.getInternalMap().getNbPoints() );
+		ROS_DEBUG_STREAM("[ICP] Computing - reading: " << newPointCloud->getNbPoints() << ", reference: " << icp.getInternalMap().getNbPoints() );
 
 		icpMapLock.lock();
 		T_updatedScanner_to_localMap = icp(*newPointCloud, T_scanner_to_localMap);
@@ -591,13 +532,12 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 
 		T_updatedScanner_to_map = T_localMap_to_map * T_updatedScanner_to_localMap;
 
-
 		ROS_DEBUG_STREAM("[ICP] T_updatedScanner_to_map:\n" << T_updatedScanner_to_map);
 		ROS_DEBUG_STREAM("[ICP] T_updatedScanner_to_localMap:\n" << T_updatedScanner_to_localMap);
 		
 		// Ensure minimum overlap between scans
 		const double estimatedOverlap = icp.errorMinimizer->getOverlap();
-		ROS_INFO_STREAM("[ICP] Overlap: " << estimatedOverlap);
+		ROS_DEBUG_STREAM("[ICP] Overlap: " << estimatedOverlap);
 		if (estimatedOverlap < minOverlap)
 		{
 			ROS_ERROR_STREAM("[ICP] Estimated overlap too small, ignoring ICP correction!");
@@ -606,35 +546,13 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		
 		// Compute tf
 		publishStamp = stamp;
-		publishLock.lock();
-
-		// Update old transform
-		T_odom_to_map = T_updatedScanner_to_map * T_odom_to_scanner;
-		
-		// Publish tf
-		if(publishMapTf == true)
-		{
-			
-			if (inverseTransform) 
-			{
-				tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map.inverse(), odomFrame, mapFrame, stamp));
-			} 
-			else 
-			{
-				tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, stamp));
-			}		
-		}
-
-		publishLock.unlock();
 		processingNewCloud = false;
 		
-		ROS_DEBUG_STREAM("[ICP] T_odom_to_map:\n" << T_odom_to_map);
-
 		// Publish odometry
 		if (odomPub.getNumSubscribers())
 		{
 			// Not sure that the transformation represents the odometry
-			odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(T_updatedScanner_to_map, mapFrame, stamp));
+			odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(T_updatedScanner_to_map, tfMapFrame, stamp));
 		}
 		// Publish pose
 		if (posePub.getNumSubscribers())
@@ -642,23 +560,18 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 			// Not sure that the transformation represents the odometry
 			posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(T_updatedScanner_to_map, lidarFrame, tfMapFrame, stamp));
 		}
-		// Publish error on odometry
-		if (odomErrorPub.getNumSubscribers())
-			odomErrorPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(T_odom_to_map, mapFrame, stamp));
-
-                // Publish the point map.
-                if (mapPub.getNumSubscribers()) {
+                if (mapPub.getNumSubscribers()) { 
                       mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud,
                                                                         tfMapFrame,
                                                                         mapCreationTime));
-                } 
+                }
 		// Publish the corrected scan point cloud
       DP pc = transformation->compute(*newPointCloud, T_updatedScanner_to_map);
       mapPostFilters.apply(pc);
       publishLock.lock();
       if (scanPub.getNumSubscribers() && localizing)
       {
-        ROS_INFO_STREAM("Corrected scan publishing " << pc.getNbPoints() << " points");
+        ROS_DEBUG_STREAM("Corrected scan publishing " << pc.getNbPoints() << " points");
         scanPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(pc, tfMapFrame, stamp));
       }
       publishLock.unlock();
@@ -672,7 +585,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 			// make sure we process the last available map
 			mapCreationTime = stamp;
 
-			ROS_INFO("[MAP] Adding new points in a separate thread");
+			ROS_DEBUG_STREAM("[MAP] Adding new points in a separate thread");
 			
 			mapBuildingTask = MapBuildingTask(boost::bind(&Mapper::updateMap, this, newPointCloud.release(), T_updatedScanner_to_map, true));
 			mapBuildingFuture = mapBuildingTask.get_future();
@@ -709,12 +622,18 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud, const std::string& scann
 		icp.getPrefilteredMap().save("error_ref.vtk");
 		return;
 	}
-	
+        catch ( ... )
+        {
+                // everything else
+                publishLock.unlock();
+                ROS_ERROR_STREAM("Unen XZ");
+                return;
+        }	
 	//Statistics about time and real-time capability
 	int realTimeRatio = 100*t.elapsed() / (stamp.toSec()-lastPoinCloudTime.toSec());
 	realTimeRatio *= seq - lastPointCloudSeq;
 
-	ROS_INFO_STREAM("[TIME] Total ICP took: " << t.elapsed() << " [s]");
+	ROS_DEBUG_STREAM("[TIME] Total ICP took: " << t.elapsed() << " [s]");
 	if(realTimeRatio < 80)
 		ROS_INFO_STREAM("[TIME] Real-time capability: " << realTimeRatio << "%");
 	else
@@ -729,7 +648,7 @@ void Mapper::processNewMapIfAvailable()
 	#if BOOST_VERSION >= 104100
 	if (mapBuildingInProgress && mapBuildingFuture.has_value())
 	{
-		ROS_INFO_STREAM("[MAP] Computation in thread done");
+		ROS_DEBUG_STREAM("[MAP] Computation in thread done");
 		setMap(mapBuildingFuture.get());
 		mapBuildingInProgress = false;
 	}
@@ -754,7 +673,7 @@ void Mapper::setMap(DP* newMapPointCloud)
 	publishLock.lock();
 	if (mapPub.getNumSubscribers() && mapping)
 	{
-		ROS_INFO_STREAM("[MAP] publishing " << mapPointCloud->getNbPoints() << " points");
+		ROS_DEBUG_STREAM("[MAP] publishing " << mapPointCloud->getNbPoints() << " points");
 		mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud, tfMapFrame, mapCreationTime));
 	}
 	publishLock.unlock();
@@ -764,24 +683,17 @@ void Mapper::updateIcpMap(const DP* newMapPointCloud)
 {
 	ros::Time time_current = ros::Time::now();
 	//TODO check if T_odom_to_scanner can be reused
-	try
-	{
-		std::cout << "sensor frame: " << sensorFrame << " odomframe " << odomFrame << std::endl;
-		tfListener.waitForTransform(sensorFrame, odomFrame, time_current, ros::Duration(3.0));
-
-//		 Fetching current transformation to the sensor
-
-		const PM::TransformationParameters T_odom_to_scanner =
-			PointMatcher_ros::eigenMatrixToDim<float>(
-					PointMatcher_ros::transformListenerToEigenMatrix<float>(
-						tfListener,
-						sensorFrame,
-						odomFrame,
-						time_current
-						), mapPointCloud->getHomogeneousDim());
+        try {
 
 		// Move the global map to the scanner pose
-		const PM::TransformationParameters T_scanner_to_map = this->T_odom_to_map * T_odom_to_scanner.inverse();
+		T_scanner_to_map =
+                        PointMatcher_ros::eigenMatrixToDim<float>(
+                                        PointMatcher_ros::transformListenerToEigenMatrix<float>(
+                                                tfListener,
+                                                tfMapFrame,
+                                                sensorFrame,
+                                                time_current
+                                                ), mapPointCloud->getHomogeneousDim());
 		DP localMap = transformation->compute(*newMapPointCloud, T_scanner_to_map.inverse());
 
 		// Cut points in a radius of the parameter sensorMaxRange
@@ -830,7 +742,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 
 		if (!mapExists) 
 		{
-			ROS_INFO_STREAM( "[MAP] Initial map, only filtering points");
+			ROS_DEBUG_STREAM( "[MAP] Initial map, only filtering points");
 			*newPointCloud = transformation->compute(*newPointCloud, T_updatedScanner_to_map); 
 			mapPostFilters.apply(*newPointCloud);
 
@@ -841,7 +753,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 		// Early out if no map modification is wanted
 		if(!mapping)
 		{
-			ROS_INFO_STREAM("[MAP] Skipping modification of the map");
+			ROS_DEBUG_STREAM("[MAP] Skipping modification of the map");
 			return mapPointCloud;
 		}
 		
@@ -1060,12 +972,6 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 		no_overlap.conservativeResize(ptsOut);
 		overlap.conservativeResize(ptsIn);
 
-		// Publish outliers
-		//if (outlierPub.getNumSubscribers())
-		//{
-			//outlierPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(no_overlap, mapFrame, mapCreationTime));
-		//}
-
 		// Initialize descriptors
 		no_overlap.addDescriptor("probabilityStatic", PM::Matrix::Constant(1, no_overlap.features.cols(), priorStatic));
 		no_overlap.addDescriptor("probabilityDynamic", PM::Matrix::Constant(1, no_overlap.features.cols(), priorDyn));
@@ -1093,7 +999,7 @@ Mapper::DP* Mapper::updateMap(DP* newPointCloud, const PM::TransformationParamet
 		abort();
 	}
 	
-	ROS_INFO_STREAM("[TIME][MAP] New map available (" << newPointCloud->features.cols() << " pts), update took " << t.elapsed() << " [s]");
+	ROS_DEBUG_STREAM("[TIME][MAP] New map available (" << newPointCloud->features.cols() << " pts), update took " << t.elapsed() << " [s]");
 	
 	return newPointCloud;
 }
@@ -1124,19 +1030,6 @@ void Mapper::publishLoop(double publishPeriod)
 
 void Mapper::publishTransform()
 {
-	if(processingNewCloud == false && publishMapTf == true)
-	{
-		publishLock.lock();
-    ros::Time stamp = ros::Time::now();
-		// Note: we use now as timestamp to refresh the tf and avoid other buffer to be empty
-		if (inverseTransform) {
-        tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map.inverse(), odomFrame, mapFrame, stamp));
-    } else {
-        tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, stamp));
-    }		
-		
-		publishLock.unlock();
-	}
 }
 
 bool Mapper::getPointMap(map_msgs::GetPointMap::Request &req, map_msgs::GetPointMap::Response &res)
@@ -1185,16 +1078,8 @@ bool Mapper::loadMap(ethzasl_icp_mapper::LoadMap::Request &req, ethzasl_icp_mapp
 		ROS_INFO_STREAM("    - " << cloud->descriptorLabels[i].text); 
 	}
 
-	//reset transformation
-	publishLock.lock();
-	T_odom_to_map = PM::TransformationParameters::Identity(dim,dim);
 	T_localMap_to_map = PM::TransformationParameters::Identity(dim,dim);
-	T_odom_to_scanner = PM::TransformationParameters::Identity(dim,dim);
-	
-	//ISER
-	//T_odom_to_map(2,3) = mapElevation;
-	publishLock.unlock();
-
+        T_scanner_to_map = PM::TransformationParameters::Identity(dim,dim);
 	//TODO: check that...
 	mapping = true;
 	setMap(updateMap(cloud, PM::TransformationParameters::Identity(dim,dim), false));
@@ -1210,9 +1095,8 @@ bool Mapper::reset(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res
 	// note: no need for locking as we do ros::spin(), to update if we go for multi-threading
 	publishLock.lock();
 	// WARNING: this will break in 2D
-	T_odom_to_map = PM::TransformationParameters::Identity(4,4);
 	T_localMap_to_map = PM::TransformationParameters::Identity(4,4);
-	T_odom_to_scanner = PM::TransformationParameters::Identity(4,4);
+        T_scanner_to_map = PM::TransformationParameters::Identity(4,4);
 	publishLock.unlock();
 
 	icp.clearMap();
@@ -1227,37 +1111,19 @@ bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req, ethzasl_
 
 	try
 	{
-		T_odom_to_map = PointMatcher_ros::eigenMatrixToDim<float>(PointMatcher_ros::odomMsgToEigenMatrix<float>(req.odom), dim);
 
-
-		const PM::TransformationParameters T_odom_to_scanner = 
+		T_scanner_to_map = 
 			PointMatcher_ros::eigenMatrixToDim<float>(
 					PointMatcher_ros::transformListenerToEigenMatrix<float>(
 						tfListener,
-						sensorFrame, 
-						odomFrame,
+						tfMapFrame, 
+						sensorFrame,
 						ros::Time::now()
 						), dim);
-
-		const PM::TransformationParameters T_scanner_to_map = T_odom_to_map * T_odom_to_scanner.inverse();
 
 
 		// update ICP map
 		updateIcpMap(mapPointCloud);
-
-		//ISER
-		/*
-			 {
-		// remove roll and pitch
-		T_odom_to_map(2,0) = 0; 
-		T_odom_to_map(2,1) = 0; 
-		T_odom_to_map(2,2) = 1; 
-		T_odom_to_map(0,2) = 0; 
-		T_odom_to_map(1,2) = 0;
-		T_odom_to_map(2,3) = mapElevation; //z
-		}*/
-
-		tfBroadcaster.sendTransform(PointMatcher_ros::eigenMatrixToStampedTransform<float>(T_odom_to_map, mapFrame, odomFrame, ros::Time::now()));
 
 	}
 	catch ( ... )
@@ -1325,7 +1191,6 @@ bool Mapper::getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req, ethz
 	Eigen::Affine3d eigenTr;
 	tf::poseMsgToEigen(req.mapCenter, eigenTr);
 	Eigen::MatrixXf T = eigenTr.matrix().inverse().cast<float>();
-	//const Eigen::MatrixXf T = eigenTr.matrix().cast<float>();
 
 	T = transformation->correctParameters(T);
 
