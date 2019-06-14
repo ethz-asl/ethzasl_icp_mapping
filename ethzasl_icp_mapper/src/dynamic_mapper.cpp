@@ -212,25 +212,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
   // Dimension of the point cloud, important since we handle 2D and 3D
   const int dimp1(newPointCloud->features.rows());
 
-  // This need to be depreciated, there is addTime for those field in pm
-  if (!(newPointCloud->descriptorExists("stamps_Msec")
-      && newPointCloud->descriptorExists("stamps_sec")
-      && newPointCloud->descriptorExists("stamps_nsec"))) {
-    const float Msec = round(stamp.sec / 1e6);
-    const float sec = round(stamp.sec - Msec * 1e6);
-    const float nsec = round(stamp.nsec);
-
-    const PM::Matrix desc_Msec = PM::Matrix::Constant(1, goodCount, Msec);
-    const PM::Matrix desc_sec = PM::Matrix::Constant(1, goodCount, sec);
-    const PM::Matrix desc_nsec = PM::Matrix::Constant(1, goodCount, nsec);
-    newPointCloud->addDescriptor("stamps_Msec", desc_Msec);
-    newPointCloud->addDescriptor("stamps_sec", desc_sec);
-    newPointCloud->addDescriptor("stamps_nsec", desc_nsec);
-
-    //cout << "Adding time" << endl;
-
-  }
-
   // Ensure a minimum amount of point before filtering
   int ptsCount = newPointCloud->getNbPoints();
   if (ptsCount < minReadingPointCount) {
