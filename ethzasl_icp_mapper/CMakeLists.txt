@@ -76,7 +76,12 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 add_definitions(-DHAVE_YAML_CPP)
 
-include_directories(include ${catkin_INCLUDE_DIRS} ${libpointmatcher_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS}
+		${libpointmatcher_INCLUDE_DIRS})
+
+add_library(dynamic_mapper src/dynamic_mapper.cpp)
+target_link_libraries(dynamic_mapper ${catkin_LIBRARIES}
+		${libpointmatcher_LIBRARIES})
 
 add_executable(matcher_service src/matcher_service.cpp)
 add_dependencies(matcher_service ${PROJECT_NAME}_gencpp)
@@ -98,9 +103,10 @@ add_executable(interact_mapper src/interact_mapper.cpp )
 add_dependencies(interact_mapper ${PROJECT_NAME}_gencpp)
 target_link_libraries(interact_mapper ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
 
-add_executable(dynamic_mapper src/dynamic_mapper.cpp )
-add_dependencies(dynamic_mapper ${PROJECT_NAME}_gencpp)
-target_link_libraries(dynamic_mapper ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
+add_executable(dynamic_mapper_node src/dynamic_mapper_node.cpp )
+add_dependencies(dynamic_mapper_node ${PROJECT_NAME}_gencpp)
+target_link_libraries(dynamic_mapper_node ${catkin_LIBRARIES}
+		dynamic_mapper)
 
 add_executable(dynamic_trails src/dynamic_trails.cpp )
 add_dependencies(dynamic_trails ${PROJECT_NAME}_gencpp)
