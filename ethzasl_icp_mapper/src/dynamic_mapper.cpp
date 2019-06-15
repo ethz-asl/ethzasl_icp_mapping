@@ -1,5 +1,4 @@
 #include "nav_msgs/Odometry.h"
-//#include "pointmatcher_ros/get_params_from_server.h"
 #include "std_msgs/String.h"
 #include "std_msgs/Header.h"
 
@@ -31,7 +30,7 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
 
   PM::Parameters params;
   params["dim"] = "-1";
-  params["maxDist"] = toParam(parameters_.sensorMaxRange);
+  params["maxDist"] = toParam(parameters_.sensor_max_range);
 
   radiusFilter = PM::get().DataPointsFilterRegistrar.create(
       "MaxDistDataPointsFilter",
@@ -39,11 +38,14 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
 
   // topic initializations
   if (parameters_.subscribe_cloud) {
-    cloudSub = n.subscribe("cloud_in", parameters_.inputQueueSize, &Mapper::gotCloud, this);
+    cloudSub = n.subscribe("cloud_in",
+                           parameters_.input_queue_size,
+                           &Mapper::gotCloud,
+                           this);
   }
   if (parameters_.subscribe_cad) {
     cadSub = n.subscribe("cad_interface_node/cad_model",
-                         parameters_.inputQueueSize,
+                         parameters_.input_queue_size,
                          &Mapper::gotCAD,
                          this);
   }
@@ -79,18 +81,17 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
 Mapper::~Mapper() {
 #if BOOST_VERSION >= 104100
   // wait for map-building thread
-  if (mapBuildingInProgress)
-  {
-      mapBuildingFuture.wait();
-      if (mapBuildingFuture.has_value())
-          delete mapBuildingFuture.get();
+  if (mapBuildingInProgress) {
+    mapBuildingFuture.wait();
+    if (mapBuildingFuture.has_value())
+      delete mapBuildingFuture.get();
   }
 #endif // BOOST_VERSION >= 104100
   // wait for publish thread
   publishThread.join();
   // save point cloud
   if (mapPointCloud) {
-    mapPointCloud->save(parameters_.vtkFinalMapName);
+    mapPointCloud->save(parameters_.vtk_final_map_name);
     delete mapPointCloud;
   }
 }
@@ -100,8 +101,8 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2 &cloudMsgIn) {
     if (odom_received < 3) {
       try {
         tf::StampedTransform transform;
-        tfListener.lookupTransform(parameters_.tfMapFrame,
-                                   parameters_.lidarFrame,
+        tfListener.lookupTransform(parameters_.tf_map_frame,
+                                   parameters_.lidar_frame,
                                    cloudMsgIn.header.stamp,
                                    transform);
         odom_received++;
@@ -109,8 +110,8 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2 &cloudMsgIn) {
         ROS_WARN_STREAM("Transformations still initializing.");
         posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
             T_scanner_to_map.inverse(),
-            parameters_.lidarFrame,
-            parameters_.tfMapFrame,
+            parameters_.lidar_frame,
+            parameters_.tf_map_frame,
             cloudMsgIn.header.stamp));
         odom_received++;
       }
@@ -155,8 +156,8 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
                           uint32_t seq) {
 
   // If the sensor frame was not set by the user, use default
-  if (parameters_.sensorFrame == "") {
-    parameters_.sensorFrame = scannerFrame;
+  if (parameters_.sensor_frame== "") {
+    parameters_.sensor_frame= scannerFrame;
   }
 
   // if the future has completed, use the new map
@@ -194,7 +195,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
 
   // Ensure a minimum amount of point before filtering
   int ptsCount = newPointCloud->getNbPoints();
-  if (ptsCount < parameters_.minReadingPointCount) {
+  if (ptsCount < parameters_.min_reading_point_count) {
     ROS_ERROR_STREAM(
         "[ICP] Not enough points in newPointCloud: only " << ptsCount
                                                           << " pts.");
@@ -211,7 +212,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
     T_scanner_to_map = PointMatcher_ros::eigenMatrixToDim<float>(
         PointMatcher_ros::transformListenerToEigenMatrix<float>(
             tfListener,
-            parameters_.tfMapFrame, // to
+            parameters_.tf_map_frame, // to
             scannerFrame, // from
             stamp
         ), dimp1);
@@ -231,7 +232,8 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
     return;
   }
   ROS_DEBUG_STREAM(
-      "[ICP] T_scanner_to_map (" << scannerFrame << " to " << parameters_.mapFrame << "):\n"
+      "[ICP] T_scanner_to_map (" << scannerFrame << " to "
+                                 << parameters_.map_frame<< "):\n"
                                  << T_scanner_to_map);
 
   const PM::TransformationParameters T_scanner_to_localMap =
@@ -240,7 +242,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
 
   // Ensure a minimum amount of point after filtering
   ptsCount = newPointCloud->getNbPoints();
-  if (ptsCount < parameters_.minReadingPointCount) {
+  if (ptsCount < parameters_.min_reading_point_count) {
     ROS_ERROR_STREAM(
         "[ICP] Not enough points in newPointCloud: only " << ptsCount
                                                           << " pts.");
@@ -288,7 +290,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
     // Ensure minimum overlap between scans
     const double estimatedOverlap = icp.errorMinimizer->getOverlap();
     ROS_DEBUG_STREAM("[ICP] Overlap: " << estimatedOverlap);
-    if (estimatedOverlap < parameters_.minOverlap) {
+    if (estimatedOverlap < parameters_.min_overlap) {
       ROS_ERROR_STREAM(
           "[ICP] Estimated overlap too small, ignoring ICP correction!");
       return;
@@ -302,7 +304,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
       // Not sure that the transformation represents the odometry
       odomPub.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(
           T_updatedScanner_to_map,
-          parameters_.tfMapFrame,
+          parameters_.tf_map_frame,
           stamp));
     }
     // Publish pose
@@ -310,13 +312,13 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
       // Not sure that the transformation represents the odometry
       posePub.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
           T_updatedScanner_to_map,
-          parameters_.lidarFrame,
-          parameters_.tfMapFrame,
+          parameters_.lidar_frame,
+          parameters_.tf_map_frame,
           stamp));
     }
     if (mapPub.getNumSubscribers()) {
       mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud,
-                                                                        parameters_.tfMapFrame,
+                                                                        parameters_.tf_map_frame,
                                                                         mapCreationTime));
     }
     // Publish the corrected scan point cloud
@@ -327,16 +329,16 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
       ROS_DEBUG_STREAM(
           "Corrected scan publishing " << pc.getNbPoints() << " points");
       scanPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(pc,
-                                                                         parameters_.tfMapFrame,
+                                                                         parameters_.tf_map_frame,
                                                                          stamp));
     }
     publishLock.unlock();
 
     // check if new points should be added to the map.
     if (
-        ((estimatedOverlap < parameters_.maxOverlapToMerge)
+        ((estimatedOverlap < parameters_.max_overlap_to_merge)
             || (icp.getPrefilteredInternalMap().features.cols()
-                < parameters_.minMapPointCount)) && (!mapBuildingInProgress)
+                < parameters_.min_map_point_count)) && (!mapBuildingInProgress)
         ) {
       // Make sure we process the last available map.
       mapCreationTime = stamp;
@@ -357,11 +359,14 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
     } else {
       cerr << "SKIPPING MAP" << endl;
       cerr << "estimatedOverlap < maxOverlapToMerge: "
-           << (estimatedOverlap < parameters_.maxOverlapToMerge) << endl;
-      cerr << "(icp.getPrefilteredInternalMap().features.cols() < minMapPointCount): "
-           << icp.getPrefilteredInternalMap().features.cols() << " < " << parameters_.minMapPointCount
-           << " = " << (icp.getPrefilteredInternalMap().features.cols() < parameters_.minMapPointCount)
-           << endl;
+           << (estimatedOverlap < parameters_.max_overlap_to_merge) << endl;
+      cerr
+          << "(icp.getPrefilteredInternalMap().features.cols() < minMapPointCount): "
+          << icp.getPrefilteredInternalMap().features.cols() << " < "
+          << parameters_.min_map_point_count
+          << " = " << (icp.getPrefilteredInternalMap().features.cols()
+          < parameters_.min_map_point_count)
+          << endl;
       cerr << "mapBuildingInProgress: " << mapBuildingInProgress << endl;
 
       bool stateLock = publishLock.try_lock();
@@ -408,11 +413,10 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
 
 void Mapper::processNewMapIfAvailable() {
 #if BOOST_VERSION >= 104100
-  if (mapBuildingInProgress && mapBuildingFuture.has_value())
-  {
-      ROS_DEBUG_STREAM("[MAP] Computation in thread done");
-      setMap(mapBuildingFuture.get());
-      mapBuildingInProgress = false;
+  if (mapBuildingInProgress && mapBuildingFuture.has_value()) {
+    ROS_DEBUG_STREAM("[MAP] Computation in thread done");
+    setMap(mapBuildingFuture.get());
+    mapBuildingInProgress = false;
   }
 #endif // BOOST_VERSION >= 104100
 }
@@ -435,7 +439,7 @@ void Mapper::setMap(DP *newMapPointCloud) {
     ROS_DEBUG_STREAM(
         "[MAP] publishing " << mapPointCloud->getNbPoints() << " points");
     mapPub.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud,
-                                                                      parameters_.tfMapFrame,
+                                                                      parameters_.tf_map_frame,
                                                                       mapCreationTime));
   }
   publishLock.unlock();
@@ -451,8 +455,8 @@ void Mapper::updateIcpMap(const DP *newMapPointCloud) {
         PointMatcher_ros::eigenMatrixToDim<float>(
             PointMatcher_ros::transformListenerToEigenMatrix<float>(
                 tfListener,
-                parameters_.tfMapFrame,
-                parameters_.sensorFrame,
+                parameters_.tf_map_frame,
+                parameters_.sensor_frame,
                 time_current
             ), mapPointCloud->getHomogeneousDim());
     DP localMap =
@@ -486,14 +490,14 @@ Mapper::DP *Mapper::updateMap(DP *newPointCloud,
       newPointCloud->addDescriptor("probabilityStatic",
                                    PM::Matrix::Constant(1,
                                                         newPointCloud->features.cols(),
-                                                        parameters_.priorStatic));
+                                                        parameters_.prior_static));
     }
 
     if (newPointCloud->descriptorExists("probabilityDynamic") == false) {
       newPointCloud->addDescriptor("probabilityDynamic",
                                    PM::Matrix::Constant(1,
                                                         newPointCloud->features.cols(),
-                                                        parameters_.priorDyn));
+                                                        parameters_.prior_dyn));
     }
 
     if (!mapExists) {
@@ -545,7 +549,7 @@ Mapper::DP *Mapper::updateMap(DP *newPointCloud,
 
     int ptsOut = 0;
     for (int i = 0; i < readPtsCount; ++i) {
-      if (matches_overlap.dists(i) > parameters_.maxDistNewPoint) {
+      if (matches_overlap.dists(i) > parameters_.max_dist_new_point) {
         no_overlap.setColFrom(ptsOut, *newPointCloud, i);
         ptsOut++;
       }
@@ -584,11 +588,10 @@ Mapper::DP *Mapper::updateMap(DP *newPointCloud,
 
 void Mapper::waitForMapBuildingCompleted() {
 #if BOOST_VERSION >= 104100
-  if (mapBuildingInProgress)
-  {
-      // we wait for now, in future we should kill it
-      mapBuildingFuture.wait();
-      mapBuildingInProgress = false;
+  if (mapBuildingInProgress) {
+    // we wait for now, in future we should kill it
+    mapBuildingFuture.wait();
+    mapBuildingInProgress = false;
   }
 #endif // BOOST_VERSION >= 104100
 }
@@ -600,7 +603,7 @@ bool Mapper::getPointMap(map_msgs::GetPointMap::Request &req,
 
   // FIXME: do we need a mutex here?
   res.map = PointMatcher_ros::pointMatcherCloudToRosMsg<float>(*mapPointCloud,
-                                                               parameters_.mapFrame,
+                                                               parameters_.map_frame,
                                                                ros::Time::now());
   return true;
 }
@@ -681,8 +684,8 @@ bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req,
         PointMatcher_ros::eigenMatrixToDim<float>(
             PointMatcher_ros::transformListenerToEigenMatrix<float>(
                 tfListener,
-                parameters_.tfMapFrame,
-                parameters_.sensorFrame,
+                parameters_.tf_map_frame,
+                parameters_.sensor_frame,
                 ros::Time::now()
             ), dim);
 
@@ -782,7 +785,7 @@ bool Mapper::getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req,
   // Send the resulting point cloud in ROS format
   res.boundedMap = PointMatcher_ros::pointMatcherCloudToRosMsg<float>(
       cutPointCloud,
-      parameters_.mapFrame,
+      parameters_.map_frame,
       ros::Time::now());
   return true;
 }

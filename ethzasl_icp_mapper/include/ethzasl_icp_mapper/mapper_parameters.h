@@ -1,75 +1,52 @@
 #ifndef ETHZASL_ICP_MAPPER_MAPPER_PARAMETERS_H
 #define ETHZASL_ICP_MAPPER_MAPPER_PARAMETERS_H
 
-#include <fstream>
-
 #include <boost/version.hpp>
 #include <boost/thread.hpp>
 #if BOOST_VERSION >= 104100
 #include <boost/thread/future.hpp>
 #endif // BOOST_VERSION >=  104100
-
-#include "ros/ros.h"
-#include "ros/console.h"
-#include "pointmatcher/PointMatcher.h"
-#include "pointmatcher/Timer.h"
-
-#include "nabo/nabo.h"
-
-#include "tf/transform_broadcaster.h"
-#include "tf_conversions/tf_eigen.h"
-#include "tf/transform_listener.h"
-#include "eigen_conversions/eigen_msg.h"
+#include <fstream>
 
 namespace mapper {
 
-typedef PointMatcher<float> PM;
-
 struct MapperParameters {
-  typedef PM::DataPoints DP;
 
   MapperParameters();
   ~MapperParameters();
 
   // Parameters
-  bool useConstMotionModel;
+  bool use_const_motion_model;
   bool localizing;
   bool mapping;
-  int minReadingPointCount;
-  int minMapPointCount;
-  int inputQueueSize;
-  double minOverlap;
-  double maxOverlapToMerge;
-  double tfRefreshPeriod;
+  int min_reading_point_count;
+  int min_map_point_count;
+  int input_queue_size;
+  double min_overlap;
+  double max_overlap_to_merge;
+  double tf_refresh_period;
   bool cad_trigger;
   bool use_logger;
   bool subscribe_cloud;
   bool subscribe_cad;
-  std::string sensorFrame;
-  std::string odomFrame;
-  std::string mapFrame;
-  std::string tfMapFrame;
-  std::string lidarFrame;
-  std::string vtkFinalMapName; //!< name of the final vtk map
+  std::string sensor_frame;
+  std::string odom_frame;
+  std::string map_frame;
+  std::string tf_map_frame;
+  std::string lidar_frame;
+  std::string vtk_final_map_name;
 
   // Parameters for dynamic filtering
-  const float
-      priorDyn; //!< ratio. Prior to be dynamic when a new point is added
-  const float
-      priorStatic; //!< ratio. Prior to be static when a new point is added
-  const float maxAngle; //!< in rad. Openning angle of a laser beam
-  const float eps_a; //!< ratio. Error proportional to the laser distance
-  const float eps_d; //!< in meter. Fix error on the laser distance
-  const float
-      alpha; //!< ratio. Propability of staying static given that the point was dynamic
-  const float
-      beta; //!< ratio. Propability of staying dynamic given that the point was static
-  const float maxDyn; //!< ratio. Threshold for which a point will stay dynamic
-  const float
-      maxDistNewPoint; //!< in meter. Distance at which a new point will be added in the global map.
-  const float
-      sensorMaxRange; //!< in meter. Maximum reading distance of the laser. Used to cut the global map before matching.
-  const float eps;
+  const float prior_dyn;
+  const float prior_static;
+  const float max_angle;
+  const float eps_a;
+  const float eps_d;
+  const float alpha;
+  const float beta;
+  const float max_dyn;
+  const float max_dist_new_point;
+  const float sensor_max_range;
 };
 
 }
