@@ -171,9 +171,6 @@ class Mapper {
                 bool mapExists);
   void waitForMapBuildingCompleted();
   void updateIcpMap(const DP *newMapPointCloud);
-
-//  void publishLoop(double publishPeriod);
-//  void publishTransform();
   void loadExternalParameters();
 
   // Services

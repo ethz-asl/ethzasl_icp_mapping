@@ -15,7 +15,7 @@ Parameters for ICRA 2014: "Long-term 3D map maintenance in dynamic environments"
 		<param name="subscribe_cad" value="true"/>
 		<param name="icpConfig" value="$(find ethzasl_icp_mapper)/launch/velodyne_puck/icp_dynamic.yaml" />
 		<param name="inputFiltersConfig" value="$(find ethzasl_icp_mapper)/launch/velodyne_puck/input_filters.yaml" />
-		
+
 		<!--Put that back! -->
 		<param name="odom_frame" value="/world" /> #lidar
 
@@ -39,7 +39,7 @@ Parameters for ICRA 2014: "Long-term 3D map maintenance in dynamic environments"
 		<param name="alpha" value="0.99"/>
 		<param name="beta" value="0.90"/>
 		<param name="maxDyn" value="0.90"/>
-		<param name="maxDistNewPoint" value="0.05"/>
+		<param name="maxDistNewPoint" value="0.06"/>
 
 	</node>
 
