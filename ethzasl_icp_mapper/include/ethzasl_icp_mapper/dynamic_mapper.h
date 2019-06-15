@@ -46,88 +46,24 @@ class Mapper {
   typedef typename Nabo::NearestNeighbourSearch<float> NNS;
   typedef typename NNS::SearchType NNSearchType;
 
-  ros::NodeHandle &n;
-  ros::NodeHandle &pn;
-
-  // Subscribers
-  ros::Subscriber cloudSub;
-  ros::Subscriber cadSub;
-
-  // Publishers
-  ros::Publisher mapPub;
-  ros::Publisher scanPub;
-  ros::Publisher outlierPub;
-  ros::Publisher odomPub;
-  ros::Publisher odomErrorPub;
-  ros::Publisher posePub;
-
-  // Services
-  ros::ServiceServer getPointMapSrv;
-  ros::ServiceServer saveMapSrv;
-  ros::ServiceServer loadMapSrv;
-  ros::ServiceServer resetSrv;
-  ros::ServiceServer correctPoseSrv;
-  ros::ServiceServer setModeSrv;
-  ros::ServiceServer getModeSrv;
-  ros::ServiceServer getBoundedMapSrv;
-  ros::ServiceServer reloadAllYamlSrv;
-  ros::ServiceServer initialTransformSrv;
-  ros::ServiceServer loadPublishedMapSrv;
-
-  // Time
-  ros::Time mapCreationTime;
-  ros::Time lastPoinCloudTime;
-  uint32_t lastPointCloudSeq;
-
-  // libpointmatcher
-  PM::DataPointsFilters inputFilters;
-  PM::DataPointsFilters mapPreFilters;
-  PM::DataPointsFilters mapPostFilters;
-  PM::DataPoints *mapPointCloud;
-  PM::ICPSequence icp;
-  shared_ptr<PM::Transformation> transformation;
-  shared_ptr<PM::DataPointsFilter> radiusFilter;
-
-  // multi-threading mapper
-#if BOOST_VERSION >= 104100
-  typedef boost::packaged_task<PM::DataPoints *> MapBuildingTask;
-  typedef boost::unique_future<PM::DataPoints *> MapBuildingFuture;
-  boost::thread mapBuildingThread;
-  MapBuildingTask mapBuildingTask;
-  MapBuildingFuture mapBuildingFuture;
-  bool mapBuildingInProgress;
-#endif // BOOST_VERSION >= 104100
-
-  MapperParameters parameters_;
-  int odom_received;
-  PM::TransformationParameters T_localMap_to_map;
-  PM::TransformationParameters T_scanner_to_map;
-  boost::thread publishThread;
-  boost::mutex publishLock;
-  boost::mutex icpMapLock;
-  ros::Time publishStamp;
-
-  tf::TransformListener tfListener;
-  tf::TransformBroadcaster tfBroadcaster;
-
  public:
   Mapper(ros::NodeHandle &n, ros::NodeHandle &pn);
   ~Mapper();
 
  protected:
-  void gotCloud(const sensor_msgs::PointCloud2 &cloudMsgIn);
-  void gotCAD(const sensor_msgs::PointCloud2 &cloudMsgIn);
+  void gotCloud(const sensor_msgs::PointCloud2 &cloud_msg_in);
+  void gotCAD(const sensor_msgs::PointCloud2 &cloud_msg_in);
   void processCloud(unique_ptr<DP> cloud,
-                    const std::string &scannerFrame,
+                    const std::string &scanner_frame,
                     const ros::Time &stamp,
                     uint32_t seq);
   void processNewMapIfAvailable();
-  void setMap(DP *newPointCloud);
-  DP *updateMap(DP *newPointCloud,
-                const PM::TransformationParameters T_updatedScanner_to_map,
-                bool mapExists);
+  void setMap(DP *new_point_cloud);
+  DP *updateMap(DP *new_point_cloud,
+                const PM::TransformationParameters T_updated_scanner_to_map,
+                bool map_exists);
   void waitForMapBuildingCompleted();
-  void updateIcpMap(const DP *newMapPointCloud);
+  void updateIcpMap(const DP *new_map_point_cloud);
   void loadExternalParameters();
 
   // Services
@@ -152,6 +88,70 @@ class Mapper {
                         ethzasl_icp_mapper::InitialTransform::Response &res);
   bool loadPublishedMap(std_srvs::Empty::Request &req,
                         std_srvs::Empty::Response &res);
+
+ private:
+  ros::NodeHandle &n;
+  ros::NodeHandle &pn;
+
+  // Subscribers
+  ros::Subscriber cloud_sub_;
+  ros::Subscriber cad_sub_;
+
+  // Publishers
+  ros::Publisher map_pub_;
+  ros::Publisher scan_pub_;
+  ros::Publisher outlier_pub_;
+  ros::Publisher odom_pub_;
+  ros::Publisher odom_error_pub_;
+  ros::Publisher pose_pub_;
+
+  // Services
+  ros::ServiceServer get_point_map_srv_;
+  ros::ServiceServer save_map_srv_;
+  ros::ServiceServer load_map_srv_;
+  ros::ServiceServer reset_srv_;
+  ros::ServiceServer correct_pose_srv_;
+  ros::ServiceServer set_mode_srv_;
+  ros::ServiceServer get_mode_srv_;
+  ros::ServiceServer get_bounded_map_srv_;
+  ros::ServiceServer reload_all_yaml_srv_;
+  ros::ServiceServer initial_transform_srv_;
+  ros::ServiceServer load_published_map_srv_;
+
+  // Time
+  ros::Time map_creation_time_;
+  ros::Time last_poin_cloud_time_;
+  uint32_t last_point_cloud_seq_;
+
+  // libpointmatcher
+  PM::DataPointsFilters input_filters_;
+  PM::DataPointsFilters map_pre_filters_;
+  PM::DataPointsFilters map_post_filters_;
+  PM::DataPoints *map_point_cloud_;
+  PM::ICPSequence icp_;
+  shared_ptr<PM::Transformation> transformation_;
+  shared_ptr<PM::DataPointsFilter> radius_filter_;
+
+  // multi-threading mapper
+#if BOOST_VERSION >= 104100
+  typedef boost::packaged_task<PM::DataPoints *> MapBuildingTask;
+  typedef boost::unique_future<PM::DataPoints *> MapBuildingFuture;
+  boost::thread map_building_thread_;
+  MapBuildingTask map_building_task_;
+  MapBuildingFuture map_building_future_;
+  bool map_building_in_progress_;
+#endif // BOOST_VERSION >= 104100
+
+  MapperParameters parameters_;
+  int odom_received_;
+  PM::TransformationParameters T_local_map_to_map_;
+  PM::TransformationParameters T_scanner_to_map_;
+  boost::thread publish_thread_;
+  boost::mutex publish_lock_;
+  boost::mutex icp_map_lock_;
+  ros::Time publish_stamp_;
+
+  tf::TransformListener tf_listener_;
 };
 
 }
