@@ -79,7 +79,7 @@ add_definitions(-DHAVE_YAML_CPP)
 include_directories(include ${catkin_INCLUDE_DIRS}
 		${libpointmatcher_INCLUDE_DIRS})
 
-add_library(dynamic_mapper src/dynamic_mapper.cpp)
+add_library(dynamic_mapper src/dynamic_mapper.cpp src/mapper_parameters.cpp)
 target_link_libraries(dynamic_mapper ${catkin_LIBRARIES}
 		${libpointmatcher_LIBRARIES})
 

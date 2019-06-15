@@ -9,6 +9,8 @@
 #include <boost/thread/future.hpp>
 #endif // BOOST_VERSION >=  104100
 
+#include "ethzasl_icp_mapper/mapper_parameters.h"
+
 #include "ros/ros.h"
 #include "ros/console.h"
 #include "pointmatcher/PointMatcher.h"
@@ -103,44 +105,8 @@ class Mapper {
   bool mapBuildingInProgress;
 #endif // BOOST_VERSION >= 104100
 
-  // Parameters
-  bool useConstMotionModel;
-  bool localizing;
-  bool mapping;
-  int minReadingPointCount;
-  int minMapPointCount;
-  int inputQueueSize;
-  double minOverlap;
-  double maxOverlapToMerge;
-  double
-      tfRefreshPeriod;  //!< if set to zero, tf will be publish at the rate of the incoming point cloud messages
-  bool cad_trigger;
+  MapperParameters parameters_;
   int odom_received;
-  string sensorFrame;
-  string odomFrame;
-  string mapFrame;
-  string tfMapFrame;
-  string lidarFrame;
-  string vtkFinalMapName; //!< name of the final vtk map
-
-  // Parameters for dynamic filtering
-  const float
-      priorDyn; //!< ratio. Prior to be dynamic when a new point is added
-  const float
-      priorStatic; //!< ratio. Prior to be static when a new point is added
-  const float maxAngle; //!< in rad. Openning angle of a laser beam
-  const float eps_a; //!< ratio. Error proportional to the laser distance
-  const float eps_d; //!< in meter. Fix error on the laser distance
-  const float
-      alpha; //!< ratio. Propability of staying static given that the point was dynamic
-  const float
-      beta; //!< ratio. Propability of staying dynamic given that the point was static
-  const float maxDyn; //!< ratio. Threshold for which a point will stay dynamic
-  const float
-      maxDistNewPoint; //!< in meter. Distance at which a new point will be added in the global map.
-  const float
-      sensorMaxRange; //!< in meter. Maximum reading distance of the laser. Used to cut the global map before matching.
-
   PM::TransformationParameters T_localMap_to_map;
   PM::TransformationParameters T_scanner_to_map;
   boost::thread publishThread;
@@ -150,8 +116,6 @@ class Mapper {
 
   tf::TransformListener tfListener;
   tf::TransformBroadcaster tfBroadcaster;
-
-  const float eps;
 
  public:
   Mapper(ros::NodeHandle &n, ros::NodeHandle &pn);
