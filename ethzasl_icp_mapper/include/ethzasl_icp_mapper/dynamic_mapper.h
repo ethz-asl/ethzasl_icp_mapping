@@ -1,43 +1,36 @@
 #ifndef ETHZASL_ICP_MAPPER_DYNAMIC_MAPPER_H
 #define ETHZASL_ICP_MAPPER_DYNAMIC_MAPPER_H
 
-#include <fstream>
-
-#include <boost/version.hpp>
 #include <boost/thread.hpp>
+#include <boost/version.hpp>
 #if BOOST_VERSION >= 104100
 #include <boost/thread/future.hpp>
 #endif // BOOST_VERSION >=  104100
+#include <fstream>
 
-#include "ethzasl_icp_mapper/mapper_parameters.h"
+#include <eigen_conversions/eigen_msg.h>
+#include <map_msgs/GetPointMap.h>
+#include <map_msgs/SaveMap.h>
+#include <nabo/nabo.h>
+#include <pointmatcher/PointMatcher.h>
+#include <pointmatcher/Timer.h>
+#include <pointmatcher_ros/point_cloud.h>
+#include <pointmatcher_ros/ros_logger.h>
+#include <pointmatcher_ros/transform.h>
+#include <ros/console.h>
+#include <ros/ros.h>
+#include <std_srvs/Empty.h>
+#include <tf_conversions/tf_eigen.h>
+#include <tf/transform_broadcaster.h>
+#include <tf/transform_listener.h>
 
-#include "ros/ros.h"
-#include "ros/console.h"
-#include "pointmatcher/PointMatcher.h"
-#include "pointmatcher/Timer.h"
-
-#include "nabo/nabo.h"
-
-#include "pointmatcher_ros/point_cloud.h"
-#include "pointmatcher_ros/transform.h"
-#include "pointmatcher_ros/ros_logger.h"
-
-#include "tf/transform_broadcaster.h"
-#include "tf_conversions/tf_eigen.h"
-#include "tf/transform_listener.h"
-#include "eigen_conversions/eigen_msg.h"
-
-// Services
-
-#include "std_srvs/Empty.h"
-#include "map_msgs/GetPointMap.h"
-#include "map_msgs/SaveMap.h"
 #include "ethzasl_icp_mapper/LoadMap.h"
 #include "ethzasl_icp_mapper/CorrectPose.h"
 #include "ethzasl_icp_mapper/SetMode.h"
 #include "ethzasl_icp_mapper/GetMode.h"
 #include "ethzasl_icp_mapper/InitialTransform.h"
-#include "ethzasl_icp_mapper/GetBoundedMap.h" // FIXME: should that be moved to map_msgs?
+#include "ethzasl_icp_mapper/GetBoundedMap.h"
+#include "ethzasl_icp_mapper/mapper_parameters.h"
 
 namespace mapper {
 
