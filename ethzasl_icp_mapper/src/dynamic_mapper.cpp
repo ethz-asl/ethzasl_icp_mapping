@@ -212,6 +212,22 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
   // Dimension of the point cloud, important since we handle 2D and 3D
   const int dimp1(newPointCloud->features.rows());
 
+  // This need to be depreciated, there is addTime for those field in pm
+  if (!(newPointCloud->descriptorExists("stamps_Msec")
+      && newPointCloud->descriptorExists("stamps_sec")
+      && newPointCloud->descriptorExists("stamps_nsec"))) {
+    const float Msec = round(stamp.sec / 1e6);
+    const float sec = round(stamp.sec - Msec * 1e6);
+    const float nsec = round(stamp.nsec);
+
+    const PM::Matrix desc_Msec = PM::Matrix::Constant(1, goodCount, Msec);
+    const PM::Matrix desc_sec = PM::Matrix::Constant(1, goodCount, sec);
+    const PM::Matrix desc_nsec = PM::Matrix::Constant(1, goodCount, nsec);
+    newPointCloud->addDescriptor("stamps_Msec", desc_Msec);
+    newPointCloud->addDescriptor("stamps_sec", desc_sec);
+    newPointCloud->addDescriptor("stamps_nsec", desc_nsec);
+  }
+
   // Ensure a minimum amount of point before filtering
   int ptsCount = newPointCloud->getNbPoints();
   if (ptsCount < minReadingPointCount) {
@@ -226,8 +242,6 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
     // Apply filters to incoming cloud, in scanner coordinates
     inputFilters.apply(*newPointCloud);
   }
-
-  string reason;
 
   try {
     T_scanner_to_map = PointMatcher_ros::eigenMatrixToDim<float>(
@@ -249,10 +263,9 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
   }
   catch (...) {
     // everything else
-    ROS_ERROR_STREAM("Unexpected exception... ignoring scan X");
+    ROS_ERROR_STREAM("Unexpected exception... ignoring scan.");
     return;
   }
-  // Recuring need to see those transformations...
   ROS_DEBUG_STREAM(
       "[ICP] T_scanner_to_map (" << scannerFrame << " to " << mapFrame << "):\n"
                                  << T_scanner_to_map);
@@ -274,15 +287,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
   if (!icp.hasMap()) {
     ROS_INFO_STREAM("[MAP] Creating an initial map");
     mapCreationTime = stamp;
-    if (cad_trigger) {
-      ROS_INFO_STREAM(
-          "[ICP] T_scanner_to_map (" << scannerFrame << " to " << tfMapFrame
-                                     << "):\n" << T_scanner_to_map);
-      setMap(updateMap(newPointCloud.release(), T_scanner_to_map, false));
-    } else {
-      setMap(updateMap(newPointCloud.release(), T_scanner_to_map, false));
-    }
-    // we must not delete newPointCloud because we just stored it in the mapPointCloud
+    setMap(updateMap(newPointCloud.release(), T_scanner_to_map, false));
     return;
   }
 
@@ -363,14 +368,13 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
     }
     publishLock.unlock();
 
-
-    // check if news points should be added to the map
+    // check if new points should be added to the map.
     if (
         ((estimatedOverlap < maxOverlapToMerge)
             || (icp.getPrefilteredInternalMap().features.cols()
                 < minMapPointCount)) && (!mapBuildingInProgress)
         ) {
-      // make sure we process the last available map
+      // Make sure we process the last available map.
       mapCreationTime = stamp;
 
       ROS_DEBUG_STREAM("[MAP] Adding new points in a separate thread");
@@ -451,18 +455,17 @@ void Mapper::processNewMapIfAvailable() {
 
 void Mapper::setMap(DP *newMapPointCloud) {
 
-  // delete old map
+  // Delete old map.
   if (mapPointCloud && mapPointCloud != newMapPointCloud)
     delete mapPointCloud;
 
-  // set new map
+  // Set new map.
   mapPointCloud = newMapPointCloud;
 
-  // update ICP map
+  // Update ICP map.
   updateIcpMap(mapPointCloud);
 
-  // Publish map point cloud
-  // FIXME this crash when used without descriptor
+  // Publish map point cloud.
   publishLock.lock();
   if (mapPub.getNumSubscribers() && mapping) {
     ROS_DEBUG_STREAM(
