@@ -149,7 +149,6 @@ class Mapper {
   boost::thread publish_thread_;
   boost::mutex publish_lock_;
   boost::mutex icp_map_lock_;
-  ros::Time publish_stamp_;
 
   tf::TransformListener tf_listener_;
 };

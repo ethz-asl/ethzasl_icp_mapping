@@ -17,18 +17,14 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
 #endif // BOOST_VERSION >= 104100
     T_local_map_to_map_(PM::TransformationParameters::Identity(4, 4)),
     T_scanner_to_map_(PM::TransformationParameters::Identity(4, 4)),
-    publish_stamp_(ros::Time::now()),
     tf_listener_(ros::Duration(30)),
     odom_received_(0) {
 
-  // set logger
   if (parameters_.use_logger) {
     PointMatcherSupport::setLogger(make_shared<PointMatcherSupport::ROSLogger>());
   }
 
-  // Load all parameters stored in external files
   loadExternalParameters();
-
   PM::Parameters params;
   params["dim"] = "-1";
   params["maxDist"] = toParam(parameters_.sensor_max_range);
@@ -37,7 +33,6 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
       "MaxDistDataPointsFilter",
       params);
 
-  // topic initializations
   if (parameters_.subscribe_cloud) {
     cloud_sub_ = n.subscribe("cloud_in",
                              parameters_.input_queue_size,
@@ -59,7 +54,6 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
       n.advertise<geometry_msgs::TransformStamped>("icp_pose", 50, true);
   odom_error_pub_ = n.advertise<nav_msgs::Odometry>("icp_error_odom", 50, true);
 
-  // service initializations
   get_point_map_srv_ =
       n.advertiseService("dynamic_point_map", &Mapper::getPointMap, this);
   save_map_srv_ = pn.advertiseService("save_map", &Mapper::saveMap, this);
@@ -82,16 +76,16 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
 
 Mapper::~Mapper() {
 #if BOOST_VERSION >= 104100
-  // wait for map-building thread
+  // Wait for map-building thread.
   if (map_building_in_progress_) {
     map_building_future_.wait();
     if (map_building_future_.has_value())
       delete map_building_future_.get();
   }
 #endif // BOOST_VERSION >= 104100
-  // wait for publish thread
+  // Wait for publish thread.
   publish_thread_.join();
-  // save point cloud
+  // Save point cloud.
   if (map_point_cloud_) {
     map_point_cloud_->save(parameters_.vtk_final_map_name);
     delete map_point_cloud_;
@@ -158,7 +152,6 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
                           const ros::Time &stamp,
                           uint32_t seq) {
 
-  // If the sensor frame was not set by the user, use default
   if (parameters_.sensor_frame == "") {
     parameters_.sensor_frame = scanner_frame;
   }
@@ -170,17 +163,16 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
   // IMPORTANT:  We need to receive the point clouds in local coordinates (scanner or robot)
   timer t;
 
-  // Convert point cloud
   const size_t good_count(new_point_cloud->features.cols());
   if (good_count == 0) {
     ROS_ERROR("[ICP] I found no good points in the cloud");
     return;
   }
 
-  // Dimension of the point cloud, important since we handle 2D and 3D
+  // Dimension of the point cloud, important since we handle 2D and 3D.
   const int dimp1(new_point_cloud->features.rows());
 
-  // This need to be depreciated, there is addTime for those field in pm
+  // This need to be depreciated, there is addTime for those field in pm.
   if (!(new_point_cloud->descriptorExists("stamps_Msec")
       && new_point_cloud->descriptorExists("stamps_sec")
       && new_point_cloud->descriptorExists("stamps_nsec"))) {
@@ -196,7 +188,6 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
     new_point_cloud->addDescriptor("stamps_nsec", desc_nsec);
   }
 
-  // Ensure a minimum amount of point before filtering
   int pts_count = new_point_cloud->getNbPoints();
   if (pts_count < parameters_.min_reading_point_count) {
     ROS_ERROR_STREAM(
@@ -205,11 +196,7 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
     return;
   }
 
-  {
-
-    // Apply filters to incoming cloud, in scanner coordinates
-    input_filters_.apply(*new_point_cloud);
-  }
+  input_filters_.apply(*new_point_cloud);
 
   try {
     T_scanner_to_map_ = PointMatcher_ros::eigenMatrixToDim<float>(
@@ -219,8 +206,7 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
             scanner_frame, // from
             stamp
         ), dimp1);
-  }
-  catch (tf::ExtrapolationException e) {
+  } catch (tf::ExtrapolationException e) {
     ROS_ERROR_STREAM("Extrapolation Exception. stamp = " << stamp << " now = "
                                                          << ros::Time::now()
                                                          << " delta = "
@@ -228,9 +214,8 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
                                                              - stamp << endl
                                                          << e.what());
     return;
-  }
-  catch (...) {
-    // everything else
+  } catch (...) {
+    // Everything else.
     ROS_ERROR_STREAM("Unexpected exception... ignoring scan.");
     return;
   }
@@ -243,7 +228,6 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
       transformation_->correctParameters(
           T_local_map_to_map_.inverse() * T_scanner_to_map_);
 
-  // Ensure a minimum amount of point after filtering
   pts_count = new_point_cloud->getNbPoints();
   if (pts_count < parameters_.min_reading_point_count) {
     ROS_ERROR_STREAM(
@@ -252,7 +236,6 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
     return;
   }
 
-  // Initialize the map if empty
   if (!icp_.hasMap()) {
     ROS_INFO_STREAM("[MAP] Creating an initial map");
     map_creation_time_ = stamp;
@@ -260,7 +243,6 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
     return;
   }
 
-  // Check dimension
   if (new_point_cloud->getEuclideanDim()
       != icp_.getPrefilteredInternalMap().getEuclideanDim()) {
     ROS_ERROR_STREAM("[ICP] Dimensionality missmatch: incoming cloud is "
@@ -271,7 +253,6 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
   }
 
   try {
-    // Apply ICP
     PM::TransformationParameters T_updated_scanner_to_map;
     PM::TransformationParameters T_updated_scanner_to_local_map;
 
@@ -294,7 +275,7 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
     ROS_DEBUG_STREAM("[ICP] T_updatedScanner_to_localMap:\n"
                          << T_updated_scanner_to_local_map);
 
-    // Ensure minimum overlap between scans
+    // Ensure minimum overlap between scans.
     const double estimated_overlap = icp_.errorMinimizer->getOverlap();
     ROS_DEBUG_STREAM("[ICP] Overlap: " << estimated_overlap);
     if (estimated_overlap < parameters_.min_overlap) {
@@ -303,20 +284,15 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
       return;
     }
 
-    // Compute tf
-    publish_stamp_ = stamp;
-
-    // Publish odometry
+    // Publish odometry.
     if (odom_pub_.getNumSubscribers()) {
-      // Not sure that the transformation represents the odometry
       odom_pub_.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(
           T_updated_scanner_to_map,
           parameters_.tf_map_frame,
           stamp));
     }
-    // Publish pose
+    // Publish pose.
     if (pose_pub_.getNumSubscribers()) {
-      // Not sure that the transformation represents the odometry
       pose_pub_.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
           T_updated_scanner_to_map,
           parameters_.lidar_frame,
@@ -343,7 +319,6 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
     }
     publish_lock_.unlock();
 
-    // check if new points should be added to the map.
     if (
         ((estimated_overlap < parameters_.max_overlap_to_merge)
             || (icp_.getPrefilteredInternalMap().features.cols()
@@ -363,7 +338,7 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
       map_building_future_ = map_building_task_.get_future();
       map_building_thread_ =
           boost::thread(boost::move(boost::ref(map_building_task_)));
-      map_building_thread_.detach(); // We don't care about joining this one
+      map_building_thread_.detach(); // We don't care about joining this one.
       sched_yield();
       map_building_in_progress_ = true;
     } else {
@@ -393,21 +368,19 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
 
     }
 
-  }
-  catch (PM::ConvergenceError error) {
+  } catch (PM::ConvergenceError error) {
     icp_map_lock_.unlock();
     ROS_ERROR_STREAM("[ICP] failed to converge: " << error.what());
     new_point_cloud->save("error_read.vtk");
     icp_.getPrefilteredMap().save("error_ref.vtk");
     return;
-  }
-  catch (...) {
-    // everything else
+  } catch (...) {
+    // everything else.
     publish_lock_.unlock();
     ROS_ERROR_STREAM("Unen XZ");
     return;
   }
-  //Statistics about time and real-time capability
+  // Statistics about time and real-time capability.
   int real_time_ratio =
       100 * t.elapsed() / (stamp.toSec() - last_poin_cloud_time_.toSec());
   real_time_ratio *= seq - last_point_cloud_seq_;
@@ -463,7 +436,7 @@ void Mapper::updateIcpMap(const DP *new_map_point_cloud) {
   //TODO check if T_odom_to_scanner can be reused
   try {
 
-    // Move the global map to the scanner pose
+    // Move the global map to the scanner pose.
     T_scanner_to_map_ =
         PointMatcher_ros::eigenMatrixToDim<float>(
             PointMatcher_ros::transformListenerToEigenMatrix<float>(
@@ -476,18 +449,17 @@ void Mapper::updateIcpMap(const DP *new_map_point_cloud) {
         transformation_->compute(*new_map_point_cloud, T_scanner_to_map_
             .inverse());
 
-    // Cut points in a radius of the parameter sensorMaxRange
+    // Cut points in a radius of the parameter sensorMaxRange.
     radius_filter_->inPlaceFilter(local_map);
 
     icp_map_lock_.lock();
-    // Update the transformation to the local map
+    // Update the transformation to the local map.
     this->T_local_map_to_map_ = T_scanner_to_map_;
 
     icp_.setMap(local_map);
     icp_map_lock_.unlock();
-  }
-  catch (...) {
-    // everything else
+  } catch (...) {
+    // Everything else.
     ROS_ERROR_STREAM("Unexpected exception... ignoring scan B");
     return;
   }
@@ -500,7 +472,7 @@ Mapper::DP *Mapper::updateMap(DP *new_point_cloud,
   timer t;
 
   try {
-    // Prepare empty field if not existing
+    // Prepare empty field if not existing.
     if (new_point_cloud->descriptorExists("probabilityStatic") == false) {
       new_point_cloud->addDescriptor("probabilityStatic",
                                      PM::Matrix::Constant(1,
@@ -526,7 +498,7 @@ Mapper::DP *Mapper::updateMap(DP *new_point_cloud,
     }
 
 
-    // Early out if no map modification is wanted
+    // Early out if no map modification is wanted.
     if (!parameters_.mapping) {
       ROS_DEBUG_STREAM("[MAP] Skipping modification of the map");
       return map_point_cloud_;
@@ -536,14 +508,14 @@ Mapper::DP *Mapper::updateMap(DP *new_point_cloud,
     const int read_pts_count(new_point_cloud->getNbPoints());
     const int dim = map_point_cloud_->getEuclideanDim();
 
-    // Transform the global map in local coordinates
+    // Transform the global map in local coordinates.
     DP map_local_frame_cut = transformation_->compute(*map_point_cloud_,
                                                       T_updated_scanner_to_map
                                                           .inverse());
     // Perform density computation.
     map_local_frame_cut.concatenate(*new_point_cloud);
 
-    // build and populate NNS
+    // Build and populate NNS.
     std::shared_ptr<NNS> featureNNS;
     featureNNS.reset(NNS::create(map_local_frame_cut.features,
                                  map_local_frame_cut.features.rows() - 1,
@@ -573,23 +545,20 @@ Mapper::DP *Mapper::updateMap(DP *new_point_cloud,
 
     no_overlap.conservativeResize(pts_out);
 
-    // shrink the newPointCloud to the new information
+    // Shrink the new PointCloud to the new information.
     *new_point_cloud = no_overlap;
 
-    // Correct new points using ICP result
+    // Correct new points using ICP result.
     *new_point_cloud =
         transformation_->compute(*new_point_cloud, T_updated_scanner_to_map);
 
-    // Merge point clouds to map
+    // Merge point clouds to map.
     new_point_cloud->concatenate(*map_point_cloud_);
     map_post_filters_.apply(*new_point_cloud);
-  }
-  catch (DP::InvalidField e) {
+  } catch (DP::InvalidField e) {
     ROS_ERROR_STREAM(e.what());
     abort();
-  }
-  catch (const std::exception &exc) {
-    // catch anything thrown within try block that derives from std::exception
+  } catch (const std::exception &exc) {
     std::cerr << exc.what();
     abort();
   }
@@ -632,8 +601,7 @@ bool Mapper::saveMap(map_msgs::SaveMap::Request &req,
 
   try {
     map_point_cloud_->save(req.filename.data);
-  }
-  catch (const std::runtime_error &e) {
+  } catch (const std::runtime_error &e) {
     ROS_ERROR_STREAM("Unable to save: " << e.what());
     return false;
   }
@@ -650,7 +618,7 @@ bool Mapper::loadMap(ethzasl_icp_mapper::LoadMap::Request &req,
 
   DP *cloud(new DP(DP::load(req.filename.data)));
 
-  // Print new map information
+  // Print new map information.
   const int dim = cloud->features.rows();
   const int nbPts = cloud->features.cols();
   ROS_INFO_STREAM(
@@ -678,9 +646,8 @@ bool Mapper::reset(std_srvs::Empty::Request &req,
                    std_srvs::Empty::Response &res) {
   waitForMapBuildingCompleted();
 
-  // note: no need for locking as we do ros::spin(), to update if we go for multi-threading
   publish_lock_.lock();
-  // WARNING: this will break in 2D
+  // WARNING: this will break in 2D.
   T_local_map_to_map_ = PM::TransformationParameters::Identity(4, 4);
   T_scanner_to_map_ = PM::TransformationParameters::Identity(4, 4);
   publish_lock_.unlock();
@@ -706,12 +673,8 @@ bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req,
                 ros::Time::now()
             ), dim);
 
-
-    // update ICP map
     updateIcpMap(map_point_cloud_);
-
-  }
-  catch (...) {
+  } catch (...) {
     // everything else
     publish_lock_.unlock();
     ROS_ERROR_STREAM("Unexpected exception... ignoring scan C");
@@ -719,19 +682,17 @@ bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req,
   }
 
   publish_lock_.unlock();
-
   return true;
 }
 
 bool Mapper::setMode(ethzasl_icp_mapper::SetMode::Request &req,
                      ethzasl_icp_mapper::SetMode::Response &res) {
-  // Impossible states
+  // Impossible states.
   if (req.localize == false && req.map == true)
     return false;
 
   parameters_.localizing = req.localize;
   parameters_.mapping = req.map;
-
   return true;
 }
 
@@ -798,7 +759,7 @@ bool Mapper::getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req,
   cut_point_cloud = transformation_->compute(cut_point_cloud, T.inverse());
 
 
-  // Send the resulting point cloud in ROS format
+  // Send the resulting point cloud in ROS format.
   res.boundedMap = PointMatcher_ros::pointMatcherCloudToRosMsg<float>(
       cut_point_cloud,
       parameters_.map_frame,
@@ -808,7 +769,7 @@ bool Mapper::getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req,
 
 void Mapper::loadExternalParameters() {
 
-  // load configs
+  // Load configs.
   string config_file_name;
   if (ros::param::get("~icpConfig", config_file_name)) {
     ifstream ifs(config_file_name.c_str());
