@@ -272,7 +272,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
     ROS_DEBUG_STREAM(
         "[ICP] Computing - reading: " << newPointCloud->getNbPoints()
                                       << ", reference: "
-                                      << icp.getInternalMap().getNbPoints());
+                                      << icp.getPrefilteredInternalMap().getNbPoints());
 
     icpMapLock.lock();
     T_updatedScanner_to_localMap = icp(*newPointCloud, T_scanner_to_localMap);
@@ -358,9 +358,9 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
       cerr << "SKIPPING MAP" << endl;
       cerr << "estimatedOverlap < maxOverlapToMerge: "
            << (estimatedOverlap < parameters_.maxOverlapToMerge) << endl;
-      cerr << "(icp.getInternalMap().features.cols() < minMapPointCount): "
-           << icp.getInternalMap().features.cols() << " < " << parameters_.minMapPointCount
-           << " = " << (icp.getInternalMap().features.cols() < parameters_.minMapPointCount)
+      cerr << "(icp.getPrefilteredInternalMap().features.cols() < minMapPointCount): "
+           << icp.getPrefilteredInternalMap().features.cols() << " < " << parameters_.minMapPointCount
+           << " = " << (icp.getPrefilteredInternalMap().features.cols() < parameters_.minMapPointCount)
            << endl;
       cerr << "mapBuildingInProgress: " << mapBuildingInProgress << endl;
 
