@@ -107,8 +107,8 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
       pn.advertiseService("reload_all_yaml", &Mapper::reloadallYaml, this);
 
   // refreshing tf transform thread
-  publishThread =
-      boost::thread(boost::bind(&Mapper::publishLoop, this, tfRefreshPeriod));
+//  publishThread =
+//      boost::thread(boost::bind(&Mapper::publishLoop, this, tfRefreshPeriod));
 }
 
 Mapper::~Mapper() {
@@ -432,7 +432,7 @@ void Mapper::processCloud(unique_ptr<DP> newPointCloud,
       100 * t.elapsed() / (stamp.toSec() - lastPoinCloudTime.toSec());
   realTimeRatio *= seq - lastPointCloudSeq;
 
-  ROS_DEBUG_STREAM("[TIME] Total ICP took: " << t.elapsed() << " [s]");
+  ROS_INFO_STREAM("[TIME] Total ICP took: " << t.elapsed() << " [s]");
   if (realTimeRatio < 80)
     ROS_INFO_STREAM("[TIME] Real-time capability: " << realTimeRatio << "%");
   else
@@ -519,7 +519,6 @@ Mapper::DP *Mapper::updateMap(DP *newPointCloud,
   try {
     // Prepare empty field if not existing
     if (newPointCloud->descriptorExists("probabilityStatic") == false) {
-      //newPointCloud->addDescriptor("probabilityStatic", PM::Matrix::Zero(1, newPointCloud->features.cols()));
       newPointCloud->addDescriptor("probabilityStatic",
                                    PM::Matrix::Constant(1,
                                                         newPointCloud->features.cols(),
@@ -527,18 +526,17 @@ Mapper::DP *Mapper::updateMap(DP *newPointCloud,
     }
 
     if (newPointCloud->descriptorExists("probabilityDynamic") == false) {
-      //newPointCloud->addDescriptor("probabilityDynamic", PM::Matrix::Zero(1, newPointCloud->features.cols()));
       newPointCloud->addDescriptor("probabilityDynamic",
                                    PM::Matrix::Constant(1,
                                                         newPointCloud->features.cols(),
                                                         priorDyn));
     }
 
-    if (newPointCloud->descriptorExists("debug") == false) {
-      newPointCloud->addDescriptor("debug",
-                                   PM::Matrix::Zero(1,
-                                                    newPointCloud->features.cols()));
-    }
+//    if (newPointCloud->descriptorExists("debug") == false) {
+//      newPointCloud->addDescriptor("debug",
+//                                   PM::Matrix::Zero(1,
+//                                                    newPointCloud->features.cols()));
+//    }
 
     if (!mapExists) {
       ROS_DEBUG_STREAM("[MAP] Initial map, only filtering points");
@@ -633,29 +631,29 @@ Mapper::DP *Mapper::updateMap(DP *newPointCloud,
                     maxAngle);
 
     // Define views on descriptors
-    DP::View viewOn_Msec_overlap =
-        newPointCloud->getDescriptorViewByName("stamps_Msec");
-    DP::View viewOn_sec_overlap =
-        newPointCloud->getDescriptorViewByName("stamps_sec");
-    DP::View viewOn_nsec_overlap =
-        newPointCloud->getDescriptorViewByName("stamps_nsec");
+//    DP::View viewOn_Msec_overlap =
+//        newPointCloud->getDescriptorViewByName("stamps_Msec");
+//    DP::View viewOn_sec_overlap =
+//        newPointCloud->getDescriptorViewByName("stamps_sec");
+//    DP::View viewOn_nsec_overlap =
+//        newPointCloud->getDescriptorViewByName("stamps_nsec");
 
     DP::View viewOnProbabilityStatic =
         mapPointCloud->getDescriptorViewByName("probabilityStatic");
     DP::View viewOnProbabilityDynamic =
         mapPointCloud->getDescriptorViewByName("probabilityDynamic");
-    DP::View viewDebug = mapPointCloud->getDescriptorViewByName("debug");
+//    DP::View viewDebug = mapPointCloud->getDescriptorViewByName("debug");
 
     DP::View viewOn_normals_map =
         mapLocalFrameCut.getDescriptorViewByName("normals");
-    DP::View
-        viewOn_Msec_map = mapPointCloud->getDescriptorViewByName("stamps_Msec");
-    DP::View
-        viewOn_sec_map = mapPointCloud->getDescriptorViewByName("stamps_sec");
-    DP::View
-        viewOn_nsec_map = mapPointCloud->getDescriptorViewByName("stamps_nsec");
+//    DP::View
+//        viewOn_Msec_map = mapPointCloud->getDescriptorViewByName("stamps_Msec");
+//    DP::View
+//        viewOn_sec_map = mapPointCloud->getDescriptorViewByName("stamps_sec");
+//    DP::View
+//        viewOn_nsec_map = mapPointCloud->getDescriptorViewByName("stamps_nsec");
 
-    viewDebug = PM::Matrix::Zero(1, mapPtsCount);
+//    viewDebug = PM::Matrix::Zero(1, mapPtsCount);
     for (int i = 0; i < mapCutPtsCount; i++) {
       if (dists(i) != numeric_limits<float>::infinity()) {
         const int readId = ids(0, i);
@@ -716,8 +714,6 @@ Mapper::DP *Mapper::updateMap(DP *newPointCloud,
             viewOnProbabilityDynamic(0, mapId) = 1 - eps;
           }
 
-
-
           // normalization
           const float sumZ = viewOnProbabilityDynamic(0, mapId)
               + viewOnProbabilityStatic(0, mapId);
@@ -726,14 +722,14 @@ Mapper::DP *Mapper::updateMap(DP *newPointCloud,
           viewOnProbabilityDynamic(0, mapId) /= sumZ;
           viewOnProbabilityStatic(0, mapId) /= sumZ;
 
-          viewDebug(0, mapId) = w_d2;
+//          viewDebug(0, mapId) = w_d2;
 
 
           //TODO use the new time structure
           // Refresh time
-          viewOn_Msec_map(0, mapId) = viewOn_Msec_overlap(0, readId);
-          viewOn_sec_map(0, mapId) = viewOn_sec_overlap(0, readId);
-          viewOn_nsec_map(0, mapId) = viewOn_nsec_overlap(0, readId);
+//          viewOn_Msec_map(0, mapId) = viewOn_Msec_overlap(0, readId);
+//          viewOn_sec_map(0, mapId) = viewOn_sec_overlap(0, readId);
+//          viewOn_nsec_map(0, mapId) = viewOn_nsec_overlap(0, readId);
         }
 
       }
@@ -760,23 +756,23 @@ Mapper::DP *Mapper::updateMap(DP *newPointCloud,
                     1,
                     0);
 
-    DP overlap(newPointCloud->createSimilarEmpty());
+//    DP overlap(newPointCloud->createSimilarEmpty());
     DP no_overlap(newPointCloud->createSimilarEmpty());
 
     int ptsOut = 0;
-    int ptsIn = 0;
+//    int ptsIn = 0;
     for (int i = 0; i < readPtsCount; ++i) {
       if (matches_overlap.dists(i) > maxDistNewPoint) {
         no_overlap.setColFrom(ptsOut, *newPointCloud, i);
         ptsOut++;
-      } else {
-        overlap.setColFrom(ptsIn, *newPointCloud, i);
-        ptsIn++;
+//      } else {
+//        overlap.setColFrom(ptsIn, *newPointCloud, i);
+//        ptsIn++;
       }
     }
 
     no_overlap.conservativeResize(ptsOut);
-    overlap.conservativeResize(ptsIn);
+//    overlap.conservativeResize(ptsIn);
 
     // Initialize descriptors
     no_overlap.addDescriptor("probabilityStatic",
@@ -811,7 +807,7 @@ Mapper::DP *Mapper::updateMap(DP *newPointCloud,
     abort();
   }
 
-  ROS_DEBUG_STREAM(
+  ROS_INFO_STREAM(
       "[TIME][MAP] New map available (" << newPointCloud->features.cols()
                                         << " pts), update took " << t.elapsed()
                                         << " [s]");
@@ -830,18 +826,15 @@ void Mapper::waitForMapBuildingCompleted() {
 #endif // BOOST_VERSION >= 104100
 }
 
-void Mapper::publishLoop(double publishPeriod) {
-  if (publishPeriod == 0)
-    return;
-  ros::Rate r(1.0 / publishPeriod);
-  while (ros::ok()) {
-    publishTransform();
-    r.sleep();
-  }
-}
-
-void Mapper::publishTransform() {
-}
+//void Mapper::publishLoop(double publishPeriod) {
+//  if (publishPeriod == 0)
+//    return;
+//  ros::Rate r(1.0 / publishPeriod);
+//  while (ros::ok()) {
+//    publishTransform();
+//    r.sleep();
+//  }
+//}
 
 bool Mapper::getPointMap(map_msgs::GetPointMap::Request &req,
                          map_msgs::GetPointMap::Response &res) {
@@ -1104,14 +1097,3 @@ bool Mapper::reloadallYaml(std_srvs::Empty::Request &req,
 }
 
 }
-
-//// Main function supporting the Mapper class
-//int main(int argc, char **argv) {
-//  ros::init(argc, argv, "mapper");
-//  ros::NodeHandle n;
-//  ros::NodeHandle pn("~");
-//  Mapper mapper(n, pn);
-//  ros::spin();
-//
-//  return 0;
-//}
