@@ -156,11 +156,9 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
     parameters_.sensor_frame = scanner_frame;
   }
 
-  // if the future has completed, use the new map
-  //TODO: investigate if we need that
+  // If the future has completed, use the new map.
   processNewMapIfAvailable();
 
-  // IMPORTANT:  We need to receive the point clouds in local coordinates (scanner or robot)
   timer t;
 
   const size_t good_count(new_point_cloud->features.cols());
