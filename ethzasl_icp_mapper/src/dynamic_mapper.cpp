@@ -291,7 +291,7 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
   scanPub = n.advertise<sensor_msgs::PointCloud2>("corrected_scan", 2, true);
   outlierPub = n.advertise<sensor_msgs::PointCloud2>("outliers", 2, true);
   odomPub = n.advertise<nav_msgs::Odometry>("icp_odom", 50, true);
-  posePub = n.advertise<geometry_msgs::TransformStamped>("icp_pose", 50, true);
+  posePub = n.advertise<geometry_msgs::TransformStamped>("icp_pose", 50, false);
   odomErrorPub = n.advertise<nav_msgs::Odometry>("icp_error_odom", 50, true);
 
   // service initializations
