@@ -9,7 +9,7 @@ Parameters for Center for robotics summer school 2019
 		<include file="$(find rslidar_pointcloud)/launch/rs_lidar_16.launch">
 		</include>
 
-	<node name="mapper" type="dynamic_mapper" pkg="ethzasl_icp_mapper" output="screen" >
+	<node name="mapper" type="dynamic_mapper_node" pkg="ethzasl_icp_mapper" output="screen" >
 		<remap from="cloud_in" to="/rslidar_points" />
 		<param name="subscribe_scan" value="false"/>
 		<param name="subscribe_cad" value="true"/>
