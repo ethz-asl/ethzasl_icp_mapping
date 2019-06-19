@@ -1,8 +1,13 @@
-<!-- 
+<?xml version="1.0" encoding="utf-8"?>
+<!--
 Parameters for Center for robotics summer school 2019
 -->
 
 <launch>
+
+		<!-- Launch Robosense driver -->
+		<include file="$(find rslidar_pointcloud)/launch/rs_lidar_16.launch">
+		</include>
 
 	<node name="mapper" type="dynamic_mapper" pkg="ethzasl_icp_mapper" output="screen" >
 		<remap from="cloud_in" to="/rslidar_points" />
