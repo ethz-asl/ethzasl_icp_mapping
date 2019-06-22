@@ -118,7 +118,7 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2 &cloud_msg_in) {
               cloud_msg_in)));
 
       processCloud(move(cloud),
-                   cloud_msg_in.header.frame_id,
+                   parameters_.lidar_frame,
                    cloud_msg_in.header.stamp,
                    cloud_msg_in.header.seq);
     }
@@ -197,6 +197,8 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
   input_filters_.apply(*new_point_cloud);
 
   try {
+    std::cout << stamp << std::endl;
+    std::cout << scanner_frame << " to " << parameters_.tf_map_frame << std::endl;
     T_scanner_to_map_ = PointMatcher_ros::eigenMatrixToDim<float>(
         PointMatcher_ros::transformListenerToEigenMatrix<float>(
             tf_listener_,
