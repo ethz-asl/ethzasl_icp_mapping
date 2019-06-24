@@ -30,8 +30,6 @@ Parameters for Center for robotics summer school 2019
 		<param name="intensity_mode" value="1"/>
 	</node>
 
-	</launch>
-
 	<node name="mapper" type="dynamic_mapper_node" pkg="ethzasl_icp_mapper" output="screen" >
 		<remap from="cloud_in" to="/rslidar_points" />
 		<param name="subscribe_scan" value="false"/>
