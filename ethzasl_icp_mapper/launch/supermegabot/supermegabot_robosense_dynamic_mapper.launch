@@ -6,8 +6,31 @@ Parameters for Center for robotics summer school 2019
 <launch>
 
 		<!-- Launch Robosense driver -->
-		<include file="$(find rslidar_pointcloud)/launch/rs_lidar_16.launch">
-		</include>
+	<arg name="model" default="RS16" />
+	<arg name="device_ip" default="10.0.0.3" />
+	<arg name="msop_port" default="6699" />
+	<arg name="difop_port" default="7788" />
+	<arg name="lidar_param_path" default="$(find rslidar_pointcloud)/data/rs_lidar_16/"/>
+
+	<node  name="rslidar_node" pkg="rslidar_driver" type="rslidar_node" output="screen" >
+		<param name="model" value="$(arg model)"/>
+		<param name="device_ip" value="$(arg device_ip)" />
+		<param name="msop_port" value="$(arg msop_port)" />
+		<param name="difop_port" value="$(arg difop_port)"/>
+	</node>
+
+	<node  name="cloud_node" pkg="rslidar_pointcloud" type="cloud_node" output="screen" >
+		<param name="model" value="$(arg model)"/>
+		<param name="curves_path" value="$(arg lidar_param_path)/curves.csv" />
+		<param name="angle_path" value="$(arg lidar_param_path)/angle.csv" />
+		<param name="channel_path" value="$(arg lidar_param_path)/ChannelNum.csv" />
+		<param name="max_distance" value="20"/>
+		<param name="min_distance" value="0.2"/>
+		<param name="resolution_type" value="0.5cm"/>
+		<param name="intensity_mode" value="1"/>
+	</node>
+
+	</launch>
 
 	<node name="mapper" type="dynamic_mapper_node" pkg="ethzasl_icp_mapper" output="screen" >
 		<remap from="cloud_in" to="/rslidar_points" />
