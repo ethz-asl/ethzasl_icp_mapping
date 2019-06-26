@@ -56,7 +56,7 @@ class Mapper {
   void processCloud(unique_ptr<DP> cloud,
                     const std::string &scanner_frame,
                     const ros::Time &stamp,
-                    uint32_t seq);
+                    uint32_t seq, bool new_map);
   void processNewMapIfAvailable();
   void setMap(DP *new_point_cloud);
   DP *updateMap(DP *new_point_cloud,

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<launch>
+
+  <arg name="map_file" default="/home/johnny/.ros/finalMap.pcd" />
+  <arg name="map_frame"    default="map" />
+  <arg name="marker_frame" default="marker" />
+  <arg name="marker_frame2" default="marker2" />
+  <arg name="world_frame" default="world" />
+
+  <node name="map_interface_node" pkg="map_interface" type="map_interface_node" output="screen"/>
+    <param name="/map_file_pcd" value="$(arg map_file)" />
+
+  <node name="interactive_marker" pkg="map_interface" type="interactive_cloud.py" output="screen"/>
+    <param name="map_frame"      value="$(arg map_frame)" />
+    <param name="marker_frame"   value="$(arg marker_frame)" />
+    <param name="marker_frame2"   value="$(arg marker_frame2)" />
+
+</launch>

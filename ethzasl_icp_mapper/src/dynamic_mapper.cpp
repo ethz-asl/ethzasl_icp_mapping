@@ -40,7 +40,7 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
                              this);
   }
   if (parameters_.subscribe_cad) {
-    cad_sub_ = n.subscribe("cad_interface_node/cad_model",
+    cad_sub_ = n.subscribe("map_interface_node/map_model",
                            parameters_.input_queue_size,
                            &Mapper::gotCAD,
                            this);
@@ -88,6 +88,8 @@ Mapper::~Mapper() {
   // Save point cloud.
   if (map_point_cloud_) {
     map_point_cloud_->save(parameters_.vtk_final_map_name);
+    std::string pcd_name = "finalMap.pcd";
+    PointMatcherIO<float>::savePCD(*map_point_cloud_, pcd_name);
     delete map_point_cloud_;
   }
 }
@@ -120,15 +122,14 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2 &cloud_msg_in) {
       processCloud(move(cloud),
                    parameters_.lidar_frame,
                    cloud_msg_in.header.stamp,
-                   cloud_msg_in.header.seq);
+                   cloud_msg_in.header.seq, false);
     }
   }
 }
 
 void Mapper::gotCAD(const sensor_msgs::PointCloud2 &cloud_msg_in) {
   if (parameters_.cad_trigger) {
-    ROS_WARN_STREAM("Processing CAD");
-    std::cout << "getting cad" << std::endl;
+    ROS_WARN_STREAM("Processing loaded map");
     // Load the cad map as base map.
     parameters_.localizing = true;
     parameters_.mapping = true;
@@ -140,8 +141,7 @@ void Mapper::gotCAD(const sensor_msgs::PointCloud2 &cloud_msg_in) {
     processCloud(move(cloud),
                  cloud_msg_in.header.frame_id,
                  cloud_msg_in.header.stamp,
-                 cloud_msg_in.header.seq);
-    parameters_.mapping = false;
+                 cloud_msg_in.header.seq, true);
     parameters_.cad_trigger = false;
     publish_lock_.unlock();
   }
@@ -150,7 +150,7 @@ void Mapper::gotCAD(const sensor_msgs::PointCloud2 &cloud_msg_in) {
 void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
                           const std::string &scanner_frame,
                           const ros::Time &stamp,
-                          uint32_t seq) {
+                          uint32_t seq, bool new_map) {
 
   if (parameters_.sensor_frame == "") {
     parameters_.sensor_frame = scanner_frame;
@@ -234,10 +234,11 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
     return;
   }
 
-  if (!icp_.hasMap()) {
+  if (!icp_.hasMap() || new_map) {
     ROS_INFO_STREAM("[MAP] Creating an initial map");
     map_creation_time_ = stamp;
     setMap(updateMap(new_point_cloud.release(), T_scanner_to_map_, false));
+    parameters_.cad_trigger = false;
     return;
   }
 
@@ -486,7 +487,7 @@ Mapper::DP *Mapper::updateMap(DP *new_point_cloud,
     }
 
     if (!map_exists) {
-      ROS_DEBUG_STREAM("[MAP] Initial map, only filtering points");
+      ROS_INFO_STREAM("[MAP] Initial map, only filtering points");
       *new_point_cloud =
           transformation_->compute(*new_point_cloud,
                                    T_updated_scanner_to_map);
@@ -498,7 +499,7 @@ Mapper::DP *Mapper::updateMap(DP *new_point_cloud,
 
     // Early out if no map modification is wanted.
     if (!parameters_.mapping) {
-      ROS_DEBUG_STREAM("[MAP] Skipping modification of the map");
+      ROS_INFO_STREAM("[MAP] Skipping modification of the map");
       return map_point_cloud_;
     }
 

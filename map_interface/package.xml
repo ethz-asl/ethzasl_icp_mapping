@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>map_interface</name>
+  <version>0.1.0</version>
+  <description>
+    Interactive Point cloud loading.
+  </description>
+
+  <author email="gawela@ethz.ch">Abel Gawel</author>
+  <maintainer email="gawela@ethz.ch">Abel Gawel</maintainer>
+
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>catkin_simple</buildtool_depend>
+
+  <depend>eigen_catkin</depend>
+  <depend>geometry_msgs</depend>
+  <depend>interactive_markers</depend>
+  <depend>message_generation</depend>
+  <depend>message_runtime</depend>
+  <depend>pcl_catkin</depend>
+  <depend>roscpp</depend>
+  <depend>visualization_msgs</depend>
+  <depend>volumetric_msgs</depend>
+  <depend>waco_planner_msgs</depend>
+
+</package>
