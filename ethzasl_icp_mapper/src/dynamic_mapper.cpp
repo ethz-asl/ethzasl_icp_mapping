@@ -39,10 +39,10 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
                              &Mapper::gotCloud,
                              this);
   }
-  if (parameters_.subscribe_cad) {
-    cad_sub_ = n.subscribe("map_interface_node/map_model",
+  if (parameters_.subscribe_map) {
+    map_sub_ = n.subscribe("map_interface_node/map_model",
                            parameters_.input_queue_size,
-                           &Mapper::gotCAD,
+                           &Mapper::gotMap,
                            this);
   }
 
@@ -127,10 +127,10 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2 &cloud_msg_in) {
   }
 }
 
-void Mapper::gotCAD(const sensor_msgs::PointCloud2 &cloud_msg_in) {
-  if (parameters_.cad_trigger) {
+void Mapper::gotMap(const sensor_msgs::PointCloud2 &cloud_msg_in) {
+  if (parameters_.map_trigger) {
     ROS_WARN_STREAM("Processing loaded map");
-    // Load the cad map as base map.
+    // Load the map as base map.
     parameters_.localizing = true;
     parameters_.mapping = true;
     std_srvs::Empty::Request req;
@@ -142,7 +142,7 @@ void Mapper::gotCAD(const sensor_msgs::PointCloud2 &cloud_msg_in) {
                  cloud_msg_in.header.frame_id,
                  cloud_msg_in.header.stamp,
                  cloud_msg_in.header.seq, true);
-    parameters_.cad_trigger = false;
+    parameters_.map_trigger = false;
     publish_lock_.unlock();
   }
 }
@@ -238,7 +238,7 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
     ROS_INFO_STREAM("[MAP] Creating an initial map");
     map_creation_time_ = stamp;
     setMap(updateMap(new_point_cloud.release(), T_scanner_to_map_, false));
-    parameters_.cad_trigger = false;
+    parameters_.map_trigger = false;
     return;
   }
 
@@ -710,7 +710,7 @@ bool Mapper::initialTransform(ethzasl_icp_mapper::InitialTransform::Request &req
 
 bool Mapper::loadPublishedMap(std_srvs::Empty::Request &req,
                               std_srvs::Empty::Response &res) {
-  parameters_.cad_trigger = true;
+  parameters_.map_trigger = true;
 }
 
 bool Mapper::getBoundedMap(ethzasl_icp_mapper::GetBoundedMap::Request &req,

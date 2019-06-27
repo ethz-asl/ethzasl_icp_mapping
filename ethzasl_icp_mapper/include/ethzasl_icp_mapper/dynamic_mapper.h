@@ -52,7 +52,7 @@ class Mapper {
 
  protected:
   void gotCloud(const sensor_msgs::PointCloud2 &cloud_msg_in);
-  void gotCAD(const sensor_msgs::PointCloud2 &cloud_msg_in);
+  void gotMap(const sensor_msgs::PointCloud2 &cloud_msg_in);
   void processCloud(unique_ptr<DP> cloud,
                     const std::string &scanner_frame,
                     const ros::Time &stamp,
@@ -95,7 +95,7 @@ class Mapper {
 
   // Subscribers
   ros::Subscriber cloud_sub_;
-  ros::Subscriber cad_sub_;
+  ros::Subscriber map_sub_;
 
   // Publishers
   ros::Publisher map_pub_;

@@ -8,7 +8,7 @@ Parameters for Center for robotics summer school 2019
 	<node name="mapper" type="dynamic_mapper_node" pkg="ethzasl_icp_mapper" output="screen" >
 		<remap from="cloud_in" to="/rslidar_points" />
 		<param name="subscribe_scan" value="false"/>
-		<param name="subscribe_cad" value="true"/>
+		<param name="subscribe_map" value="true"/>
 		<param name="icpConfig"
 			   value="$(find ethzasl_icp_mapper)/launch/supermegabot/icp_dynamic.yaml" />
 		<param name="inputFiltersConfig"

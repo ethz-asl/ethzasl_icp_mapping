@@ -25,10 +25,10 @@ struct MapperParameters {
   double min_overlap;
   double max_overlap_to_merge;
   double tf_refresh_period;
-  bool cad_trigger;
+  bool map_trigger;
   bool use_logger;
   bool subscribe_cloud;
-  bool subscribe_cad;
+  bool subscribe_map;
   std::string sensor_frame;
   std::string odom_frame;
   std::string map_frame;

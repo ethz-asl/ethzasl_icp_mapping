@@ -30,10 +30,10 @@ MapperParameters::MapperParameters() :
     max_dyn(getParam<double>("maxDyn", 0.95)),
     max_dist_new_point(pow(getParam<double>("maxDistNewPoint", 0.1), 2)),
     sensor_max_range(getParam<double>("sensorMaxRange", 80.0)),
-    cad_trigger(false),
+    map_trigger(false),
     use_logger(getParam<bool>("useROSLogger", false)),
     subscribe_cloud(getParam<bool>("subscribe_cloud", true)),
-    subscribe_cad(getParam<bool>("subscribe_cad", true))
+    subscribe_map(getParam<bool>("subscribe_map", true))
 {
   // Ensure proper states.
   if (localizing == false)
