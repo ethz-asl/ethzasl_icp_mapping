@@ -1,6 +1,0 @@
-- SimpleSensorNoiseDataPointsFilter
-- SurfaceNormalDataPointsFilter:
-    knn: 3
-    keepNormals: 1
-- ObservationDirectionDataPointsFilter
-- OrientNormalsDataPointsFilter 

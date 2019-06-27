@@ -1,4 +1,0 @@
-- MaxDensityDataPointsFilter:
-   maxDensity: 10
-- MaxPointCountDataPointsFilter:
-    maxCount: 900000
