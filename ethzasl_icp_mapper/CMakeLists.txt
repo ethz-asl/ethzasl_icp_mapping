@@ -83,33 +83,7 @@ add_library(dynamic_mapper src/dynamic_mapper.cpp src/mapper_parameters.cpp)
 target_link_libraries(dynamic_mapper ${catkin_LIBRARIES}
 		${libpointmatcher_LIBRARIES})
 
-add_executable(matcher_service src/matcher_service.cpp)
-add_dependencies(matcher_service ${PROJECT_NAME}_gencpp)
-target_link_libraries(matcher_service ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
-
-add_executable(occupancy_grid_builder src/occupancy_grid_builder.cpp)
-add_dependencies(occupancy_grid_builder ${PROJECT_NAME}_gencpp)
-target_link_libraries(occupancy_grid_builder ${catkin_LIBRARIES} ${EXTRA_LIBS} ${libpointmatcher_LIBRARIES})
-
-add_executable(mapper src/mapper.cpp)
-add_dependencies(mapper ${PROJECT_NAME}_gencpp)
-target_link_libraries(mapper ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
-
-add_executable(map_maintainer src/map_maintainer.cpp )
-add_dependencies(map_maintainer ${PROJECT_NAME}_gencpp)
-target_link_libraries(map_maintainer ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
-
-add_executable(interact_mapper src/interact_mapper.cpp )
-add_dependencies(interact_mapper ${PROJECT_NAME}_gencpp)
-target_link_libraries(interact_mapper ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
-
 add_executable(dynamic_mapper_node src/dynamic_mapper_node.cpp )
 add_dependencies(dynamic_mapper_node ${PROJECT_NAME}_gencpp)
 target_link_libraries(dynamic_mapper_node ${catkin_LIBRARIES}
 		dynamic_mapper)
-
-add_executable(dynamic_trails src/dynamic_trails.cpp )
-add_dependencies(dynamic_trails ${PROJECT_NAME}_gencpp)
-target_link_libraries(dynamic_trails ${catkin_LIBRARIES} ${libpointmatcher_LIBRARIES})
-
-
