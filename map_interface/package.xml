@@ -19,10 +19,9 @@
   <depend>interactive_markers</depend>
   <depend>message_generation</depend>
   <depend>message_runtime</depend>
-  <depend>pcl_catkin</depend>
+  <depend>pcl_ros</depend>
   <depend>roscpp</depend>
   <depend>visualization_msgs</depend>
   <depend>volumetric_msgs</depend>
-  <depend>waco_planner_msgs</depend>
 
 </package>
