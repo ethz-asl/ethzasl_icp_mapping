@@ -7,7 +7,7 @@ Parameters for Center for robotics summer school 2019
 
 		<!-- Launch Robosense driver -->
 	<arg name="model" default="RS16" />
-	<arg name="device_ip" default="10.0.0.3" />
+	<arg name="device_ip" default="11.0.0.3" />
 	<arg name="msop_port" default="6699" />
 	<arg name="difop_port" default="7788" />
 	<arg name="lidar_param_path" default="$(find rslidar_pointcloud)/data/rs_lidar_16/"/>
