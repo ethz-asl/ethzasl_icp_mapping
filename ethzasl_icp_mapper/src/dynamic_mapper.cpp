@@ -599,7 +599,9 @@ bool Mapper::saveMap(map_msgs::SaveMap::Request &req,
     return false;
 
   try {
-    map_point_cloud_->save(req.filename.data);
+    map_point_cloud_->save(req.filename.data + ".vtk");
+    PointMatcherIO<float>::savePCD(*map_point_cloud_, req.filename.data + ".pcd");
+
   } catch (const std::runtime_error &e) {
     ROS_ERROR_STREAM("Unable to save: " << e.what());
     return false;
