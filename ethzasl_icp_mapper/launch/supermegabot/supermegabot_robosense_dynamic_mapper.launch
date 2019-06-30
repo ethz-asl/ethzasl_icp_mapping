@@ -25,7 +25,7 @@ Parameters for Center for robotics summer school 2019
 		<param name="angle_path" value="$(arg lidar_param_path)/angle.csv" />
 		<param name="channel_path" value="$(arg lidar_param_path)/ChannelNum.csv" />
 		<param name="max_distance" value="20"/>
-		<param name="min_distance" value="0.2"/>
+		<param name="min_distance" value="0.55"/>
 		<param name="resolution_type" value="0.5cm"/>
 		<param name="intensity_mode" value="1"/>
 	</node>
