@@ -11,6 +11,14 @@ tf_conversions
 eigen_conversions
 )
 
+find_package(Boost REQUIRED COMPONENTS 
+thread
+system
+filesystem
+program_options
+date_time
+chrono)
+
 # This was tested for a system install of libpointmatcher
 find_package(libpointmatcher CONFIG)
 
