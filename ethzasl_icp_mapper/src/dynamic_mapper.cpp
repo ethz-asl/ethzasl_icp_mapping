@@ -201,7 +201,7 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
         PointMatcher_ros::transformListenerToEigenMatrix<float>(
             tf_listener_,
             parameters_.tf_map_frame, // to
-            parameters_.lidar_frame, // from
+            scanner_frame, // from
             stamp
         ), dimp1);
   } catch (tf::ExtrapolationException e) {
