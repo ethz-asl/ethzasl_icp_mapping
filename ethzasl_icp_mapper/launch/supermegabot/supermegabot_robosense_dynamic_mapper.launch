@@ -43,7 +43,7 @@ Parameters for Center for robotics summer school 2019
 		<param name="publishMapTf" value="false"/>
 		<param name="odom_frame" value="/world" /> #lidar
 
-		<param name="lidar_frame" value="lidar" />
+		<param name="lidar_frame" value="rslidar" />
 		<param name="map_frame" value="/icp_map" />
 		<param name="tf_map_frame" value="/map" />
 		<param name="useROSLogger" value="true" />
