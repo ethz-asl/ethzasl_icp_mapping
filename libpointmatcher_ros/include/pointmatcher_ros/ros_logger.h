@@ -1,6 +1,7 @@
 #ifndef __ROS_LOGGER_H
 #define __ROS_LOGGER_H
 
+#include <ros/console.h>
 #include "pointmatcher/PointMatcher.h"
 
 namespace PointMatcherSupport

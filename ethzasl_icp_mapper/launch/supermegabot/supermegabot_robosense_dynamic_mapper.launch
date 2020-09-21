@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Parameters for Center for robotics summer school 2019
+-->
+
+<launch>
+
+		<!-- Launch Robosense driver -->
+	<arg name="model" default="RS16" />
+	<arg name="device_ip" default="11.0.0.3" />
+	<arg name="msop_port" default="6699" />
+	<arg name="difop_port" default="7788" />
+	<arg name="lidar_param_path" default="$(find rslidar_pointcloud)/data/rs_lidar_16/"/>
+
+	<node  name="rslidar_node" pkg="rslidar_driver" type="rslidar_node" output="screen" >
+		<param name="model" value="$(arg model)"/>
+		<param name="device_ip" value="$(arg device_ip)" />
+		<param name="msop_port" value="$(arg msop_port)" />
+		<param name="difop_port" value="$(arg difop_port)"/>
+	</node>
+
+	<node  name="cloud_node" pkg="rslidar_pointcloud" type="cloud_node" output="screen" >
+		<param name="model" value="$(arg model)"/>
+		<param name="curves_path" value="$(arg lidar_param_path)/curves.csv" />
+		<param name="angle_path" value="$(arg lidar_param_path)/angle.csv" />
+		<param name="channel_path" value="$(arg lidar_param_path)/ChannelNum.csv" />
+		<param name="max_distance" value="20"/>
+		<param name="min_distance" value="0.55"/>
+		<param name="resolution_type" value="0.5cm"/>
+		<param name="intensity_mode" value="1"/>
+	</node>
+
+	<node name="mapper" type="dynamic_mapper_node" pkg="ethzasl_icp_mapper" output="screen" >
+		<remap from="cloud_in" to="/rslidar_points" />
+		<param name="subscribe_scan" value="false"/>
+		<param name="subscribe_map" value="true"/>
+		<param name="icpConfig"
+			   value="$(find ethzasl_icp_mapper)/launch/supermegabot/icp_dynamic.yaml" />
+		<param name="inputFiltersConfig"
+			   value="$(find ethzasl_icp_mapper)/launch/supermegabot/input_filters.yaml" />
+		
+		<!--Put that back! -->
+		<param name="publishMapTf" value="false"/>
+		<param name="odom_frame" value="/world" /> #lidar
+
+		<param name="lidar_frame" value="lidar" />
+		<param name="map_frame" value="/icp_map" />
+		<param name="tf_map_frame" value="/map" />
+		<param name="useROSLogger" value="true" />
+		<param name="inputQueueSize" value="1" />
+		<param name="tfRefreshPeriod" value="0.005" />
+		<param name="minOverlap" value="0.2" />
+		<param name="maxOverlapToMerge" value="0.99" /> 
+		<param name="minReadingPointCount" value="1000" /> 
+		<param name="minMapPointCount" value="10000" /> <!-- quick fix to have map published each time -->
+
+		<!-- Parameters for dynamic elements -->
+		<param name="priorStatic" value="0.8"/>
+		<param name="priorDyn" value="0.2"/>
+		<param name="maxAngle" value="0.04"/>
+		<param name="eps_a" value="0.20"/>
+		<param name="eps_d" value="0.1"/>
+		<param name="alpha" value="0.99"/>
+		<param name="beta" value="0.90"/>
+		<param name="maxDyn" value="0.90"/>
+		<param name="maxDistNewPoint" value="0.05"/>
+
+	</node>
+
+</launch>

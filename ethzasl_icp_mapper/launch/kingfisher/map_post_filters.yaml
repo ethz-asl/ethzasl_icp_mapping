@@ -1,9 +1,0 @@
-- SurfaceNormalDataPointsFilter:
-    knn: 10
-    epsilon: 3.16
-    keepNormals: 0
-    keepDensities: 1
-- CutAtDescriptorThresholdDataPointsFilter:
-    descName: probabilityStatic
-    useLargerThan: 0
-    threshold: 0.1

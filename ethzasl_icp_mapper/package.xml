@@ -24,6 +24,8 @@
   <build_depend>tf2</build_depend>
   <build_depend>tf_conversions</build_depend>
   <build_depend>message_filters</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>message_runtime</build_depend>
   <build_depend>map_msgs</build_depend>
   <build_depend>libpointmatcher</build_depend>
   <build_depend>libpointmatcher_ros</build_depend>
@@ -43,6 +45,8 @@
   <run_depend>tf2</run_depend>
   <run_depend>tf_conversions</run_depend>
   <run_depend>message_filters</run_depend>
+  <run_depend>message_generation</run_depend>
+  <run_depend>message_runtime</run_depend>
   <run_depend>map_msgs</run_depend>
   <run_depend>libpointmatcher</run_depend>
   <run_depend>libpointmatcher_ros</run_depend>

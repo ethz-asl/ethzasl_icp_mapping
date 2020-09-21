@@ -1,0 +1,5 @@
+<launch>
+	<node name="rosbag_record" pkg="rosbag" type="record" output="screen" respawn="false" 
+        args="-o /home/smb/smb /rslidar_points /cam0/cam_info /cam0/image_raw /cam1/cam_info /cam1/image_raw /imu0  /wheelSpeeds">  
+	</node>
+</launch>

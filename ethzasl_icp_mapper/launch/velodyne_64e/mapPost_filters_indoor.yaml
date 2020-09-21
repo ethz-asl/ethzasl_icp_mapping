@@ -1,7 +1,0 @@
-- CutAtDescriptorThresholdDataPointsFilter:
-    descName: probabilityStatic
-    useLargerThan: 0
-    threshold: 0.2
-#- MaxPointCountDataPointsFilter:
-#    maxCount: 400000
-
