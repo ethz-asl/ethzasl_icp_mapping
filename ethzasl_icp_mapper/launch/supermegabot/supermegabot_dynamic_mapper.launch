@@ -8,7 +8,7 @@ Parameters for Center for robotics summer school 2019
 	<node name="mapper" type="dynamic_mapper_node" pkg="ethzasl_icp_mapper" output="screen" >
 		<remap from="cloud_in" to="/rslidar_points" />
 		<param name="subscribe_scan" value="false"/>
-		<param name="subscribe_map" value="true"/>
+		<param name="subscribe_map" value="false"/>
 		<param name="icpConfig"
 			   value="$(find ethzasl_icp_mapper)/launch/supermegabot/icp_dynamic.yaml" />
 		<param name="inputFiltersConfig"
@@ -25,21 +25,10 @@ Parameters for Center for robotics summer school 2019
 		<param name="inputQueueSize" value="1" />
 		<param name="tfRefreshPeriod" value="0.005" />
 		<param name="minOverlap" value="0.2" />
-		<param name="maxOverlapToMerge" value="0.99" /> 
+		<param name="maxOverlapToMerge" value="0.96" /> 
 		<param name="minReadingPointCount" value="1000" /> 
 		<param name="minMapPointCount" value="10000" /> <!-- quick fix to have map published each time -->
 		<param name="skip_frames" value="2" /> <!-- Skip this many frames before processing a new one-->
-
-		<!-- Parameters for dynamic elements -->
-		<param name="priorStatic" value="0.8"/>
-		<param name="priorDyn" value="0.2"/>
-		<param name="maxAngle" value="0.04"/>
-		<param name="eps_a" value="0.20"/>
-		<param name="eps_d" value="0.1"/>
-		<param name="alpha" value="0.99"/>
-		<param name="beta" value="0.90"/>
-		<param name="maxDyn" value="0.90"/>
-		<param name="maxDistNewPoint" value="0.05"/>
 
 	</node>
 
