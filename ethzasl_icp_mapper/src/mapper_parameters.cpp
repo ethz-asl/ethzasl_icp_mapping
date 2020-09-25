@@ -18,7 +18,7 @@ MapperParameters::MapperParameters() :
     odom_frame(getParam<std::string>("odom_frame", "odom")),
     map_frame(getParam<std::string>("map_frame", "world")),
     tf_map_frame(getParam<std::string>("tf_map_frame", "map")),
-    lidar_frame(getParam<std::string>("lidar_frame", "lidar")),
+    lidar_frame(getParam<std::string>("lidar_frame", "rslidar")),
     vtk_final_map_name(getParam<std::string>("vtkFinalMapName", "finalMap.vtk")),
     prior_dyn(getParam<double>("priorDyn", 0.5)),
     prior_static(1. - prior_dyn),
