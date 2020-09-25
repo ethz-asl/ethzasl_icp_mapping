@@ -28,6 +28,7 @@ Parameters for Center for robotics summer school 2019
 		<param name="maxOverlapToMerge" value="0.99" /> 
 		<param name="minReadingPointCount" value="1000" /> 
 		<param name="minMapPointCount" value="10000" /> <!-- quick fix to have map published each time -->
+		<param name="skip_frames" value="2" /> <!-- Skip this many frames before processing a new one-->
 
 		<!-- Parameters for dynamic elements -->
 		<param name="priorStatic" value="0.8"/>

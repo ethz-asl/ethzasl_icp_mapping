@@ -33,7 +33,8 @@ MapperParameters::MapperParameters() :
     map_trigger(false),
     use_logger(getParam<bool>("useROSLogger", false)),
     subscribe_cloud(getParam<bool>("subscribe_cloud", true)),
-    subscribe_map(getParam<bool>("subscribe_map", true))
+    subscribe_map(getParam<bool>("subscribe_map", true)),
+    skip_frames(getParam<int>("skip_frames", 0))
 {
   // Ensure proper states.
   if (localizing == false)

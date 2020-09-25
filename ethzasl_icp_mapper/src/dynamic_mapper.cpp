@@ -18,7 +18,8 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
     T_local_map_to_map_(PM::TransformationParameters::Identity(4, 4)),
     T_scanner_to_map_(PM::TransformationParameters::Identity(4, 4)),
     tf_listener_(ros::Duration(30)),
-    odom_received_(0) {
+    odom_received_(0),
+    scan_counter_(0) {
 
   if (parameters_.use_logger) {
     PointMatcherSupport::setLogger(make_shared<PointMatcherSupport::ROSLogger>());
@@ -115,14 +116,17 @@ void Mapper::gotCloud(const sensor_msgs::PointCloud2 &cloud_msg_in) {
         odom_received_++;
       }
     } else {
-      unique_ptr<DP> cloud
-          (new DP(PointMatcher_ros::rosMsgToPointMatcherCloud<float>(
-              cloud_msg_in)));
+        if (scan_counter_ == parameters_.skip_frames) {
+        unique_ptr<DP> cloud(new DP(
+            PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloud_msg_in)));
 
-      processCloud(move(cloud),
-                   parameters_.lidar_frame,
-                   cloud_msg_in.header.stamp,
-                   cloud_msg_in.header.seq, false);
+        processCloud(move(cloud), parameters_.lidar_frame,
+                     cloud_msg_in.header.stamp, cloud_msg_in.header.seq, false);
+            scan_counter_ = 0;
+      } else {
+            ++scan_counter_;
+            ROS_INFO_STREAM("Skipping frame " << scan_counter_ << "/" << parameters_.skip_frames);
+      }
     }
   }
 }

@@ -35,6 +35,7 @@ struct MapperParameters {
   std::string tf_map_frame;
   std::string lidar_frame;
   std::string vtk_final_map_name;
+  int skip_frames;
 
   // Parameters for dynamic filtering
   const float prior_dyn;
