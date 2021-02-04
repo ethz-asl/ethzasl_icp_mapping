@@ -144,7 +144,6 @@ class Mapper {
 
   MapperParameters parameters_;
   int odom_received_;
-  PM::TransformationParameters T_local_map_to_map_;
   PM::TransformationParameters T_scanner_to_odom_;
   PM::TransformationParameters T_odom_to_map_;
   boost::thread publish_thread_;
