@@ -30,5 +30,5 @@ Parameters for Center for robotics summer school 2019
 
 	</node>
 
-    <node pkg="tf" type="static_transform_publisher" name="tracking_cam_to_lidar" args="-0.2837 0.0087 0.045 0.0 0.0 -0.701 0.701  /camera_pose_frame /rslidar 100"/>
+    <node pkg="tf" type="static_transform_publisher" name="tracking_cam_to_lidar" args="-0.2837 0.0087 0.045 0.0 0.0 0.701 0.701  /camera_pose_frame /rslidar 100"/>
 </launch>
