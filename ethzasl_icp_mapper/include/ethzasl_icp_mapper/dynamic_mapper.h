@@ -145,13 +145,15 @@ class Mapper {
   MapperParameters parameters_;
   int odom_received_;
   PM::TransformationParameters T_local_map_to_map_;
-  PM::TransformationParameters T_scanner_to_map_;
+  PM::TransformationParameters T_scanner_to_odom_;
+  PM::TransformationParameters T_odom_to_map_;
   boost::thread publish_thread_;
   boost::mutex publish_lock_;
   boost::mutex icp_map_lock_;
   int scan_counter_;
 
   tf::TransformListener tf_listener_;
+  tf::TransformBroadcaster tf_broadcaster_;
 };
 
 }
