@@ -16,7 +16,7 @@ Parameters for Center for robotics summer school 2019
 		
 		<!--Put that back! -->
 		<param name="publishMapTf" value="false"/>
-		<param name="odom_frame" value="/tracking_cam_odom_frame" />
+		<param name="odom_frame" value="/camera_odom_frame" />
 		<param name="lidar_frame" value="/rslidar" />
 		<param name="map_frame" value="/map" />
 		<param name="useROSLogger" value="true" />
@@ -30,5 +30,5 @@ Parameters for Center for robotics summer school 2019
 
 	</node>
 
-    <node pkg="tf" type="static_transform_publisher" name="tracking_cam_to_lidar" args="0.0087 -0.2837 0.045 0.0 0.0 -0.701 0.701  /tracking_cam_pose_frame /rslidar 100"/>
+    <node pkg="tf" type="static_transform_publisher" name="tracking_cam_to_lidar" args="-0.2837 0.0087 0.045 0.0 0.0 -0.701 0.701  /camera_pose_frame /rslidar 100"/>
 </launch>
