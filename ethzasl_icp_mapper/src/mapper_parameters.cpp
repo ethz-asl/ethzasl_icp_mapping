@@ -15,6 +15,7 @@ MapperParameters::MapperParameters() :
     max_overlap_to_merge(getParam<double>("maxOverlapToMerge", 0.9)),
     tf_refresh_period(getParam<double>("tfRefreshPeriod", 0.01)),
     sensor_frame(getParam<std::string>("sensor_frame", "")),
+    base_frame(getParam<std::string>("base_frame", "base")),
     odom_frame(getParam<std::string>("odom_frame", "odom")),
     map_frame(getParam<std::string>("map_frame", "map")),
     lidar_frame(getParam<std::string>("lidar_frame", "rslidar")),

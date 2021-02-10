@@ -30,6 +30,7 @@ struct MapperParameters {
   bool subscribe_cloud;
   bool subscribe_map;
   std::string sensor_frame;
+  std::string base_frame;
   std::string odom_frame;
   std::string map_frame;
   std::string tf_map_frame;

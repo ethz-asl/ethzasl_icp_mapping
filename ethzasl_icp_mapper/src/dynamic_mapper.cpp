@@ -51,8 +51,11 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
   scan_pub_ = n.advertise<sensor_msgs::PointCloud2>("corrected_scan", 2, true);
   outlier_pub_ = n.advertise<sensor_msgs::PointCloud2>("outliers", 2, true);
   odom_pub_ = n.advertise<nav_msgs::Odometry>("icp_odom", 50, true);
+  odom_base_pub_ = n.advertise<nav_msgs::Odometry>("base_odom", 50, true);
   pose_pub_ =
       n.advertise<geometry_msgs::TransformStamped>("icp_pose", 50, true);
+  pose_base_pub_ =
+      n.advertise<geometry_msgs::TransformStamped>("base_pose", 50, true);
   odom_error_pub_ = n.advertise<nav_msgs::Odometry>("icp_error_odom", 50, true);
 
   get_point_map_srv_ =
@@ -285,6 +288,44 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
           parameters_.lidar_frame,
           parameters_.map_frame,
           stamp));
+    }
+    // Publish for base
+    try {
+      // Get transform scanner to base
+      PM::TransformationParameters T_scanner_to_base = PointMatcher_ros::eigenMatrixToDim<float>(
+          PointMatcher_ros::transformListenerToEigenMatrix<float>(
+              tf_listener_,
+              parameters_.base_frame, // to
+              parameters_.sensor_frame, // from
+              stamp
+          ), dimp1);
+      PM::TransformationParameters T_base_to_map = T_scanner_to_map * T_scanner_to_base.inverse();
+
+      // Publish odometry base
+      if (odom_base_pub_.getNumSubscribers()) {
+        odom_base_pub_.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(
+            T_base_to_map,
+            parameters_.map_frame,
+            stamp));
+      }
+      // Publish pose base.
+      if (pose_base_pub_.getNumSubscribers()) {
+        pose_base_pub_.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
+            T_base_to_map,
+            parameters_.base_frame,
+            parameters_.map_frame,
+            stamp));
+      }
+    } catch (tf::ExtrapolationException& e) {
+      ROS_WARN_STREAM("Extrapolation Exception. stamp = " << stamp << " now = "
+                                                          << ros::Time::now()
+                                                          << " delta = "
+                                                          << ros::Time::now()
+                                                              - stamp << endl
+                                                          << e.what());
+    } catch (...) {
+      // Everything else.
+      ROS_WARN_STREAM("Unexpected exception, ignoring base odometry.");
     }
     if (map_pub_.getNumSubscribers()) {
       map_pub_.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>

@@ -102,8 +102,10 @@ class Mapper {
   ros::Publisher scan_pub_;
   ros::Publisher outlier_pub_;
   ros::Publisher odom_pub_;
+  ros::Publisher odom_base_pub_;
   ros::Publisher odom_error_pub_;
   ros::Publisher pose_pub_;
+  ros::Publisher pose_base_pub_;
 
   // Services
   ros::ServiceServer get_point_map_srv_;
