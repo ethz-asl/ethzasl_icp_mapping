@@ -65,6 +65,8 @@ class Mapper {
   void waitForMapBuildingCompleted();
   void updateIcpMap(const DP *new_map_point_cloud);
   void loadExternalParameters();
+  void publishTransforms(const ros::Time &stamp);
+  void publishCallback(const ros::TimerEvent& event);
 
   // Services
   bool getPointMap(map_msgs::GetPointMap::Request &req,
@@ -120,6 +122,9 @@ class Mapper {
   ros::ServiceServer initial_transform_srv_;
   ros::ServiceServer load_published_map_srv_;
 
+  // Timers
+  ros::Timer publish_timer_;
+
   // Time
   ros::Time map_creation_time_;
   ros::Time last_poin_cloud_time_;
@@ -133,6 +138,7 @@ class Mapper {
   PM::ICPSequence icp_;
   shared_ptr<PM::Transformation> transformation_;
   shared_ptr<PM::DataPointsFilter> radius_filter_;
+  int dimp1_;
 
   // multi-threading mapper
 #if BOOST_VERSION >= 104100

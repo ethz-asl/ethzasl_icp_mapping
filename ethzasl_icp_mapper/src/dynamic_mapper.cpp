@@ -18,6 +18,7 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
     T_scanner_to_odom_(PM::TransformationParameters::Identity(4, 4)),
     T_odom_to_map_(PM::TransformationParameters::Identity(4, 4)),
     tf_listener_(ros::Duration(30)),
+    dimp1_(0),
     odom_received_(0),
     scan_counter_(0) {
 
@@ -76,6 +77,14 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
       pn.advertiseService("get_bounded_map", &Mapper::getBoundedMap, this);
   reload_all_yaml_srv_ =
       pn.advertiseService("reload_all_yaml", &Mapper::reloadallYaml, this);
+
+  // Setup timer for publishing tf and odometry
+  float rate = pn.param("publish_rate", 0.0);
+  if (rate > 0) {
+    ros::Duration timer_period(1.0 / rate);
+    publish_timer_ = pn.createTimer(
+        timer_period, &Mapper::publishCallback, this);
+  }
 }
 
 Mapper::~Mapper() {
@@ -155,7 +164,7 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
   }
 
   // Dimension of the point cloud, important since we handle 2D and 3D.
-  const int dimp1(new_point_cloud->features.rows());
+  dimp1_ = new_point_cloud->features.rows();
 
   // This need to be depreciated, there is addTime for those field in pm.
   if (!(new_point_cloud->descriptorExists("stamps_Msec")
@@ -190,7 +199,7 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
             parameters_.odom_frame, // to
             scanner_frame, // from
             stamp
-        ), dimp1);
+        ), dimp1_);
   } catch (tf::ExtrapolationException e) {
     ROS_ERROR_STREAM("Extrapolation Exception. stamp = " << stamp << " now = "
                                                          << ros::Time::now()
@@ -268,65 +277,10 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
           "[ICP] Estimated overlap too small, ignoring ICP correction!");
       return;
     }
-    // Publish tf.
-    tf_broadcaster_.sendTransform(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
-        T_odom_to_map_,
-        parameters_.odom_frame,
-        parameters_.map_frame,
-        stamp));
-    // Publish odometry.
-    if (odom_pub_.getNumSubscribers()) {
-      odom_pub_.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(
-          T_updated_scanner_to_map,
-          parameters_.map_frame,
-          stamp));
-    }
-    // Publish pose.
-    if (pose_pub_.getNumSubscribers()) {
-      pose_pub_.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
-          T_updated_scanner_to_map,
-          parameters_.lidar_frame,
-          parameters_.map_frame,
-          stamp));
-    }
-    // Publish for base
-    try {
-      // Get transform scanner to base
-      PM::TransformationParameters T_scanner_to_base = PointMatcher_ros::eigenMatrixToDim<float>(
-          PointMatcher_ros::transformListenerToEigenMatrix<float>(
-              tf_listener_,
-              parameters_.base_frame, // to
-              parameters_.sensor_frame, // from
-              stamp
-          ), dimp1);
-      PM::TransformationParameters T_base_to_map = T_scanner_to_map * T_scanner_to_base.inverse();
 
-      // Publish odometry base
-      if (odom_base_pub_.getNumSubscribers()) {
-        odom_base_pub_.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(
-            T_base_to_map,
-            parameters_.map_frame,
-            stamp));
-      }
-      // Publish pose base.
-      if (pose_base_pub_.getNumSubscribers()) {
-        pose_base_pub_.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
-            T_base_to_map,
-            parameters_.base_frame,
-            parameters_.map_frame,
-            stamp));
-      }
-    } catch (tf::ExtrapolationException& e) {
-      ROS_WARN_STREAM("Extrapolation Exception. stamp = " << stamp << " now = "
-                                                          << ros::Time::now()
-                                                          << " delta = "
-                                                          << ros::Time::now()
-                                                              - stamp << endl
-                                                          << e.what());
-    } catch (...) {
-      // Everything else.
-      ROS_WARN_STREAM("Unexpected exception, ignoring base odometry.");
-    }
+    // Publish pose and odom transforms
+    publishTransforms(stamp);
+    // Publish map
     if (map_pub_.getNumSubscribers()) {
       map_pub_.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>
                            (*map_point_cloud_,
@@ -422,6 +376,80 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
 
   last_poin_cloud_time_ = stamp;
   last_point_cloud_seq_ = seq;
+}
+
+void Mapper::publishCallback(const ros::TimerEvent& event) {
+  publishTransforms(event.current_real);
+}
+
+void Mapper::publishTransforms(const ros::Time &stamp) {
+  // Check if initialized
+  if (dimp1_ == 0) {
+    return;
+  }
+
+  PM::TransformationParameters T_scanner_to_map = T_odom_to_map_ * T_scanner_to_odom_;
+  
+  // Publish tf.
+  tf_broadcaster_.sendTransform(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
+      T_odom_to_map_,
+      parameters_.odom_frame,
+      parameters_.map_frame,
+      stamp));
+  // Publish odometry.
+  if (odom_pub_.getNumSubscribers()) {
+    odom_pub_.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(
+        T_scanner_to_map,
+        parameters_.map_frame,
+        stamp));
+  }
+  // Publish pose.
+  if (pose_pub_.getNumSubscribers()) {
+    pose_pub_.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
+        T_scanner_to_map,
+        parameters_.lidar_frame,
+        parameters_.map_frame,
+        stamp));
+  }
+
+  // Publish for base
+  try {
+    // Get transform scanner to base
+    PM::TransformationParameters T_scanner_to_base = PointMatcher_ros::eigenMatrixToDim<float>(
+        PointMatcher_ros::transformListenerToEigenMatrix<float>(
+            tf_listener_,
+            parameters_.base_frame, // to
+            parameters_.sensor_frame, // from
+            stamp
+        ), dimp1_);
+    PM::TransformationParameters T_base_to_map = T_scanner_to_map * T_scanner_to_base.inverse();
+
+    // Publish odometry base
+    if (odom_base_pub_.getNumSubscribers()) {
+      odom_base_pub_.publish(PointMatcher_ros::eigenMatrixToOdomMsg<float>(
+          T_base_to_map,
+          parameters_.map_frame,
+          stamp));
+    }
+    // Publish pose base.
+    if (pose_base_pub_.getNumSubscribers()) {
+      pose_base_pub_.publish(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
+          T_base_to_map,
+          parameters_.base_frame,
+          parameters_.map_frame,
+          stamp));
+    }
+  } catch (tf::ExtrapolationException& e) {
+    ROS_WARN_STREAM("Extrapolation Exception. stamp = " << stamp << " now = "
+                                                        << ros::Time::now()
+                                                        << " delta = "
+                                                        << ros::Time::now()
+                                                            - stamp << endl
+                                                        << e.what());
+  } catch (...) {
+    // Everything else.
+    ROS_ERROR_STREAM("Unexpected exception, ignoring base odometry.");
+  }
 }
 
 void Mapper::processNewMapIfAvailable() {
