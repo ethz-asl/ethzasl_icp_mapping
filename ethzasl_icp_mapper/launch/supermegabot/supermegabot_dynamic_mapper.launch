@@ -17,9 +17,9 @@ Parameters for Center for robotics summer school 2019
 			   value="$(find ethzasl_icp_mapper)/launch/supermegabot/input_filters.yaml" />
 		
 		<!--Put that back! -->
-		<param name="publishMapTf" value="false"/>
-		<param name="odom_frame" value="/realsense_t265_odom_frame" />
-		<param name="base_frame" value="/base" />
+		<param name="publishMapTf" value="true"/>
+		<param name="odom_frame" value="/odom" />
+		<param name="base_frame" value="/base_link" />
 		<param name="lidar_frame" value="/rslidar" />
 		<param name="map_frame" value="$(arg map_frame)" />
 		<param name="useROSLogger" value="true" />
@@ -34,5 +34,5 @@ Parameters for Center for robotics summer school 2019
 	</node>
 
 	<node pkg="tf" type="static_transform_publisher" name="tracking_cam_to_base"
-				args="-0.309 -0.008 -0.351 0 0 0 1  /realsense_t265_pose_frame /base 100"/>
+				args="-0.309 -0.008 -0.351 0 0 0 1  /realsense_t265_pose_frame /base_link 100"/>
 </launch>
