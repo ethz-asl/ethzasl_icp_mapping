@@ -1,10 +1,10 @@
 #ifndef __POINTMATCHER_ROS_POINT_CLOUD_H
 #define __POINTMATCHER_ROS_POINT_CLOUD_H
 
-#include "pointmatcher/PointMatcher.h"
-#include "pointmatcher/IO.h"
-#include "sensor_msgs/PointCloud2.h"
-#include "sensor_msgs/LaserScan.h"
+#include <pointmatcher/PointMatcher.h>
+#include <pointmatcher/IO.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/LaserScan.h>
 
 namespace ros
 {
