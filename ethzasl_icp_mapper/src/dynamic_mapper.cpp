@@ -392,9 +392,9 @@ void Mapper::publishTransforms(const ros::Time &stamp) {
   
   // Publish tf.
   tf_broadcaster_.sendTransform(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
-      T_odom_to_map_,
-      parameters_.odom_frame,
+      T_odom_to_map_.inverse(),
       parameters_.map_frame,
+      parameters_.odom_frame,
       stamp));
   // Publish odometry.
   if (odom_pub_.getNumSubscribers()) {
