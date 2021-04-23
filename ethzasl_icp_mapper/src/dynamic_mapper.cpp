@@ -16,7 +16,7 @@ Mapper::Mapper(ros::NodeHandle &n, ros::NodeHandle &pn) :
     map_building_in_progress_(false),
 #endif // BOOST_VERSION >= 104100
     T_scanner_to_odom_(PM::TransformationParameters::Identity(4, 4)),
-    T_map_to_odom_(PM::TransformationParameters::Identity(4, 4)),
+    T_odom_to_map_(PM::TransformationParameters::Identity(4, 4)),
     tf_listener_(ros::Duration(30)),
     dimp1_(0),
     odom_received_(0),
@@ -220,7 +220,7 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
 
   const PM::TransformationParameters T_scanner_to_map =
       transformation_->correctParameters(
-          T_map_to_odom_.inverse() * T_scanner_to_odom_);
+          T_odom_to_map_ * T_scanner_to_odom_);
 
   pts_count = new_point_cloud->getNbPoints();
   if (pts_count < parameters_.min_reading_point_count) {
@@ -262,7 +262,7 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
 
     icp_map_lock_.unlock();
 
-    T_map_to_odom_ = T_scanner_to_odom_.inverse() * T_updated_scanner_to_map;
+    T_odom_to_map_ = T_updated_scanner_to_map * T_scanner_to_odom_.inverse();
 
     ROS_DEBUG_STREAM(
         "[ICP] T_updatedScanner_to_map:\n" << T_updated_scanner_to_map);
@@ -388,11 +388,11 @@ void Mapper::publishTransforms(const ros::Time &stamp) {
     return;
   }
 
-  PM::TransformationParameters T_scanner_to_map = T_map_to_odom_.inverse() * T_scanner_to_odom_;
+  PM::TransformationParameters T_scanner_to_map = T_odom_to_map_ * T_scanner_to_odom_;
   
   // Publish tf.
   tf_broadcaster_.sendTransform(PointMatcher_ros::eigenMatrixToTransformStamped<float>(
-      T_map_to_odom_,
+      T_odom_to_map_.inverse(),
       parameters_.map_frame,
       parameters_.odom_frame,
       stamp));
@@ -674,7 +674,7 @@ bool Mapper::loadMap(ethzasl_icp_mapper::LoadMap::Request &req,
   }
 
   T_scanner_to_odom_ = PM::TransformationParameters::Identity(dim, dim);
-  T_map_to_odom_ = PM::TransformationParameters::Identity(dim, dim);
+  T_odom_to_map_ = PM::TransformationParameters::Identity(dim, dim);
   //TODO: check that...
   parameters_.mapping = true;
   setMap(updateMap(cloud,
@@ -692,7 +692,7 @@ bool Mapper::reset(std_srvs::Empty::Request &req,
   publish_lock_.lock();
   // WARNING: this will break in 2D.
   T_scanner_to_odom_ = PM::TransformationParameters::Identity(4, 4);
-  T_map_to_odom_ = PM::TransformationParameters::Identity(4, 4);
+  T_odom_to_map_ = PM::TransformationParameters::Identity(4, 4);
   publish_lock_.unlock();
 
   icp_.clearMap();
