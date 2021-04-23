@@ -65,6 +65,8 @@ class Mapper {
   void waitForMapBuildingCompleted();
   void updateIcpMap(const DP *new_map_point_cloud);
   void loadExternalParameters();
+  void publishTransforms(const ros::Time &stamp);
+  void publishCallback(const ros::TimerEvent& event);
 
   // Services
   bool getPointMap(map_msgs::GetPointMap::Request &req,
@@ -102,8 +104,10 @@ class Mapper {
   ros::Publisher scan_pub_;
   ros::Publisher outlier_pub_;
   ros::Publisher odom_pub_;
+  ros::Publisher odom_base_pub_;
   ros::Publisher odom_error_pub_;
   ros::Publisher pose_pub_;
+  ros::Publisher pose_base_pub_;
 
   // Services
   ros::ServiceServer get_point_map_srv_;
@@ -118,6 +122,9 @@ class Mapper {
   ros::ServiceServer initial_transform_srv_;
   ros::ServiceServer load_published_map_srv_;
 
+  // Timers
+  ros::Timer publish_timer_;
+
   // Time
   ros::Time map_creation_time_;
   ros::Time last_poin_cloud_time_;
@@ -131,6 +138,7 @@ class Mapper {
   PM::ICPSequence icp_;
   shared_ptr<PM::Transformation> transformation_;
   shared_ptr<PM::DataPointsFilter> radius_filter_;
+  int dimp1_;
 
   // multi-threading mapper
 #if BOOST_VERSION >= 104100
@@ -144,14 +152,15 @@ class Mapper {
 
   MapperParameters parameters_;
   int odom_received_;
-  PM::TransformationParameters T_local_map_to_map_;
-  PM::TransformationParameters T_scanner_to_map_;
+  PM::TransformationParameters T_scanner_to_odom_;
+  PM::TransformationParameters T_odom_to_map_;
   boost::thread publish_thread_;
   boost::mutex publish_lock_;
   boost::mutex icp_map_lock_;
   int scan_counter_;
 
   tf::TransformListener tf_listener_;
+  tf::TransformBroadcaster tf_broadcaster_;
 };
 
 }
