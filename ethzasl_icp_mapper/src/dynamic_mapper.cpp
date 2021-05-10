@@ -216,6 +216,9 @@ void Mapper::processCloud(unique_ptr<DP> new_point_cloud,
                                                              - stamp << endl
                                                          << e.what());
     return;
+  } catch( const std::exception &e) {
+    ROS_ERROR_STREAM("Unexpected exception: " << e.what() << ". Inoring scan.");
+    return;
   } catch (...) {
     // Everything else.
     ROS_ERROR_STREAM("Unexpected exception... ignoring scan.");
@@ -461,10 +464,11 @@ void Mapper::updateIcpMap(const DP *new_map_point_cloud) {
 
     icp_.setMap(local_map);
     icp_map_lock_.unlock();
+  } catch( const std::exception &e) {
+    ROS_ERROR_STREAM("Unexpected exception: " << e.what() << ". Ignoring scan B");
   } catch (...) {
     // Everything else.
     ROS_ERROR_STREAM("Unexpected exception... ignoring scan B");
-    return;
   }
 }
 
@@ -679,7 +683,11 @@ bool Mapper::correctPose(ethzasl_icp_mapper::CorrectPose::Request &req,
             ), dim);
 
     updateIcpMap(map_point_cloud_);
-  } catch (...) {
+  } catch( const std::exception &e) {
+    publish_lock_.unlock();
+    ROS_ERROR_STREAM("Unexpected exception: " << e.what() << ". Inoring scan C");
+    return false;
+  }  catch (...) {
     // everything else
     publish_lock_.unlock();
     ROS_ERROR_STREAM("Unexpected exception... ignoring scan C");
