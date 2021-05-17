@@ -5,7 +5,7 @@ Parameters for Center for robotics summer school 2019
 
 <launch>
 
-	<arg name="map_frame" default="/map"/>
+	<arg name="map_frame" default="map"/>
 
 	<node name="mapper" type="dynamic_mapper_node" pkg="ethzasl_icp_mapper" output="screen" >
 		<remap from="cloud_in" to="/rslidar_points" />
@@ -18,9 +18,9 @@ Parameters for Center for robotics summer school 2019
 		
 		<!--Put that back! -->
 		<param name="publishMapTf" value="true"/>
-		<param name="odom_frame" value="/realsense_t265_odom_frame" />
-		<param name="base_frame" value="/base" />
-		<param name="lidar_frame" value="/rslidar" />
+		<param name="odom_frame" value="odom" />
+		<param name="base_frame" value="base_link" />
+		<param name="lidar_frame" value="rslidar" />
 		<param name="map_frame" value="$(arg map_frame)" />
 		<param name="useROSLogger" value="true" />
 		<param name="inputQueueSize" value="1" />
