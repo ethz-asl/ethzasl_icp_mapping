@@ -661,6 +661,41 @@ bool Mapper::loadMap(ethzasl_icp_mapper::LoadMap::Request &req,
 
   DP *cloud(new DP(DP::load(req.filename.data)));
 
+  if (parameters_.process_loaded_map) {
+    // NOTE(schmluk): This is just a quick re-implementation of the processing.
+    // Nothing nice.
+    ROS_WARN_STREAM("Processing loaded map.");
+    // Load the map as base map.
+    std_srvs::Empty::Request req;
+    std_srvs::Empty::Response res;
+    reset(req, res);
+    const size_t good_count(cloud->features.cols());
+    if (good_count == 0) {
+      ROS_ERROR("I found no good points in the loaded map");
+      return false;
+    }
+
+    // This need to be depreciated, there is addTime for those field in pm.
+    const ros::Time stamp = ros::Time::now();
+    if (!(cloud->descriptorExists("stamps_Msec") &&
+          cloud->descriptorExists("stamps_sec") &&
+          cloud->descriptorExists("stamps_nsec"))) {
+
+      const float Msec = round(stamp.sec / 1e6);
+      const float sec = round(stamp.sec - Msec * 1e6);
+      const float nsec = round(stamp.nsec);
+
+      const PM::Matrix desc_Msec = PM::Matrix::Constant(1, good_count, Msec);
+      const PM::Matrix desc_sec = PM::Matrix::Constant(1, good_count, sec);
+      const PM::Matrix desc_nsec = PM::Matrix::Constant(1, good_count, nsec);
+      cloud->addDescriptor("stamps_Msec", desc_Msec);
+      cloud->addDescriptor("stamps_sec", desc_sec);
+      cloud->addDescriptor("stamps_nsec", desc_nsec);
+    }
+
+    input_filters_.apply(*cloud);
+  }
+
   // Print new map information.
   const int dim = cloud->features.rows();
   const int nbPts = cloud->features.cols();
